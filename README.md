@@ -10,7 +10,7 @@ This project uses Flutter and can be developed either locally or using GitHub Co
 
 1. Click the "Code" button on the GitHub repository
 2. Select "Create codespace on main"
-3. Wait for the container to build and VS Code to load
+3. Wait for the container to build (prebuilds enabled to speed the process) and VS Code to load
 4. The development environment will be automatically configured with:
    - Flutter SDK (stable channel)
    - Android SDK
