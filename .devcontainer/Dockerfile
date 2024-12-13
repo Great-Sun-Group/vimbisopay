@@ -3,58 +3,89 @@ FROM ubuntu:22.04
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Configure Flutter version
-ARG FLUTTER_VERSION=stable
-ENV FLUTTER_ROOT=/usr/local/flutter
-ENV FLUTTER_HOME=/usr/local/flutter
-
-# Configure Android SDK version
-ENV ANDROID_SDK_ROOT=/usr/local/android-sdk
-ENV ANDROID_SDK_HOME=/usr/local/android-sdk
-ENV ANDROID_HOME=/usr/local/android-sdk
-ENV ANDROID_SDK_TOOLS_VERSION=9477386
-
-# Setup essential packages
-RUN apt-get update && apt-get install -y \
-    curl \
+# Configure apt and install packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    apt-utils \
     git \
+    curl \
     unzip \
     xz-utils \
     zip \
     libglu1-mesa \
-    openjdk-11-jdk \
+    openjdk-17-jdk \
     wget \
-    clang \
-    cmake \
+    xauth \
+    libpulse0 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxi6 \
+    libxtst6 \
+    libnss3 \
+    libcups2 \
+    libxss1 \
+    libxrandr2 \
+    libasound2 \
+    libatk1.0-0 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
     ninja-build \
     pkg-config \
-    libgtk-3-dev \
-    liblzma-dev \
-    python3 \
-    python3-pip \
+    cmake \
+    make \
+    # Clean up
+    && apt-get autoremove -y \
+    && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Flutter
-RUN git clone -b ${FLUTTER_VERSION} https://github.com/flutter/flutter.git ${FLUTTER_ROOT}
-
-# Install Android SDK
-RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS_VERSION}_latest.zip && \
-    unzip *tools*linux*.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/latest && \
-    rm *tools*linux*.zip
-
-# Set environment variables
-ENV PATH=${PATH}:${FLUTTER_ROOT}/bin:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools
-
-# Accept Android SDK licenses
-RUN yes "y" | sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
-
-# Pre-download Flutter artifacts
-RUN flutter precache
-
-# Verify flutter installation
-RUN flutter doctor
 
 # Switch back to dialog for any ad-hoc use of apt-get
 ENV DEBIAN_FRONTEND=dialog
+
+# Setup Android SDK with minimal components needed
+ENV ANDROID_SDK_ROOT /usr/local/android-sdk
+ENV ANDROID_HOME /usr/local/android-sdk
+ENV PATH ${PATH}:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools
+
+RUN mkdir -p ${ANDROID_SDK_ROOT} \
+    && cd ${ANDROID_SDK_ROOT} \
+    && curl -C - --output commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+    && unzip commandlinetools.zip \
+    && rm commandlinetools.zip \
+    && mkdir -p cmdline-tools/latest \
+    && mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true \
+    && cd cmdline-tools/latest/bin \
+    && yes | ./sdkmanager --licenses \
+    && ./sdkmanager --update \
+    && ./sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+# Setup Flutter
+ENV FLUTTER_HOME /usr/local/flutter
+ENV PATH ${PATH}:${FLUTTER_HOME}/bin
+
+# Clone Flutter stable channel
+RUN git clone https://github.com/flutter/flutter.git ${FLUTTER_HOME} \
+    && cd ${FLUTTER_HOME} \
+    && git checkout stable
+
+# Create vscode user
+RUN useradd -ms /bin/bash vscode
+
+# Set proper ownership
+RUN chown -R vscode:vscode ${FLUTTER_HOME}
+RUN chown -R vscode:vscode ${ANDROID_SDK_ROOT}
+
+# Switch to non-root user
+USER vscode
+
+# Configure Git for the vscode user
+RUN git config --global --add safe.directory ${FLUTTER_HOME}
+
+# Update Flutter and configure
+RUN flutter upgrade && \
+    flutter config --no-analytics && \
+    flutter config --enable-web && \
+    flutter doctor
+
+# Verify installation
+RUN flutter --version

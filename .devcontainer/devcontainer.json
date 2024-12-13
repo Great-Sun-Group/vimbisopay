@@ -10,19 +10,14 @@
       "installOhMyZsh": true,
       "upgradePackages": true
     },
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/git:1": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "Dart-Code.dart-code",
         "Dart-Code.flutter",
-        "usernamehw.errorlens",
-        "streetsidesoftware.code-spell-checker",
-        "eamodio.gitlens",
-        "ryanluker.vscode-coverage-gutters",
-        "saoudrizwan.claude-dev"
+        "usernamehw.errorlens"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -49,10 +44,9 @@
     }
   },
   "forwardPorts": [
-    3000,
-    9100
+    3000
   ],
-  "postCreateCommand": "chmod +x projects/*.sh && flutter doctor",
+  "postCreateCommand": "flutter doctor && flutter pub add dio flutter_secure_storage jwt_decoder && mkdir -p lib/{api,models,services}",
   "remoteUser": "vscode",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"

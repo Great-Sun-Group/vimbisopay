@@ -1,6 +1,6 @@
 # VimbisoPay
 
-VimbisoPay client to manage your payments, accounts, corporations, and portfolios in the credex ecosystem.
+Client app to manage your payments, accounts, corporations, and portfolios in the credex ecosystem.
 
 ## Development Setup
 
@@ -28,9 +28,6 @@ This project uses Flutter and can be developed either locally or using GitHub Co
    - Dart-Code.dart-code
    - Dart-Code.flutter
    - usernamehw.errorlens
-   - streetsidesoftware.code-spell-checker
-   - eamodio.gitlens
-   - ryanluker.vscode-coverage-gutters
 
 #### Setup Steps
 
@@ -57,11 +54,23 @@ The development environment includes:
 - 80-character line length ruler
 - Git configuration persistence
 
+## API Documentation
+
+The project includes a Makefile target to fetch and process the latest Swagger documentation from the Credex API:
+
+```bash
+make update-swagger
+```
+
+This command will:
+1. Fetch the latest Swagger documentation from https://docs.mycredex.app/develop/swagger.json/
+2. Parse and format it for better readability
+3. Save it to the `api-docs` directory
+
 ## Ports
 
 The development environment forwards the following ports:
 - 3000: Flutter web development
-- 9100: Flutter debugging
 
 ## Getting Started
 
