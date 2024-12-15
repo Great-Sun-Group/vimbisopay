@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import 'auth_screen.dart';
-import 'forgot_password_screen.dart';
-import '../../infrastructure/repositories/account_repository_impl.dart';
-import '../../infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

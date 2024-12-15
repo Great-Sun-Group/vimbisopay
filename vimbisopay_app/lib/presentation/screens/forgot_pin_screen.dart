@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../infrastructure/services/security_service.dart';
-import '../../infrastructure/repositories/account_repository_impl.dart';
-import '../../infrastructure/database/database_helper.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
 class ForgotPINScreen extends StatefulWidget {
-  const ForgotPINScreen({Key? key}) : super(key: key);
+  const ForgotPINScreen({super.key});
 
   @override
   State<ForgotPINScreen> createState() => _ForgotPINScreenState();

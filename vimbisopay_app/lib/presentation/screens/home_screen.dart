@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../infrastructure/services/security_service.dart';
-import '../../infrastructure/database/database_helper.dart';
-import '../../core/theme/app_colors.dart';
-import 'auth_screen.dart';
-import 'settings_screen.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

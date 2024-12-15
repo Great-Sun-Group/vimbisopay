@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../../domain/entities/user.dart';
-import '../services/encryption_service.dart';
-import '../services/security_service.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/infrastructure/services/encryption_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -25,7 +25,7 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'vimbisopay.db');
+    final String path = join(await getDatabasesPath(), 'vimbisopay.db');
     return await openDatabase(
       path,
       version: 2,
@@ -93,8 +93,8 @@ class DatabaseHelper {
       if (maps.isEmpty) return null;
 
       // Decrypt the token before creating the User object
-      String encryptedToken = maps.first['token'] as String;
-      String token =encryptedToken;
+      final String encryptedToken = maps.first['token'] as String;
+      final String token =encryptedToken;
       try{
       final token =
           await _encryptionService.decryptToken(encryptedToken);

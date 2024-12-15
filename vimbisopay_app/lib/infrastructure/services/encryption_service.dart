@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:crypto/crypto.dart';
-import '../../core/config/encryption_config.dart';
-import 'security_service.dart';
+import 'package:vimbisopay_app/core/config/encryption_config.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class EncryptionService {
   final SecurityService _securityService;
