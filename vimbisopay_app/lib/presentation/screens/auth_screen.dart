@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../infrastructure/services/security_service.dart';
-import '../../infrastructure/repositories/account_repository_impl.dart';
-import '../../infrastructure/database/database_helper.dart';
-import '../../domain/entities/user.dart';
-import '../../core/theme/app_colors.dart';
-import 'security_setup_screen.dart';
-import 'login_screen.dart';
-import 'forgot_pin_screen.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/presentation/screens/forgot_pin_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/login_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   final User? user;
@@ -236,10 +236,10 @@ class _AuthScreenState extends State<AuthScreen> {
       await _saveUserAndNavigateHome();
     } else if (mounted && !_isDisposed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Invalid PIN. Please try again.'),
+        const SnackBar(
+          content: Text('Invalid PIN. Please try again.'),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
       setState(() {

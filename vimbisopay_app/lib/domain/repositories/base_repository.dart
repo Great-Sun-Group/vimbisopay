@@ -1,5 +1,5 @@
 import 'package:dartz/dartz.dart';
-import '../../core/error/failures.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 
 // Base repository interface that all repositories should implement
 // Uses Either type from dartz for functional error handling

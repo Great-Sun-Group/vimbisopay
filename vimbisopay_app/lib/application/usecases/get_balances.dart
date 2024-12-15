@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
-import '../../core/error/failures.dart';
-import '../../domain/repositories/account_repository.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
+import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 
 /// Use case for retrieving current account balances
 class GetBalances {

@@ -1,4 +1,4 @@
-import 'base_entity.dart';
+import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 
 class Account extends Entity {
   final String handle;

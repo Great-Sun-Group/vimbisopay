@@ -1,7 +1,7 @@
 import 'package:dartz/dartz.dart';
-import '../entities/account.dart';
-import '../entities/user.dart';
-import '../../core/error/failures.dart';
+import 'package:vimbisopay_app/domain/entities/account.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../infrastructure/services/security_service.dart';
-import '../../infrastructure/repositories/account_repository_impl.dart';
-import '../../domain/entities/user.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class SecuritySetupScreen extends StatefulWidget {
   final User user;
@@ -181,8 +181,8 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('PINs do not match. Please try again.'),
+          const SnackBar(
+            content: Text('PINs do not match. Please try again.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -278,7 +278,9 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 }
               });
             },
-            onChanged: (value) {},
+            onChanged: (_) {
+              // Pin code changes are handled in onCompleted
+            },
           ),
         ),
         const SizedBox(height: 16),

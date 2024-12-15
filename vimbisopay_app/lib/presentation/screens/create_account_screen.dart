@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../infrastructure/repositories/account_repository_impl.dart';
-import '../../core/theme/app_colors.dart';
-import 'security_setup_screen.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});

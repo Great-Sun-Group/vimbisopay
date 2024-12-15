@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'presentation/screens/intro_screen.dart';
-import 'presentation/screens/create_account_screen.dart';
-import 'presentation/screens/home_screen.dart';
-import 'presentation/screens/login_screen.dart';
-import 'presentation/screens/auth_screen.dart';
-import 'infrastructure/database/database_helper.dart';
-import 'infrastructure/services/security_service.dart';
-import 'domain/entities/user.dart';
+import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/home_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/login_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +27,6 @@ class MyApp extends StatelessWidget {
           primary: Colors.deepPurple,
           secondary: Colors.teal,
           surface: Colors.white,
-          background: Colors.grey[50]!,
           error: Colors.red[700]!,
         ),
       ),
