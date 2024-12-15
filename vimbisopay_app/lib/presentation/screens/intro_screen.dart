@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class IntroScreen extends StatefulWidget {
-  const IntroScreen({super.key});
+  final VoidCallback onComplete;
+  
+  const IntroScreen({
+    super.key,
+    required this.onComplete,
+  });
 
   @override
   State<IntroScreen> createState() => _IntroScreenState();
@@ -63,6 +68,14 @@ class _IntroScreenState extends State<IntroScreen> {
           // PageView
           PageView(
             controller: _pageController,
+            onPageChanged: (index) {
+              // When user reaches the last page, show a button to complete
+              if (index == 2) {
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  widget.onComplete();
+                });
+              }
+            },
             children: [
               _buildPage(
                 color: Colors.blue,

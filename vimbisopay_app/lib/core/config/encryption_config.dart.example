@@ -1,0 +1,3 @@
+class EncryptionConfig {
+  static const String keyPrefix = 'your_prefix_';
+}

@@ -1,0 +1,6 @@
+class ApiConfig {
+  static const String apiKey = 'Your API key here';
+  
+  // Private constructor to prevent instantiation
+  ApiConfig._();
+}
