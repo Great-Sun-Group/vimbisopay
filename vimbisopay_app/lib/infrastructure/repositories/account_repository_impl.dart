@@ -13,7 +13,7 @@ import '../services/encryption_service.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl =
-      'https://7caf-2a0d-3344-822-b510-7486-2ab1-2889-1e76.ngrok-free.app/v1';
+      'https://dev.mycredex.dev';
   
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final SecurityService _securityService = SecurityService();
