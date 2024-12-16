@@ -147,6 +147,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
+            backgroundColor: AppColors.surface,
             title: Row(
               children: [
                 Icon(
@@ -155,11 +156,18 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                const Text('PIN Reset Successful'),
+                Text(
+                  'PIN Reset Successful',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
-            content: const Text(
+            content: Text(
               'Your PIN has been successfully reset. You will now be redirected to the login screen.',
+              style: TextStyle(color: AppColors.textPrimary),
             ),
             actions: [
               FilledButton(
@@ -173,6 +181,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textPrimary,
                 ),
                 child: const Text('Continue'),
               ),
@@ -196,6 +205,24 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
   }
 
   Widget _buildVerificationSection() {
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+    );
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      border: inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary),
+      ),
+      labelStyle: TextStyle(color: AppColors.textSecondary),
+      prefixIconColor: AppColors.primary,
+    );
+
     return Column(
       children: [
         Container(
@@ -246,7 +273,9 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
             label: const Text('Verify with Biometric'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textPrimary,
               minimumSize: const Size(200, 50),
+              disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 24),
@@ -261,62 +290,70 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
         ],
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: InputDecoration(
-                    labelText: 'Phone Number',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.phone),
-                    filled: true,
-                    fillColor: AppColors.surface,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: inputDecorationTheme,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      prefixIcon: Icon(Icons.phone),
+                    ),
+                    keyboardType: TextInputType.phone,
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your phone number';
+                      }
+                      return null;
+                    },
                   ),
-                  keyboardType: TextInputType.phone,
-                  enabled: !_isLoading,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your phone number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock),
-                    filled: true,
-                    fillColor: AppColors.surface,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    obscureText: true,
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  enabled: !_isLoading,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _isLoading ? null : _verifyWithPassword,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    backgroundColor: AppColors.primary,
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _isLoading ? null : _verifyWithPassword,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textPrimary,
+                      disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                            ),
+                          )
+                        : const Text('Verify Identity'),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Verify Identity'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -325,6 +362,12 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
   }
 
   Widget _buildPinResetSection() {
+    final TextStyle pinTextStyle = TextStyle(
+      color: AppColors.textPrimary,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    );
+
     return Column(
       children: [
         Container(
@@ -379,18 +422,21 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
             animationType: AnimationType.fade,
             controller: _pin.isEmpty ? _pinController : _confirmPinController,
             keyboardType: TextInputType.number,
+            textStyle: pinTextStyle,
             pinTheme: PinTheme(
               shape: PinCodeFieldShape.box,
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(8),
               fieldHeight: 50,
               fieldWidth: 40,
               activeFillColor: AppColors.surface,
               inactiveFillColor: AppColors.surface,
               selectedFillColor: AppColors.surface,
               activeColor: AppColors.primary,
-              inactiveColor: AppColors.textSecondary.withOpacity(0.3),
+              inactiveColor: AppColors.primary.withOpacity(0.3),
               selectedColor: AppColors.primary,
+              errorBorderColor: AppColors.error,
             ),
+            cursorColor: AppColors.primary,
             animationDuration: const Duration(milliseconds: 300),
             enableActiveFill: true,
             onCompleted: (value) {
@@ -419,6 +465,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
         title: const Text('Reset PIN'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(

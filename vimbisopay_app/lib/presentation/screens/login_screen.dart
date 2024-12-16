@@ -143,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'Your security is our priority. We use industry-standard encryption to protect your information.',
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textPrimary.withOpacity(0.7),
+                color: AppColors.textPrimary,
                 height: 1.4,
               ),
             ),
@@ -158,6 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
+          backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -186,16 +187,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
+                  style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
                     backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.textPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -252,6 +253,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+    );
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      border: inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary),
+      ),
+      labelStyle: TextStyle(color: AppColors.textSecondary),
+      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
+      errorStyle: TextStyle(color: AppColors.error),
+      prefixIconColor: AppColors.primary,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -263,105 +284,98 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 48),
               _buildWelcomeBanner(),
               _buildSecurityInfoBanner(),
-              Form(
-                key: _formKey,
-                onChanged: _validateForm,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: InputDecoration(
-                        labelText: 'Phone Number',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.phone),
-                        hintText: '263712345678 or 353871234567',
-                        hintStyle: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.5),
-                          fontSize: 14,
+              Theme(
+                data: Theme.of(context).copyWith(
+                  inputDecorationTheme: inputDecorationTheme,
+                ),
+                child: Form(
+                  key: _formKey,
+                  onChanged: _validateForm,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: const Icon(Icons.phone),
+                          hintText: '263712345678 or 353871234567',
+                          helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                          helperMaxLines: 2,
                         ),
-                        helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
-                        helperStyle: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.7),
-                          fontSize: 12,
+                        keyboardType: TextInputType.phone,
+                        enabled: !_isLoading,
+                        validator: _validatePhone,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock),
+                          helperText: 'Enter the password you created during registration',
                         ),
-                        helperMaxLines: 2,
-                        filled: true,
-                        fillColor: AppColors.surface,
+                        obscureText: true,
+                        enabled: !_isLoading,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your password';
+                          }
+                          if (value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
                       ),
-                      keyboardType: TextInputType.phone,
-                      enabled: !_isLoading,
-                      validator: _validatePhone,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock),
-                        helperText: 'Enter the password you created during registration',
-                        filled: true,
-                        fillColor: AppColors.surface,
-                      ),
-                      obscureText: true,
-                      enabled: !_isLoading,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _isFormValid && !_isLoading ? _handleLogin : null,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _isFormValid && !_isLoading ? _handleLogin : null,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textPrimary,
+                          disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: _isLoading 
-                          ? null 
-                          : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ForgotPasswordScreen(),
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
                                 ),
-                              );
-                            },
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 40),
-                        foregroundColor: AppColors.primary,
+                              )
+                            : const Text(
+                                'Login',
+                                style: TextStyle(fontSize: 16),
+                              ),
                       ),
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(fontSize: 14),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: _isLoading 
+                            ? null 
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ForgotPasswordScreen(),
+                                  ),
+                                );
+                              },
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 40),
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(fontSize: 14),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
