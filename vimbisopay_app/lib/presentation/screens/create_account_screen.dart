@@ -45,10 +45,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       margin: const EdgeInsets.symmetric(vertical: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.info.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.3),
+          color: AppColors.info.withOpacity(0.3),
         ),
       ),
       child: Column(
@@ -57,7 +57,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             children: [
               Icon(
                 Icons.info_outline,
-                color: AppColors.primary,
+                color: AppColors.info,
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -67,7 +67,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                    color: AppColors.info,
                   ),
                 ),
               ),
@@ -77,7 +77,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           Text(
             'Your phone number will be your unique identifier for secure transactions. We use your name to personalize your experience and verify your identity when sending or receiving money.',
             style: TextStyle(
-              color: AppColors.textPrimary.withOpacity(0.8),
+              color: AppColors.textPrimary,
               height: 1.4,
             ),
           ),
@@ -101,12 +101,25 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         });
       },
       countryListTheme: CountryListThemeData(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        backgroundColor: AppColors.surface,
+        textStyle: TextStyle(color: AppColors.textPrimary),
+        searchTextStyle: TextStyle(color: AppColors.textPrimary),
         inputDecoration: InputDecoration(
           labelText: 'Search',
-          prefixIcon: const Icon(Icons.search),
+          labelStyle: TextStyle(color: AppColors.textSecondary),
+          prefixIcon: Icon(Icons.search, color: AppColors.primary),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.primary),
           ),
         ),
       ),
@@ -124,12 +137,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
+        backgroundColor: AppColors.surface,
+        title: Text('Error', style: TextStyle(color: AppColors.error)),
+        content: Text(message, style: TextStyle(color: AppColors.textPrimary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: Text('OK', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -151,8 +165,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         barrierDismissible: false,
         builder: (context) => WillPopScope(
           onWillPop: () async => false,
-          child: const Center(
-            child: CircularProgressIndicator(),
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
           ),
         ),
       );
@@ -216,238 +232,258 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+    );
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      border: inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary),
+      ),
+      labelStyle: TextStyle(color: AppColors.textSecondary),
+      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
+      errorStyle: TextStyle(color: AppColors.error),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Create Account'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Welcome to VimbisoPay!',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Create your account to start sending and receiving money securely across borders.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textPrimary.withOpacity(0.8),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              _buildInfoBanner(),
-              TextFormField(
-                controller: _firstNameController,
-                decoration: InputDecoration(
-                  labelText: 'First Name',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  helperText: 'Enter your legal first name as it appears on your ID',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your first name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _lastNameController,
-                decoration: InputDecoration(
-                  labelText: 'Last Name',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  helperText: 'Enter your legal last name as it appears on your ID',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your last name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Phone Number',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textPrimary,
-                    ),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: inputDecorationTheme,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Welcome to VimbisoPay!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: InkWell(
-                          onTap: _showCountryPicker,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            child: Row(
-                              children: [
-                                Text(_selectedCountry.flagEmoji),
-                                const SizedBox(width: 8),
-                                Text('+${_selectedCountry.phoneCode}'),
-                                const Icon(Icons.arrow_drop_down),
-                              ],
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Create your account to start sending and receiving money securely across borders.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                _buildInfoBanner(),
+                TextFormField(
+                  controller: _firstNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'First Name',
+                    helperText: 'Enter your legal first name as it appears on your ID',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your first name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _lastNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Last Name',
+                    helperText: 'Enter your legal last name as it appears on your ID',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your last name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Phone Number',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3),
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: InkWell(
+                            onTap: _showCountryPicker,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Text(_selectedCountry.flagEmoji),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '+${_selectedCountry.phoneCode}',
+                                    style: TextStyle(color: AppColors.textPrimary),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _phoneController,
-                          decoration: InputDecoration(
-                            hintText: _selectedCountry.example,
-                            border: const OutlineInputBorder(),
-                            filled: true,
-                            fillColor: AppColors.surface,
-                            helperText: 'This will be your unique login identifier',
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            decoration: InputDecoration(
+                              hintText: _selectedCountry.example,
+                              helperText: 'This will be your unique login identifier',
+                            ),
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your phone number';
+                              }
+                              if (!_validatePhoneNumber(value)) {
+                                return 'Please enter a valid phone number';
+                              }
+                              return null;
+                            },
                           ),
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your phone number';
-                            }
-                            if (!_validatePhoneNumber(value)) {
-                              return 'Please enter a valid phone number';
-                            }
-                            return null;
-                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    errorText: _passwordError,
+                    helperText: 'Must be at least 6 characters long',
+                    suffixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters long';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _verifyPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'Verify Password',
+                    errorText: _verifyPasswordError,
+                    helperText: 'Re-enter your password to confirm',
+                    suffixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please verify your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: Wrap(
+                    children: [
+                      Text(
+                        'I accept the ',
+                        style: TextStyle(color: AppColors.textPrimary),
+                      ),
+                      GestureDetector(
+                        onTap: _launchTermsUrl,
+                        child: Text(
+                          'terms and conditions',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  errorText: _passwordError,
-                  helperText: 'Must be at least 6 characters long',
-                  suffixIcon: const Icon(Icons.lock_outline),
+                  value: _acceptedTerms,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      _acceptedTerms = value ?? false;
+                    });
+                  },
+                  activeColor: AppColors.primary,
+                  checkColor: AppColors.textPrimary,
                 ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a password';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters long';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _verifyPasswordController,
-                decoration: InputDecoration(
-                  labelText: 'Verify Password',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  errorText: _verifyPasswordError,
-                  helperText: 'Re-enter your password to confirm',
-                  suffixIcon: const Icon(Icons.lock_outline),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please verify your password';
-                  }
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              CheckboxListTile(
-                title: Wrap(
-                  children: [
-                    Text(
-                      'I accept the ',
-                      style: TextStyle(color: AppColors.textPrimary),
-                    ),
-                    GestureDetector(
-                      onTap: _launchTermsUrl,
-                      child: Text(
-                        'terms and conditions',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          decoration: TextDecoration.underline,
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _isLoading || !_acceptedTerms ? null : _onCreateAccount,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                  ),
+                  child: _isLoading
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                          ),
+                        )
+                      : const Text(
+                          'Create Account',
+                          style: TextStyle(fontSize: 18),
                         ),
-                      ),
-                    ),
-                  ],
                 ),
-                value: _acceptedTerms,
-                onChanged: (bool? value) {
-                  setState(() {
-                    _acceptedTerms = value ?? false;
-                  });
-                },
-                activeColor: AppColors.primary,
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isLoading || !_acceptedTerms ? null : _onCreateAccount,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Create Account',
-                        style: TextStyle(fontSize: 18),
-                      ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

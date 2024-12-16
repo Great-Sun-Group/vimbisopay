@@ -1,22 +1,16 @@
-import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/infrastructure/services/encryption_service.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
-  late final EncryptionService _encryptionService;
 
   factory DatabaseHelper() {
     return _instance;
   }
 
-  DatabaseHelper._internal() {
-    _encryptionService = EncryptionService(SecurityService());
-  }
+  DatabaseHelper._internal();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -56,27 +50,17 @@ class DatabaseHelper {
   Future<void> saveUser(User user) async {
     try {
       final Database db = await database;
-      String token = user.token;
-
-      try {
-        // Encrypt the token before saving
-         token = await _encryptionService.encryptToken(user.token);
-      } catch (e) {
-        if (kDebugMode) {
-          print(e);
-        }
-      }
 
       // Clear any existing user first since we only want one user
       await db.delete('users');
 
-      // Save the new user with encrypted token
+      // Save the new user
       await db.insert(
         'users',
         {
           'memberId': user.memberId,
           'phone': user.phone,
-          'token': token,
+          'token': user.token,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -92,23 +76,10 @@ class DatabaseHelper {
 
       if (maps.isEmpty) return null;
 
-      // Decrypt the token before creating the User object
-      final String encryptedToken = maps.first['token'] as String;
-      final String token =encryptedToken;
-      try{
-      final token =
-          await _encryptionService.decryptToken(encryptedToken);
-      
-      }catch(e){
-        if (kDebugMode) {
-          print(e);
-        }
-
-      }
       return User(
         memberId: maps.first['memberId'] as String,
         phone: maps.first['phone'] as String,
-        token: token,
+        token: maps.first['token'] as String,
       );
     } catch (e) {
       throw Exception('Failed to get user: $e');

@@ -80,7 +80,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             'Enter your phone number and we\'ll send you instructions to reset your password.',
             style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
               height: 1.4,
             ),
             textAlign: TextAlign.center,
@@ -143,7 +143,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
               backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.textPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -178,6 +178,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+    );
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      border: inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary),
+      ),
+      labelStyle: TextStyle(color: AppColors.textSecondary),
+      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
+      errorStyle: TextStyle(color: AppColors.error),
+      prefixIconColor: AppColors.primary,
+    );
+
     if (_isSubmitted) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -194,8 +214,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -206,61 +227,56 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeaderBanner(),
-              Form(
-                key: _formKey,
-                onChanged: _validateForm,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: InputDecoration(
-                        labelText: 'Phone Number',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.phone),
-                        hintText: '263712345678 or 353871234567',
-                        hintStyle: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.5),
-                          fontSize: 14,
+              Theme(
+                data: Theme.of(context).copyWith(
+                  inputDecorationTheme: inputDecorationTheme,
+                ),
+                child: Form(
+                  key: _formKey,
+                  onChanged: _validateForm,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: Icon(Icons.phone),
+                          hintText: '263712345678 or 353871234567',
+                          helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                          helperMaxLines: 2,
                         ),
-                        helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
-                        helperStyle: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.7),
-                          fontSize: 12,
-                        ),
-                        helperMaxLines: 2,
-                        filled: true,
-                        fillColor: AppColors.surface,
+                        keyboardType: TextInputType.phone,
+                        enabled: !_isLoading,
+                        validator: _validatePhone,
                       ),
-                      keyboardType: TextInputType.phone,
-                      enabled: !_isLoading,
-                      validator: _validatePhone,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _isFormValid && !_isLoading ? _handleSubmit : null,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _isFormValid && !_isLoading ? _handleSubmit : null,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textPrimary,
+                          disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                                ),
+                              )
+                            : const Text(
+                                'Send Instructions',
+                                style: TextStyle(fontSize: 16),
                               ),
-                            )
-                          : const Text(
-                              'Send Instructions',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

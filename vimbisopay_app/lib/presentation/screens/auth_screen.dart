@@ -89,7 +89,6 @@ class _AuthScreenState extends State<AuthScreen> {
       if (_usesBiometric) {
         _authenticateWithBiometric();
       } else {
-        // Only request focus if the widget is still mounted and not disposed
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_isDisposed) {
             _pinFocusNode.requestFocus();
@@ -188,7 +187,10 @@ class _AuthScreenState extends State<AuthScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save user data: ${failure.message}'),
+            content: Text(
+              'Failed to save user data: ${failure.message}',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -207,16 +209,20 @@ class _AuthScreenState extends State<AuthScreen> {
     } else if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
+          content: Text(
+            errorMessage,
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.surface,
           duration: const Duration(seconds: 3),
           action: SnackBarAction(
             label: 'Use PIN',
+            textColor: AppColors.primary,
             onPressed: () {
               if (mounted && !_isDisposed) {
                 setState(() {
                   _usesBiometric = false;
                 });
-                // Only request focus if the widget is still mounted and not disposed
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted && !_isDisposed) {
                     _pinFocusNode.requestFocus();
@@ -236,16 +242,18 @@ class _AuthScreenState extends State<AuthScreen> {
       await _saveUserAndNavigateHome();
     } else if (mounted && !_isDisposed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid PIN. Please try again.'),
+        SnackBar(
+          content: Text(
+            'Invalid PIN. Please try again.',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
           backgroundColor: AppColors.error,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
       setState(() {
         _pin = '';
       });
-      // Only request focus if the widget is still mounted and not disposed
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_isDisposed) {
           _pinFocusNode.requestFocus();
@@ -267,12 +275,19 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
+    final TextStyle pinTextStyle = TextStyle(
+      color: AppColors.textPrimary,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Authentication Required'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
+        elevation: 0,
         automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
@@ -292,7 +307,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 onPressed: _authenticateWithBiometric,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.textPrimary,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -306,7 +321,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     setState(() {
                       _usesBiometric = false;
                     });
-                    // Only request focus if the widget is still mounted and not disposed
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted && !_isDisposed) {
                         _pinFocusNode.requestFocus();
@@ -316,6 +330,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text('Use PIN Instead'),
               ),
@@ -338,18 +353,21 @@ class _AuthScreenState extends State<AuthScreen> {
                   animationType: AnimationType.fade,
                   focusNode: _pinFocusNode,
                   keyboardType: TextInputType.number,
+                  textStyle: pinTextStyle,
                   pinTheme: PinTheme(
                     shape: PinCodeFieldShape.box,
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(8),
                     fieldHeight: 50,
                     fieldWidth: 40,
                     activeFillColor: AppColors.surface,
                     inactiveFillColor: AppColors.surface,
                     selectedFillColor: AppColors.surface,
                     activeColor: AppColors.primary,
-                    inactiveColor: AppColors.textSecondary.withOpacity(0.3),
+                    inactiveColor: AppColors.primary.withOpacity(0.3),
                     selectedColor: AppColors.primary,
+                    errorBorderColor: AppColors.error,
                   ),
+                  cursorColor: AppColors.primary,
                   animationDuration: const Duration(milliseconds: 300),
                   enableActiveFill: true,
                   onCompleted: _verifyPin,
@@ -374,6 +392,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                   child: const Text('Use Biometric Instead'),
                 ),
@@ -390,6 +409,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text('Forgot PIN?'),
               ),

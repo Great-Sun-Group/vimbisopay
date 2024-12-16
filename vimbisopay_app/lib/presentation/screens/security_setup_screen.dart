@@ -110,7 +110,10 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save user data: ${failure.message}'),
+            content: Text(
+              'Failed to save user data: ${failure.message}',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -129,7 +132,10 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(
+              e.toString(),
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -181,8 +187,11 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('PINs do not match. Please try again.'),
+          SnackBar(
+            content: Text(
+              'PINs do not match. Please try again.',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -350,7 +359,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                   onPressed: _setupBiometric,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.textPrimary,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 32, vertical: 16),
                   ),
@@ -408,9 +417,8 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 onPressed: _setupPin,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.warning,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  foregroundColor: AppColors.textPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 ),
                 child: const Text('Set up PIN'),
               ),
@@ -431,6 +439,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           title: const Text('Security Setup'),
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
+          elevation: 0,
           automaticallyImplyLeading: false,
         ),
         body: SingleChildScrollView(

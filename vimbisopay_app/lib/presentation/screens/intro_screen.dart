@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
 class IntroScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -29,18 +30,18 @@ class _IntroScreenState extends State<IntroScreen> {
     required IconData icon,
   }) {
     return Container(
-      color: color,
+      color: AppColors.background,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 100, color: Colors.white),
+          Icon(icon, size: 100, color: color),
           const SizedBox(height: 32),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -49,9 +50,9 @@ class _IntroScreenState extends State<IntroScreen> {
             child: Text(
               description,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Colors.white,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -63,6 +64,7 @@ class _IntroScreenState extends State<IntroScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // PageView
@@ -78,19 +80,19 @@ class _IntroScreenState extends State<IntroScreen> {
             },
             children: [
               _buildPage(
-                color: Colors.blue,
+                color: AppColors.primary,
                 title: 'Send Money',
                 description: 'Transfer money to friends and family with ease',
                 icon: Icons.send,
               ),
               _buildPage(
-                color: Colors.green,
+                color: AppColors.secondary,
                 title: 'Secure Payments',
                 description: 'Your transactions are protected with advanced security',
                 icon: Icons.security,
               ),
               _buildPage(
-                color: Colors.purple,
+                color: AppColors.accent,
                 title: 'Track Expenses',
                 description: 'Keep track of your spending with detailed analytics',
                 icon: Icons.analytics,
@@ -106,12 +108,12 @@ class _IntroScreenState extends State<IntroScreen> {
               child: SmoothPageIndicator(
                 controller: _pageController,
                 count: 3,
-                effect: const WormEffect(
+                effect: WormEffect(
                   dotHeight: 10,
                   dotWidth: 10,
                   spacing: 16,
-                  dotColor: Colors.grey,
-                  activeDotColor: Colors.white,
+                  dotColor: AppColors.surface,
+                  activeDotColor: AppColors.primary,
                 ),
               ),
             ),
