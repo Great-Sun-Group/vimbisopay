@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 
@@ -18,9 +19,13 @@ abstract class AccountRepository {
 
   Future<Either<Failure, User?>> getCurrentUser();
   
+  Future<Either<Failure, bool>> saveUser(User user);
+  
   Future<Either<Failure, Map<String, double>>> getBalances();
   
   Future<Either<Failure, List>> getLedger({int? startRow, int? numRows});
 
   Future<Either<Failure, Account>> getAccountByHandle(String handle);
+
+  Future<Either<Failure, Dashboard>> getMemberDashboardByPhone(String phone);
 }
