@@ -1,13 +1,52 @@
 import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 
+enum MemberTierType {
+  open(0, 10.0, false, true, false, false, false, false),    // Free tier
+  hustler(1, 100.0, false, true, false, false, false, true); // $1 tier
+
+  final int value;
+  final double dailyLimit;
+  final bool canIssueUnsecuredCredex;
+  final bool canIssueSecuredCredex;
+  final bool canCreateAdditionalAccounts;
+  final bool canBeAddedToAccount;
+  final bool canAddOthersToAccount;
+  final bool canRequestRecurringPayments;
+
+  const MemberTierType(
+    this.value,
+    this.dailyLimit,
+    this.canIssueUnsecuredCredex,
+    this.canIssueSecuredCredex,
+    this.canCreateAdditionalAccounts,
+    this.canBeAddedToAccount,
+    this.canAddOthersToAccount,
+    this.canRequestRecurringPayments,
+  );
+}
+
 class MemberTier {
   final int low;
   final int high;
+  late final MemberTierType type;
 
-  const MemberTier({
+  MemberTier({
     required this.low,
     required this.high,
-  });
+  }) {
+    type = MemberTierType.values.firstWhere(
+      (type) => type.value == high,
+      orElse: () => MemberTierType.open,
+    );
+  }
+
+  bool get canIssueSecuredCredex => type.canIssueSecuredCredex;
+  double get dailySecuredCredexLimit => type.dailyLimit;
+  bool get canIssueUnsecuredCredex => type.canIssueUnsecuredCredex;
+  bool get canCreateAdditionalAccounts => type.canCreateAdditionalAccounts;
+  bool get canBeAddedToAccount => type.canBeAddedToAccount;
+  bool get canAddOthersToAccount => type.canAddOthersToAccount;
+  bool get canRequestRecurringPayments => type.canRequestRecurringPayments;
 }
 
 class UnsecuredBalances {
@@ -85,6 +124,14 @@ class Dashboard extends Entity {
     this.remainingAvailableUSD,
     required this.accounts,
   }) : super(id);
+
+  bool get canIssueSecuredCredex => memberTier.canIssueSecuredCredex;
+  double get dailySecuredCredexLimit => memberTier.dailySecuredCredexLimit;
+  bool get canIssueUnsecuredCredex => memberTier.canIssueUnsecuredCredex;
+  bool get canCreateAdditionalAccounts => memberTier.canCreateAdditionalAccounts;
+  bool get canBeAddedToAccount => memberTier.canBeAddedToAccount;
+  bool get canAddOthersToAccount => memberTier.canAddOthersToAccount;
+  bool get canRequestRecurringPayments => memberTier.canRequestRecurringPayments;
 
   @override
   bool operator ==(Object other) {

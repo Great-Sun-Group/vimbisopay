@@ -147,27 +147,36 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, List>> getLedger({int? startRow, int? numRows}) async {
+  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+    required String accountId,
+    int? startRow,
+    int? numRows,
+  }) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final queryParams = {
-          if (startRow != null) 'startRow': startRow.toString(),
-          if (numRows != null) 'numRows': numRows.toString(),
+        final url = '$baseUrl/getLedger';
+        final headers = _authHeaders(token);
+        final body = {
+          'accountID': accountId,
+          if (startRow != null) 'startRow': startRow,
+          if (numRows != null) 'numRows': numRows,
         };
 
-        final url = Uri.parse('$baseUrl/ledger').replace(queryParameters: queryParams).toString();
-        final headers = _authHeaders(token);
-
         final response = await _loggedRequest(
-          () => http.get(Uri.parse(url), headers: headers),
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
           url,
-          'GET',
+          'POST',
           headers: headers,
+          body: body,
         );
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          return Right(data['entries'] as List);
+          return Right(data as Map<String, dynamic>);
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
           return Left(InfrastructureFailure(errorMessage));

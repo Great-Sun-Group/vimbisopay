@@ -23,7 +23,11 @@ abstract class AccountRepository {
   
   Future<Either<Failure, Map<String, double>>> getBalances();
   
-  Future<Either<Failure, List>> getLedger({int? startRow, int? numRows});
+  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+    required String accountId,
+    int? startRow,
+    int? numRows,
+  });
 
   Future<Either<Failure, Account>> getAccountByHandle(String handle);
 
