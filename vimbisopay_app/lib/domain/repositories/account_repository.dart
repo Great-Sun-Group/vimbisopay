@@ -1,17 +1,26 @@
 import 'package:dartz/dartz.dart';
-import '../../core/error/failures.dart';
-import '../entities/account.dart';
+import 'package:vimbisopay_app/domain/entities/account.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 
 abstract class AccountRepository {
-  /// Get current user's account details
-  Future<Either<Failure, Account>> getCurrentAccount();
+  Future<Either<Failure, User>> login({
+    required String phone,
+    required String password,
+  });
+
+  Future<Either<Failure, bool>> onboardMember({
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String password,
+  });
+
+  Future<Either<Failure, User?>> getCurrentUser();
   
-  /// Get current account balances
   Future<Either<Failure, Map<String, double>>> getBalances();
   
-  /// Get current account ledger/transaction history
-  Future<Either<Failure, List<dynamic>>> getLedger({int? startRow, int? numRows});
+  Future<Either<Failure, List>> getLedger({int? startRow, int? numRows});
 
-  /// Get account by handle (needed for creating transactions)
   Future<Either<Failure, Account>> getAccountByHandle(String handle);
 }

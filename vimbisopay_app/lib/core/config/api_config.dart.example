@@ -1,0 +1,4 @@
+class ApiConfig {
+  static const String apiKey = 'Your API key here';
+  static const String baseUrl = 'https://dev.mycredex.dev';
+}

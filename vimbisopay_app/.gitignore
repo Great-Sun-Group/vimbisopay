@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Sensitive configuration files
+lib/core/config/api_config.dart
+lib/core/config/encryption_config.dart
