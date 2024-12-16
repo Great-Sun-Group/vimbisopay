@@ -1,3 +1,4 @@
+import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -40,9 +41,11 @@ class TransactionsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (context, state) {
+        print('TransactionList state: ${state.status}');
         if (state.status == HomeStatus.initial ||
-            (state.status == HomeStatus.loading &&
-                state.combinedLedgerEntries.isEmpty)) {
+            ((state.status == HomeStatus.loading || state.status == HomeStatus.success) &&
+             state.combinedLedgerEntries.isEmpty &&
+             state.accountLedgers.isEmpty)) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
@@ -69,8 +72,7 @@ class TransactionsList extends StatelessWidget {
 
         if (state.combinedLedgerEntries.isEmpty) {
           return const Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
