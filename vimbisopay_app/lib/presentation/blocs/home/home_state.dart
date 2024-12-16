@@ -7,6 +7,7 @@ enum HomeStatus {
   initial,
   loading,
   loadingMore,
+  refreshing,
   success,
   error,
 }
@@ -32,6 +33,11 @@ class HomeState extends Equatable {
     this.currentPage = 0,
   });
 
+  bool get isInitialLoading => status == HomeStatus.loading && combinedLedgerEntries.isEmpty;
+  bool get isRefreshing => status == HomeStatus.refreshing;
+  bool get isLoadingMore => status == HomeStatus.loadingMore;
+  bool get hasError => error != null;
+
   HomeState copyWith({
     HomeStatus? status,
     Dashboard? dashboard,
@@ -49,7 +55,7 @@ class HomeState extends Equatable {
       accountLedgers: accountLedgers ?? this.accountLedgers,
       combinedLedgerEntries: combinedLedgerEntries ?? this.combinedLedgerEntries,
       hasMoreEntries: hasMoreEntries ?? this.hasMoreEntries,
-      error: error ?? this.error,
+      error: error,  // Intentionally not using ?? to allow setting to null
       currentPage: currentPage ?? this.currentPage,
     );
   }

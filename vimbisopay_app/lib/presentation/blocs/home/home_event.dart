@@ -19,6 +19,18 @@ class HomePageChanged extends HomeEvent {
   List<Object> get props => [page];
 }
 
+class HomeLoadStarted extends HomeEvent {
+  const HomeLoadStarted();
+}
+
+class HomeRefreshStarted extends HomeEvent {
+  const HomeRefreshStarted();
+}
+
+class HomeLoadMoreStarted extends HomeEvent {
+  const HomeLoadMoreStarted();
+}
+
 class HomeDataLoaded extends HomeEvent {
   final Dashboard dashboard;
   final User user;

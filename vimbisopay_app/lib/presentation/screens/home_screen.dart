@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
@@ -33,9 +31,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   late final HomeBloc _homeBloc;
   bool _isAuthenticating = false;
-  bool _isInitialLoading = false;
-  bool _isRefreshing = false;
-  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -63,8 +58,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadInitialData() async {
-    if (_isInitialLoading) return;
-    setState(() => _isInitialLoading = true);
+    _homeBloc.add(const HomeLoadStarted());
 
     try {
       final user = await _databaseHelper.getUser();
@@ -75,12 +69,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await dashboardResult.fold(
           (failure) async {
             _homeBloc.add(HomeErrorOccurred(failure.message));
-            if (mounted) setState(() => _isInitialLoading = false);
           },
           (dashboard) async {
             if (dashboard.accounts.isEmpty) {
               _homeBloc.add(const HomeErrorOccurred('No accounts found'));
-              if (mounted) setState(() => _isInitialLoading = false);
               return;
             }
 
@@ -127,22 +119,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               combinedEntries: combinedEntries,
               hasMore: hasMoreEntries,
             ));
-
-            if (mounted) setState(() => _isInitialLoading = false);
           },
         );
-      } else {
-        if (mounted) setState(() => _isInitialLoading = false);
       }
     } catch (e) {
       _homeBloc.add(const HomeErrorOccurred('Failed to load data'));
-      if (mounted) setState(() => _isInitialLoading = false);
     }
   }
 
   Future<void> _refreshData() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
+    _homeBloc.add(const HomeRefreshStarted());
 
     try {
       final user = await _databaseHelper.getUser();
@@ -153,12 +139,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await dashboardResult.fold(
           (failure) async {
             _homeBloc.add(HomeErrorOccurred(failure.message));
-            if (mounted) setState(() => _isRefreshing = false);
           },
           (dashboard) async {
             if (dashboard.accounts.isEmpty) {
               _homeBloc.add(const HomeErrorOccurred('No accounts found'));
-              if (mounted) setState(() => _isRefreshing = false);
               return;
             }
 
@@ -205,24 +189,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               combinedEntries: combinedEntries,
               hasMore: hasMoreEntries,
             ));
-
-            if (mounted) setState(() => _isRefreshing = false);
           },
         );
-      } else {
-        if (mounted) setState(() => _isRefreshing = false);
       }
     } catch (e) {
       _homeBloc.add(const HomeErrorOccurred('Failed to refresh data'));
-      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
   Future<void> _loadMoreLedger() async {
     final state = _homeBloc.state;
-    if (state.dashboard == null || !state.hasMoreEntries || _isLoadingMore) return;
+    if (state.dashboard == null || !state.hasMoreEntries) return;
     
-    setState(() => _isLoadingMore = true);
+    _homeBloc.add(const HomeLoadMoreStarted());
 
     try {
       final Map<String, List<LedgerEntry>> updatedLedgers = Map.from(state.accountLedgers);
@@ -273,10 +252,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ));
     } catch (e) {
       _homeBloc.add(const HomeErrorOccurred('Failed to load more entries'));
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingMore = false);
-      }
     }
   }
 
@@ -422,14 +397,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Column(
           children: [
             if (state.dashboard != null) _buildAccountsSection(state),
-            TransactionsList(
-              transactions: state.combinedLedgerEntries,
-              isLoading: _isInitialLoading,
-              isRefreshing: _isRefreshing,
-              isLoadingMore: _isLoadingMore,
-              error: state.error,
-              onRetry: _refreshData,
-            ),
+            const TransactionsList(),
             // Extra space for action buttons
             const SizedBox(height: 120),
           ],
@@ -467,25 +435,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
         },
         builder: (context, state) {
-          return GradientBackground(
-            child: Scaffold(
-              backgroundColor: Colors.transparent,
-              appBar: _buildAppBar(state),
-              body: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: _buildScrollableContent(state),
-                    ),
-                    HomeActionButtons(
-                      accounts: state.dashboard?.accounts,
-                      onSendTap: () {
-                        // TODO: Implement send money
-                      },
-                    ),
-                  ],
-                ),
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: _buildAppBar(state),
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _buildScrollableContent(state),
+                  ),
+                  HomeActionButtons(
+                    accounts: state.dashboard?.accounts,
+                    onSendTap: () {
+                      // TODO: Implement send money
+                    },
+                  ),
+                ],
               ),
             ),
           );

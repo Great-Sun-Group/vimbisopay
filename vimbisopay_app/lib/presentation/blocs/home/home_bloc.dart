@@ -1,7 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
-import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 
@@ -11,6 +8,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeDataLoaded>(_onDataLoaded);
     on<HomeLedgerLoaded>(_onLedgerLoaded);
     on<HomeErrorOccurred>(_onErrorOccurred);
+    on<HomeLoadStarted>(_onLoadStarted);
+    on<HomeRefreshStarted>(_onRefreshStarted);
+    on<HomeLoadMoreStarted>(_onLoadMoreStarted);
   }
 
   void _onPageChanged(
@@ -18,6 +18,38 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) {
     emit(state.copyWith(currentPage: event.page));
+  }
+
+  void _onLoadStarted(
+    HomeLoadStarted event,
+    Emitter<HomeState> emit,
+  ) {
+    emit(state.copyWith(
+      status: HomeStatus.loading,
+      error: null,
+    ));
+  }
+
+  void _onRefreshStarted(
+    HomeRefreshStarted event,
+    Emitter<HomeState> emit,
+  ) {
+    emit(state.copyWith(
+      status: HomeStatus.refreshing,
+      error: null,
+    ));
+  }
+
+  void _onLoadMoreStarted(
+    HomeLoadMoreStarted event,
+    Emitter<HomeState> emit,
+  ) {
+    if (!state.hasMoreEntries) return;
+    
+    emit(state.copyWith(
+      status: HomeStatus.loadingMore,
+      error: null,
+    ));
   }
 
   void _onDataLoaded(
@@ -37,6 +69,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) {
     emit(state.copyWith(
+      status: HomeStatus.success,
       accountLedgers: event.accountLedgers,
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
