@@ -7,6 +7,8 @@ class LedgerEntry {
   final String description;
   final String counterpartyAccountName;
   final String formattedAmount;
+  final String accountId; // Added to track which account the entry belongs to
+  final String accountName; // Added to display account information
 
   LedgerEntry({
     required this.credexID,
@@ -17,9 +19,11 @@ class LedgerEntry {
     required this.description,
     required this.counterpartyAccountName,
     required this.formattedAmount,
+    required this.accountId,
+    required this.accountName,
   });
 
-  factory LedgerEntry.fromJson(Map<String, dynamic> json) {
+  factory LedgerEntry.fromJson(Map<String, dynamic> json, {required String accountId, required String accountName}) {
     final timestamp = json['timestamp'];
     return LedgerEntry(
       credexID: json['credexID'],
@@ -37,6 +41,8 @@ class LedgerEntry {
       description: json['description'],
       counterpartyAccountName: json['counterpartyAccountName'],
       formattedAmount: json['formattedAmount'],
+      accountId: accountId,
+      accountName: accountName,
     );
   }
 }

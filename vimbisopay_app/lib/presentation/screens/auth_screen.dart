@@ -31,6 +31,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _usesBiometric = false;
   User? _user;
   bool _isDisposed = false;
+  bool _isAuthenticating = false;
 
   @override
   void initState() {
@@ -120,7 +121,7 @@ class _AuthScreenState extends State<AuthScreen> {
               Expanded(
                 child: Text(
                   _usesBiometric ? 'Biometric Authentication' : 'PIN Authentication',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppColors.info,
@@ -134,7 +135,7 @@ class _AuthScreenState extends State<AuthScreen> {
             _usesBiometric
                 ? 'Use your fingerprint or face recognition to securely access your account.'
                 : 'Enter your 4-digit PIN to securely access your account.',
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.textPrimary,
               height: 1.4,
             ),
@@ -153,14 +154,14 @@ class _AuthScreenState extends State<AuthScreen> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.warning.withOpacity(0.3)),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(
             Icons.info_outline,
             color: AppColors.warning,
             size: 20,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Text(
               'Never share your PIN or allow biometric access to anyone else.',
@@ -176,8 +177,10 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Future<void> _saveUserAndNavigateHome() async {
-    if (_user == null) return;
+  Future<void> _navigateToHome() async {
+    if (_user == null || _isAuthenticating) return;
+    
+    _isAuthenticating = true;
     
     final result = await _repository.saveUser(_user!);
     
@@ -185,33 +188,38 @@ class _AuthScreenState extends State<AuthScreen> {
 
     result.fold(
       (failure) {
+        _isAuthenticating = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Failed to save user data: ${failure.message}',
-              style: TextStyle(color: AppColors.textPrimary),
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
             backgroundColor: AppColors.error,
           ),
         );
       },
-      (_) => Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false),
+      (_) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+      },
     );
   }
 
   Future<void> _authenticateWithBiometric() async {
+    if (_isAuthenticating) return;
+    
     final (authenticated, errorMessage) = await _securityService.authenticateWithBiometrics();
     
     if (!mounted || _isDisposed) return;
 
     if (authenticated) {
-      await _saveUserAndNavigateHome();
+      await _navigateToHome();
     } else if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             errorMessage,
-            style: TextStyle(color: AppColors.textPrimary),
+            style: const TextStyle(color: AppColors.textPrimary),
           ),
           backgroundColor: AppColors.surface,
           duration: const Duration(seconds: 3),
@@ -237,18 +245,20 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _verifyPin(String pin) async {
+    if (_isAuthenticating) return;
+    
     final isValid = await _securityService.verifyPin(pin);
     if (isValid && mounted && !_isDisposed) {
-      await _saveUserAndNavigateHome();
+      await _navigateToHome();
     } else if (mounted && !_isDisposed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             'Invalid PIN. Please try again.',
             style: TextStyle(color: AppColors.textPrimary),
           ),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
       setState(() {
@@ -265,7 +275,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
@@ -275,7 +285,7 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
-    final TextStyle pinTextStyle = TextStyle(
+    const TextStyle pinTextStyle = TextStyle(
       color: AppColors.textPrimary,
       fontSize: 20,
       fontWeight: FontWeight.bold,
@@ -297,7 +307,7 @@ class _AuthScreenState extends State<AuthScreen> {
             const SizedBox(height: 32),
             _buildAuthBanner(),
             if (_usesBiometric) ...[
-              Icon(
+              const Icon(
                 Icons.fingerprint,
                 size: 72,
                 color: AppColors.info,
@@ -335,7 +345,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: const Text('Use PIN Instead'),
               ),
             ] else ...[
-              Text(
+              const Text(
                 'Enter PIN',
                 style: TextStyle(
                   fontSize: 24,

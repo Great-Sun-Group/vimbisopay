@@ -51,7 +51,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           color: AppColors.info.withOpacity(0.3),
         ),
       ),
-      child: Column(
+      child: const Column(
         children: [
           Row(
             children: [
@@ -60,7 +60,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 color: AppColors.info,
                 size: 24,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Why we need your information',
@@ -73,7 +73,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Your phone number will be your unique identifier for secure transactions. We use your name to personalize your experience and verify your identity when sending or receiving money.',
             style: TextStyle(
@@ -103,12 +103,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       countryListTheme: CountryListThemeData(
         borderRadius: BorderRadius.circular(12),
         backgroundColor: AppColors.surface,
-        textStyle: TextStyle(color: AppColors.textPrimary),
-        searchTextStyle: TextStyle(color: AppColors.textPrimary),
+        textStyle: const TextStyle(color: AppColors.textPrimary),
+        searchTextStyle: const TextStyle(color: AppColors.textPrimary),
         inputDecoration: InputDecoration(
           labelText: 'Search',
-          labelStyle: TextStyle(color: AppColors.textSecondary),
-          prefixIcon: Icon(Icons.search, color: AppColors.primary),
+          labelStyle: const TextStyle(color: AppColors.textSecondary),
+          prefixIcon: const Icon(Icons.search, color: AppColors.primary),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
@@ -119,7 +119,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: AppColors.primary),
+            borderSide: const BorderSide(color: AppColors.primary),
           ),
         ),
       ),
@@ -138,12 +138,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Error', style: TextStyle(color: AppColors.error)),
-        content: Text(message, style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text('Error', style: TextStyle(color: AppColors.error)),
+        content: Text(message, style: const TextStyle(color: AppColors.textPrimary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('OK', style: TextStyle(color: AppColors.primary)),
+            child: const Text('OK', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -165,7 +165,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         barrierDismissible: false,
         builder: (context) => WillPopScope(
           onWillPop: () async => false,
-          child: Center(
+          child: const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
@@ -244,11 +244,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       enabledBorder: inputBorder,
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
-      labelStyle: TextStyle(color: AppColors.textSecondary),
+      labelStyle: const TextStyle(color: AppColors.textSecondary),
       helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: TextStyle(color: AppColors.error),
+      errorStyle: const TextStyle(color: AppColors.error),
     );
 
     return Scaffold(
@@ -259,7 +259,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.primary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -274,7 +274,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
+                const Text(
                   'Welcome to VimbisoPay!',
                   style: TextStyle(
                     fontSize: 24,
@@ -284,7 +284,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'Create your account to start sending and receiving money securely across borders.',
                   style: TextStyle(
                     fontSize: 16,
@@ -324,7 +324,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Phone Number',
                       style: TextStyle(
                         fontSize: 16,
@@ -352,9 +352,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                   const SizedBox(width: 8),
                                   Text(
                                     '+${_selectedCountry.phoneCode}',
-                                    style: TextStyle(color: AppColors.textPrimary),
+                                    style: const TextStyle(color: AppColors.textPrimary),
                                   ),
-                                  Icon(
+                                  const Icon(
                                     Icons.arrow_drop_down,
                                     color: AppColors.primary,
                                   ),
@@ -397,7 +397,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     labelText: 'Password',
                     errorText: _passwordError,
                     helperText: 'Must be at least 6 characters long',
-                    suffixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                    suffixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
                   ),
                   obscureText: true,
                   validator: (value) {
@@ -417,7 +417,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     labelText: 'Verify Password',
                     errorText: _verifyPasswordError,
                     helperText: 'Re-enter your password to confirm',
-                    suffixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                    suffixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
                   ),
                   obscureText: true,
                   validator: (value) {
@@ -434,13 +434,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 CheckboxListTile(
                   title: Wrap(
                     children: [
-                      Text(
+                      const Text(
                         'I accept the ',
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
                       GestureDetector(
                         onTap: _launchTermsUrl,
-                        child: Text(
+                        child: const Text(
                           'terms and conditions',
                           style: TextStyle(
                             color: AppColors.primary,
@@ -469,7 +469,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
                   ),
                   child: _isLoading
-                      ? SizedBox(
+                      ? const SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(

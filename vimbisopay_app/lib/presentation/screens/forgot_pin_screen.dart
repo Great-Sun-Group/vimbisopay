@@ -148,14 +148,14 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
           barrierDismissible: false,
           builder: (context) => AlertDialog(
             backgroundColor: AppColors.surface,
-            title: Row(
+            title: const Row(
               children: [
                 Icon(
                   Icons.check_circle,
                   color: AppColors.success,
                   size: 24,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   'PIN Reset Successful',
                   style: TextStyle(
@@ -165,7 +165,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                 ),
               ],
             ),
-            content: Text(
+            content: const Text(
               'Your PIN has been successfully reset. You will now be redirected to the login screen.',
               style: TextStyle(color: AppColors.textPrimary),
             ),
@@ -217,9 +217,9 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
       enabledBorder: inputBorder,
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
-      labelStyle: TextStyle(color: AppColors.textSecondary),
+      labelStyle: const TextStyle(color: AppColors.textSecondary),
       prefixIconColor: AppColors.primary,
     );
 
@@ -233,7 +233,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.info.withOpacity(0.3)),
           ),
-          child: Column(
+          child: const Column(
             children: [
               Row(
                 children: [
@@ -242,7 +242,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                     color: AppColors.info,
                     size: 24,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Verify Your Identity',
@@ -255,7 +255,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'To reset your PIN, we need to verify your identity first.',
                 style: TextStyle(
@@ -279,7 +279,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(
+          const Text(
             'OR',
             style: TextStyle(
               color: AppColors.textSecondary,
@@ -342,7 +342,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                       disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
                     ),
                     child: _isLoading
-                        ? SizedBox(
+                        ? const SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
@@ -362,7 +362,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
   }
 
   Widget _buildPinResetSection() {
-    final TextStyle pinTextStyle = TextStyle(
+    const TextStyle pinTextStyle = TextStyle(
       color: AppColors.textPrimary,
       fontSize: 20,
       fontWeight: FontWeight.bold,
@@ -380,14 +380,14 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
           ),
           child: Column(
             children: [
-              Row(
+              const Row(
                 children: [
                   Icon(
                     Icons.check_circle,
                     color: AppColors.success,
                     size: 24,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Identity Verified',
@@ -405,7 +405,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                 _pin.isEmpty
                     ? 'Enter your new PIN'
                     : 'Confirm your new PIN',
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   height: 1.4,
                 ),
@@ -481,7 +481,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.error_outline,
                       color: AppColors.error,
                       size: 20,
@@ -490,7 +490,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                     Expanded(
                       child: Text(
                         _errorMessage,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: AppColors.error,
                           fontSize: 14,
                         ),

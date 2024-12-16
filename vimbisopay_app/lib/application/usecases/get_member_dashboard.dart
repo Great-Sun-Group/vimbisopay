@@ -13,12 +13,12 @@ class GetMemberDashboard {
   /// Returns Either a Failure or the Dashboard
   Future<Either<Failure, Dashboard>> execute(String phone) async {
     if (phone.isEmpty) {
-      return Left(DomainFailure('Phone number cannot be empty'));
+      return const Left(DomainFailure('Phone number cannot be empty'));
     }
     
     // Basic phone number validation
     if (!RegExp(r'^\+?[\d\s-]+$').hasMatch(phone)) {
-      return Left(DomainFailure('Invalid phone number format'));
+      return const Left(DomainFailure('Invalid phone number format'));
     }
 
     return repository.getMemberDashboardByPhone(phone);

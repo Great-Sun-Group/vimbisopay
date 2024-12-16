@@ -38,7 +38,7 @@ class _IntroScreenState extends State<IntroScreen> {
           const SizedBox(height: 32),
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -50,7 +50,7 @@ class _IntroScreenState extends State<IntroScreen> {
             child: Text(
               description,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
               ),
@@ -108,7 +108,7 @@ class _IntroScreenState extends State<IntroScreen> {
               child: SmoothPageIndicator(
                 controller: _pageController,
                 count: 3,
-                effect: WormEffect(
+                effect: const WormEffect(
                   dotHeight: 10,
                   dotWidth: 10,
                   spacing: 16,

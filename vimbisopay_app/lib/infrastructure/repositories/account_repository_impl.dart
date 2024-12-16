@@ -34,7 +34,7 @@ class AccountRepositoryImpl implements AccountRepository {
     try {
       final user = await _databaseHelper.getUser();
       if (user == null) {
-        return Left(InfrastructureFailure('Not authenticated'));
+        return const Left(InfrastructureFailure('Not authenticated'));
       }
 
       final result = await request(user.token);
@@ -242,7 +242,7 @@ class AccountRepositoryImpl implements AccountRepository {
           if (!data.containsKey('data') || 
               !data['data'].containsKey('action') ||
               !data['data'].containsKey('dashboard')) {
-            return Left(InfrastructureFailure('Invalid response format'));
+            return const Left(InfrastructureFailure('Invalid response format'));
           }
 
           final actionDetails = data['data']['action']['details'];
@@ -374,7 +374,7 @@ class AccountRepositoryImpl implements AccountRepository {
         if (!jsonResponse.containsKey('data') || 
             !jsonResponse['data'].containsKey('action') ||
             !jsonResponse['data']['action'].containsKey('details')) {
-          return Left(InfrastructureFailure('Invalid response format'));
+          return const Left(InfrastructureFailure('Invalid response format'));
         }
 
         final actionDetails = jsonResponse['data']['action']['details'];

@@ -57,7 +57,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.info.withOpacity(0.3)),
       ),
-      child: Column(
+      child: const Column(
         children: [
           Row(
             children: [
@@ -66,7 +66,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 color: AppColors.info,
                 size: 24,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Enhanced Security Setup',
@@ -79,7 +79,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Add an extra layer of security to protect your account. This helps ensure only you can access your money and personal information.',
             style: TextStyle(
@@ -112,7 +112,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           SnackBar(
             content: Text(
               'Failed to save user data: ${failure.message}',
-              style: TextStyle(color: AppColors.textPrimary),
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
             backgroundColor: AppColors.error,
           ),
@@ -134,7 +134,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           SnackBar(
             content: Text(
               e.toString(),
-              style: TextStyle(color: AppColors.textPrimary),
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
             backgroundColor: AppColors.error,
           ),
@@ -187,7 +187,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
               'PINs do not match. Please try again.',
               style: TextStyle(color: AppColors.textPrimary),
@@ -217,7 +217,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.pin,
                     color: AppColors.warning,
                     size: 24,
@@ -226,7 +226,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                   Expanded(
                     child: Text(
                       isConfirming ? 'Confirm Your PIN' : 'Create Your PIN',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: AppColors.warning,
@@ -240,7 +240,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 isConfirming
                     ? 'Re-enter your PIN to confirm and complete the setup.'
                     : 'Choose a 4-digit PIN that you\'ll remember. This PIN will be used to access your account.',
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   height: 1.4,
                 ),
@@ -304,8 +304,8 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
               _pinController.clear();
             }
           },
-          icon: Icon(Icons.arrow_back, color: AppColors.primary),
-          label: Text(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text(
             'Choose Different Method',
             style: TextStyle(color: AppColors.primary),
           ),
@@ -331,13 +331,13 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
             ),
             child: Column(
               children: [
-                Icon(
+                const Icon(
                   Icons.fingerprint,
                   size: 48,
                   color: AppColors.success,
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Biometric Authentication',
                   style: TextStyle(
                     fontSize: 18,
@@ -346,7 +346,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Use your fingerprint or face recognition for quick and secure access to your account.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -369,7 +369,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(
+          const Text(
             'OR',
             style: TextStyle(
               fontSize: 16,
@@ -389,13 +389,13 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           ),
           child: Column(
             children: [
-              Icon(
+              const Icon(
                 Icons.pin,
                 size: 48,
                 color: AppColors.warning,
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'PIN Setup',
                 style: TextStyle(
                   fontSize: 18,
@@ -404,7 +404,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Create a 4-digit PIN to secure your account. Make sure to choose a PIN you\'ll remember.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
