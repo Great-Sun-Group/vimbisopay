@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
+import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
+
+enum AccountSelectionAction {
+  send,
+  receive,
+}
 
 class AccountSelectionBottomSheet extends StatelessWidget {
   final List<DashboardAccount> accounts;
+  final AccountSelectionAction action;
+  final AccountRepository accountRepository;
 
   const AccountSelectionBottomSheet({
     Key? key,
     required this.accounts,
+    required this.action,
+    required this.accountRepository,
   }) : super(key: key);
 
   @override
@@ -81,19 +92,31 @@ class AccountSelectionBottomSheet extends StatelessWidget {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => Container(
-                      height: MediaQuery.of(context).size.height * 0.9,
-                      decoration: const BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  if (action == AccountSelectionAction.receive) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => Container(
+                        height: MediaQuery.of(context).size.height * 0.9,
+                        decoration: const BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        ),
+                        child: AccountQRDialog(account: account),
                       ),
-                      child: AccountQRDialog(account: account),
-                    ),
-                  );
+                    );
+                  } else if (action == AccountSelectionAction.send) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SendCredexScreen(
+                          senderAccount: account,
+                          accountRepository: accountRepository,
+                        ),
+                      ),
+                    );
+                  }
                 },
               );
             },

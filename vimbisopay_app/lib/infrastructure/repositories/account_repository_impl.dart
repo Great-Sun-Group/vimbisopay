@@ -4,8 +4,10 @@ import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
@@ -217,7 +219,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, Dashboard>> getMemberDashboardByPhone(String phone) async {
+  Future<Either<Failure, dashboard.Dashboard>> getMemberDashboardByPhone(String phone) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
         final url = '$baseUrl/getMemberDashboardByPhone';
@@ -254,25 +256,25 @@ class AccountRepositoryImpl implements AccountRepository {
                 final accountData = account['data'];
                 final balanceData = accountData['balanceData']['data'];
                 
-                return DashboardAccount(
+                return dashboard.DashboardAccount(
                   accountID: accountData['accountID'],
                   accountName: accountData['accountName'],
                   accountHandle: accountData['accountHandle'],
                   defaultDenom: accountData['defaultDenom'],
                   isOwnedAccount: accountData['isOwnedAccount'],
                   authFor: (accountData['authFor'] as List)
-                      .map((auth) => AuthUser(
+                      .map((auth) => dashboard.AuthUser(
                             firstname: auth['firstname'],
                             lastname: auth['lastname'],
                             memberID: auth['memberID'],
                           ))
                       .toList(),
-                  balanceData: BalanceData(
+                  balanceData: dashboard.BalanceData(
                     securedNetBalancesByDenom: 
                         (balanceData['securedNetBalancesByDenom'] as List)
                             .map((balance) => balance.toString())
                             .toList(),
-                    unsecuredBalances: UnsecuredBalances(
+                    unsecuredBalances: dashboard.UnsecuredBalances(
                       totalPayables: balanceData['unsecuredBalancesInDefaultDenom']['totalPayables'],
                       totalReceivables: balanceData['unsecuredBalancesInDefaultDenom']['totalReceivables'],
                       netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
@@ -283,13 +285,13 @@ class AccountRepositoryImpl implements AccountRepository {
               })
               .toList();
 
-          return Right(Dashboard(
+          return Right(dashboard.Dashboard(
             id: actionDetails['memberID'],
             memberHandle: actionDetails['memberHandle'],
             firstname: actionDetails['firstname'],
             lastname: actionDetails['lastname'],
             defaultDenom: actionDetails['defaultDenom'],
-            memberTier: MemberTier(
+            memberTier: dashboard.MemberTier(
               low: actionDetails['memberTier']['low'],
               high: actionDetails['memberTier']['high'],
             ),
@@ -393,5 +395,116 @@ class AccountRepositoryImpl implements AccountRepository {
     } catch (e) {
       return Left(InfrastructureFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, credex.CredexResponse>> createCredex(CredexRequest request) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/createCredex';
+        final headers = _authHeaders(token);
+        final body = request.toJson();
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          final jsonResponse = json.decode(response.body);
+          final data = jsonResponse['data'];
+          final action = data['action'];
+          final dashboard = data['dashboard'];
+          final dashboardData = dashboard['data'];
+          final balanceData = dashboardData['balanceData'];
+
+          return Right(credex.CredexResponse(
+            message: jsonResponse['message'],
+            data: credex.CredexData(
+              action: credex.CredexAction(
+                id: action['id'],
+                type: action['type'],
+                timestamp: action['timestamp'],
+                actor: action['actor'],
+                details: credex.CredexActionDetails(
+                  amount: action['details']['amount'],
+                  denomination: action['details']['denomination'],
+                  securedCredex: action['details']['securedCredex'],
+                  receiverAccountID: action['details']['receiverAccountID'],
+                  receiverAccountName: action['details']['receiverAccountName'],
+                ),
+              ),
+              dashboard: credex.CredexDashboard(
+                success: dashboard['success'],
+                data: credex.CredexDashboardData(
+                  accountID: dashboardData['accountID'],
+                  accountName: dashboardData['accountName'],
+                  accountHandle: dashboardData['accountHandle'],
+                  defaultDenom: dashboardData['defaultDenom'],
+                  isOwnedAccount: dashboardData['isOwnedAccount'],
+                  authFor: (dashboardData['authFor'] as List).map((auth) => credex.AuthUser(
+                    lastname: auth['lastname'],
+                    firstname: auth['firstname'],
+                    memberID: auth['memberID'],
+                  )).toList(),
+                  balanceData: credex.BalanceData(
+                    success: balanceData['success'],
+                    data: credex.BalanceDataDetails(
+                      securedNetBalancesByDenom: 
+                          (balanceData['data']['securedNetBalancesByDenom'] as List)
+                              .map((balance) => balance.toString())
+                              .toList(),
+                      unsecuredBalancesInDefaultDenom: credex.UnsecuredBalances(
+                        totalPayables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalPayables'],
+                        totalReceivables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalReceivables'],
+                        netPayRec: balanceData['data']['unsecuredBalancesInDefaultDenom']['netPayRec'],
+                      ),
+                      netCredexAssetsInDefaultDenom: balanceData['data']['netCredexAssetsInDefaultDenom'],
+                    ),
+                    message: balanceData['message'],
+                  ),
+                  pendingInData: credex.PendingData(
+                    success: dashboardData['pendingInData']['success'],
+                    data: (dashboardData['pendingInData']['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: dashboardData['pendingInData']['message'],
+                  ),
+                  pendingOutData: credex.PendingData(
+                    success: dashboardData['pendingOutData']['success'],
+                    data: (dashboardData['pendingOutData']['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: dashboardData['pendingOutData']['message'],
+                  ),
+                  sendOffersTo: credex.SendOffersTo(
+                    memberID: dashboardData['sendOffersTo']['memberID'],
+                    firstname: dashboardData['sendOffersTo']['firstname'],
+                    lastname: dashboardData['sendOffersTo']['lastname'],
+                  ),
+                ),
+                message: dashboard['message'],
+              ),
+            ),
+          ));
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to create Credex';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
   }
 }
