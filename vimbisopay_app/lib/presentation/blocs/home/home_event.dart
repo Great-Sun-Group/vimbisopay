@@ -77,3 +77,16 @@ class HomeErrorOccurred extends HomeEvent {
   @override
   List<Object?> get props => [message];
 }
+
+class HomeAcceptCredexBulkStarted extends HomeEvent {
+  final List<String> credexIds;
+
+  const HomeAcceptCredexBulkStarted(this.credexIds);
+
+  @override
+  List<Object> get props => [credexIds];
+}
+
+class HomeAcceptCredexBulkCompleted extends HomeEvent {
+  const HomeAcceptCredexBulkCompleted();
+}

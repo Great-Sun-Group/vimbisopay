@@ -45,9 +45,22 @@ class _TransactionsListState extends State<TransactionsList> {
         'Description: ${transaction.description}';
   }
 
+  void _acceptBulkTransactions(BuildContext context) {
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(_selectedTransactions.toList()));
+    setState(() {
+      _selectionMode = false;
+      _selectedTransactions.clear();
+    });
+  }
+
+  void _acceptSingleTransaction(BuildContext context, String credexId) {
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([credexId]));
+  }
+
   Widget _buildPendingTransactionsSection(
     List<PendingOffer> pendingIn,
     List<PendingOffer> pendingOut,
+    HomeState state,
   ) {
     if (pendingIn.isEmpty && pendingOut.isEmpty) return const SizedBox.shrink();
 
@@ -67,7 +80,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              if (pendingIn.isNotEmpty) ...[
+              if (pendingIn.isNotEmpty && state.status != HomeStatus.acceptingCredex) ...[
                 TextButton.icon(
                   onPressed: () {
                     setState(() {
@@ -91,18 +104,26 @@ class _TransactionsListState extends State<TransactionsList> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: Implement bulk confirmation
-                print('Confirming ${_selectedTransactions.length} transactions');
-              },
+              onPressed: state.status == HomeStatus.acceptingCredex
+                  ? null
+                  : () => _acceptBulkTransactions(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 minimumSize: const Size.fromHeight(40),
               ),
-              child: Text(
-                'Confirm ${_selectedTransactions.length} Transactions',
-                style: const TextStyle(color: Colors.white),
-              ),
+              child: state.status == HomeStatus.acceptingCredex
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Confirm ${_selectedTransactions.length} Transactions',
+                      style: const TextStyle(color: Colors.white),
+                    ),
             ),
           ),
         if (pendingIn.isNotEmpty) ...[
@@ -117,7 +138,7 @@ class _TransactionsListState extends State<TransactionsList> {
               ),
             ),
           ),
-          ...pendingIn.map((offer) => _buildPendingTransactionTile(offer, true)),
+          ...pendingIn.map((offer) => _buildPendingTransactionTile(offer, true, state)),
         ],
         if (pendingOut.isNotEmpty) ...[
           const Padding(
@@ -131,14 +152,15 @@ class _TransactionsListState extends State<TransactionsList> {
               ),
             ),
           ),
-          ...pendingOut.map((offer) => _buildPendingTransactionTile(offer, false)),
+          ...pendingOut.map((offer) => _buildPendingTransactionTile(offer, false, state)),
         ],
       ],
     );
   }
 
-  Widget _buildPendingTransactionTile(PendingOffer offer, bool isIncoming) {
+  Widget _buildPendingTransactionTile(PendingOffer offer, bool isIncoming, HomeState state) {
     final bool isSelected = _selectedTransactions.contains(offer.credexID);
+    final bool isProcessing = state.processingCredexIds.contains(offer.credexID);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -146,17 +168,19 @@ class _TransactionsListState extends State<TransactionsList> {
         elevation: isSelected ? 2 : 0,
         color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
         child: InkWell(
-          onTap: _selectionMode
-              ? () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedTransactions.remove(offer.credexID);
-                    } else {
-                      _selectedTransactions.add(offer.credexID);
+          onTap: (state.status == HomeStatus.acceptingCredex || isProcessing)
+              ? null
+              : _selectionMode
+                  ? () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedTransactions.remove(offer.credexID);
+                        } else {
+                          _selectedTransactions.add(offer.credexID);
+                        }
+                      });
                     }
-                  });
-                }
-              : null,
+                  : null,
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -166,15 +190,17 @@ class _TransactionsListState extends State<TransactionsList> {
                     padding: const EdgeInsets.only(right: 8.0),
                     child: Checkbox(
                       value: isSelected,
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedTransactions.add(offer.credexID);
-                          } else {
-                            _selectedTransactions.remove(offer.credexID);
-                          }
-                        });
-                      },
+                      onChanged: (state.status == HomeStatus.acceptingCredex || isProcessing)
+                          ? null
+                          : (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  _selectedTransactions.add(offer.credexID);
+                                } else {
+                                  _selectedTransactions.remove(offer.credexID);
+                                }
+                              });
+                            },
                       activeColor: AppColors.primary,
                     ),
                   ),
@@ -231,22 +257,30 @@ class _TransactionsListState extends State<TransactionsList> {
                     if (!_selectionMode && isIncoming) ...[
                       const SizedBox(height: 8),
                       ElevatedButton(
-                        onPressed: () {
-                          // TODO: Implement individual confirmation
-                          print('Confirming transaction ${offer.credexID}');
-                        },
+                        onPressed: (state.status == HomeStatus.acceptingCredex || isProcessing)
+                            ? null
+                            : () => _acceptSingleTransaction(context, offer.credexID),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           minimumSize: const Size(60, 30),
                         ),
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                height: 15,
+                                width: 15,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
                       ),
                     ],
                   ],
@@ -261,9 +295,18 @@ class _TransactionsListState extends State<TransactionsList> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<HomeBloc, HomeState>(
+    return BlocConsumer<HomeBloc, HomeState>(
+      listener: (context, state) {
+        if (state.status == HomeStatus.error && state.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error!),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
       builder: (context, state) {
-        print('TransactionList state: ${state.status}');
         if (state.status == HomeStatus.initial ||
             ((state.status == HomeStatus.loading || state.status == HomeStatus.success) &&
              state.combinedLedgerEntries.isEmpty &&
@@ -279,7 +322,7 @@ class _TransactionsListState extends State<TransactionsList> {
           );
         }
 
-        if (state.error != null) {
+        if (state.error != null && !state.hasPendingTransactions) {
           return EmptyState(
             icon: Icons.cloud_off_rounded,
             message: state.error!,
@@ -337,6 +380,7 @@ class _TransactionsListState extends State<TransactionsList> {
               _buildPendingTransactionsSection(
                 state.pendingInTransactions,
                 state.pendingOutTransactions,
+                state,
               ),
               if (state.combinedLedgerEntries.isNotEmpty) ...[
                 const Padding(

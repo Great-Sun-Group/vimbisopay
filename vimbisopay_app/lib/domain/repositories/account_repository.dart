@@ -36,4 +36,6 @@ abstract class AccountRepository {
   Future<Either<Failure, Dashboard>> getMemberDashboardByPhone(String phone);
 
   Future<Either<Failure, CredexResponse>> createCredex(CredexRequest request);
+
+  Future<Either<Failure, bool>> acceptCredexBulk(List<String> credexIds);
 }

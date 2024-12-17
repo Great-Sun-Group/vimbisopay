@@ -9,6 +9,7 @@ enum HomeStatus {
   loading,
   loadingMore,
   refreshing,
+  acceptingCredex,
   success,
   error,
 }
@@ -24,6 +25,7 @@ class HomeState extends Equatable {
   final bool hasMoreEntries;
   final String? error;
   final int currentPage;
+  final List<String> processingCredexIds;
 
   const HomeState({
     this.status = HomeStatus.initial,
@@ -36,11 +38,13 @@ class HomeState extends Equatable {
     this.hasMoreEntries = true,
     this.error,
     this.currentPage = 0,
+    this.processingCredexIds = const [],
   });
 
   bool get isInitialLoading => status == HomeStatus.loading && combinedLedgerEntries.isEmpty;
   bool get isRefreshing => status == HomeStatus.refreshing;
   bool get isLoadingMore => status == HomeStatus.loadingMore;
+  bool get isAcceptingCredex => status == HomeStatus.acceptingCredex;
   bool get hasError => error != null;
   bool get hasPendingTransactions => pendingInTransactions.isNotEmpty || pendingOutTransactions.isNotEmpty;
 
@@ -55,6 +59,7 @@ class HomeState extends Equatable {
     bool? hasMoreEntries,
     String? error,
     int? currentPage,
+    List<String>? processingCredexIds,
   }) {
     return HomeState(
       status: status ?? this.status,
@@ -67,6 +72,7 @@ class HomeState extends Equatable {
       hasMoreEntries: hasMoreEntries ?? this.hasMoreEntries,
       error: error,  // Intentionally not using ?? to allow setting to null
       currentPage: currentPage ?? this.currentPage,
+      processingCredexIds: processingCredexIds ?? this.processingCredexIds,
     );
   }
 
@@ -82,5 +88,6 @@ class HomeState extends Equatable {
         hasMoreEntries,
         error,
         currentPage,
+        processingCredexIds,
       ];
 }
