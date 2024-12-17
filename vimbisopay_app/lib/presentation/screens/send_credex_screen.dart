@@ -27,7 +27,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   final _recipientController = TextEditingController();
   late final TextEditingController _amountController;
   final _amountFocusNode = FocusNode();
-  late final Denomination _selectedDenomination;
+  late Denomination _selectedDenomination;
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAmountFirstEdit = true;
@@ -38,6 +38,16 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   int get _decimalPlaces => _selectedDenomination == Denomination.CXX ? 3 : 2;
 
   String get _defaultAmount => '0.${'0' * _decimalPlaces}';
+
+  double get _availableBalance {
+    final denom = _selectedDenomination.toString().split('.').last;
+    final balanceStr = widget.senderAccount.balanceData.securedNetBalancesByDenom
+        .firstWhere(
+          (balance) => balance.contains(denom),
+          orElse: () => '0.0 $denom',
+        );
+    return double.tryParse(balanceStr.split(' ').first) ?? 0.0;
+  }
 
   @override
   void initState() {
@@ -70,7 +80,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
 
   void _setupRecipientListener() {
     _recipientController.addListener(() {
-      // Clear the recipient account ID when the handle changes
       if (_recipientAccountId != null) {
         setState(() {
           _recipientAccountId = null;
@@ -205,7 +214,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     });
 
     try {
-      // First validate/fetch recipient account if needed
       if (!await _validateRecipient()) {
         setState(() => _isLoading = false);
         return;
@@ -315,6 +323,38 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                 color: AppColors.textPrimary,
                 fontSize: 14,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceIndicator() {
+    final balance = _availableBalance;
+    final denom = _selectedDenomination.toString().split('.').last;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.account_balance_wallet,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Available: $balance $denom',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
             ),
           ),
         ],
@@ -453,6 +493,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                _buildBalanceIndicator(),
                 Row(
                   children: [
                     Expanded(
@@ -487,6 +528,11 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           }
                           if (amount <= 0) {
                             return 'Amount must be greater than 0';
+                          }
+                          if (amount > _availableBalance) {
+                          }
+                          if (amount > _availableBalance) {
+                            return 'Amount exceeds available balance';
                           }
                           return null;
                         },
