@@ -83,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          overlayColor: MaterialStateProperty.all(AppColors.highlightOverlay),
+          overlayColor: WidgetStateProperty.all(AppColors.highlightOverlay),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(

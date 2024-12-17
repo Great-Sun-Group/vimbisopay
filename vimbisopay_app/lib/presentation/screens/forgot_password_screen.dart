@@ -58,14 +58,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           color: AppColors.primary.withOpacity(0.2),
         ),
       ),
-      child: Column(
+      child: const Column(
         children: [
           Icon(
             Icons.lock_reset,
             size: 48,
             color: AppColors.primary,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'Reset Password',
             style: TextStyle(
@@ -75,7 +75,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Enter your phone number and we\'ll send you instructions to reset your password.',
             style: TextStyle(
@@ -107,13 +107,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           child: Column(
             children: [
-              Icon(
+              const Icon(
                 Icons.check_circle_outline,
                 color: AppColors.success,
                 size: 64,
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Instructions Sent!',
                 style: TextStyle(
                   fontSize: 20,
@@ -125,7 +125,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const SizedBox(height: 8),
               Text(
                 'We\'ve sent password reset instructions to +${_phoneController.text}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   height: 1.4,
                   color: AppColors.textPrimary,
@@ -190,11 +190,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       enabledBorder: inputBorder,
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
-      labelStyle: TextStyle(color: AppColors.textSecondary),
+      labelStyle: const TextStyle(color: AppColors.textSecondary),
       helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: TextStyle(color: AppColors.error),
+      errorStyle: const TextStyle(color: AppColors.error),
       prefixIconColor: AppColors.primary,
     );
 
@@ -216,7 +216,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.primary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -262,7 +262,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? SizedBox(
+                            ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(

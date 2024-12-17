@@ -22,7 +22,7 @@ class DatabaseHelper {
     final String path = join(await getDatabasesPath(), 'vimbisopay.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3, // Increment version to trigger upgrade
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -33,8 +33,10 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    await db.execute('DROP TABLE IF EXISTS users');
-    await _createTables(db);
+    if (oldVersion < 3) {
+      // Handle upgrade to version 3 (adding tier column)
+      await db.execute('ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT "free"');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -42,7 +44,8 @@ class DatabaseHelper {
       CREATE TABLE users(
         memberId TEXT PRIMARY KEY,
         phone TEXT NOT NULL,
-        token TEXT NOT NULL
+        token TEXT NOT NULL,
+        tier TEXT NOT NULL DEFAULT "free"
       )
     ''');
   }
@@ -57,11 +60,7 @@ class DatabaseHelper {
       // Save the new user
       await db.insert(
         'users',
-        {
-          'memberId': user.memberId,
-          'phone': user.phone,
-          'token': user.token,
-        },
+        user.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     } catch (e) {
@@ -76,11 +75,7 @@ class DatabaseHelper {
 
       if (maps.isEmpty) return null;
 
-      return User(
-        memberId: maps.first['memberId'] as String,
-        phone: maps.first['phone'] as String,
-        token: maps.first['token'] as String,
-      );
+      return User.fromMap(maps.first);
     } catch (e) {
       throw Exception('Failed to get user: $e');
     }

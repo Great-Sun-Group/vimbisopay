@@ -87,14 +87,14 @@ class _LoginScreenState extends State<LoginScreen> {
           color: AppColors.primary.withOpacity(0.2),
         ),
       ),
-      child: Column(
+      child: const Column(
         children: [
           Icon(
             Icons.account_circle_outlined,
             size: 48,
             color: AppColors.primary,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'Welcome Back!',
             style: TextStyle(
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Log in to your VimbisoPay account to send money, check balances, and manage your transactions securely.',
             style: TextStyle(
@@ -130,14 +130,14 @@ class _LoginScreenState extends State<LoginScreen> {
           color: AppColors.info.withOpacity(0.2),
         ),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(
             Icons.security_outlined,
             color: AppColors.info,
             size: 24,
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
               'Your security is our priority. We use industry-standard encryption to protect your information.',
@@ -167,13 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.error_outline,
                   size: 80,
                   color: AppColors.error,
                 ),
                 const SizedBox(height: 24),
-                Text(
+                const Text(
                   'Login Failed',
                   style: TextStyle(
                     fontSize: 20,
@@ -185,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textPrimary,
                   ),
@@ -265,11 +265,11 @@ class _LoginScreenState extends State<LoginScreen> {
       enabledBorder: inputBorder,
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
-      labelStyle: TextStyle(color: AppColors.textSecondary),
+      labelStyle: const TextStyle(color: AppColors.textSecondary),
       helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: TextStyle(color: AppColors.error),
+      errorStyle: const TextStyle(color: AppColors.error),
       prefixIconColor: AppColors.primary,
     );
 
@@ -295,9 +295,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       TextFormField(
                         controller: _phoneController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Phone Number',
-                          prefixIcon: const Icon(Icons.phone),
+                          prefixIcon: Icon(Icons.phone),
                           hintText: '263712345678 or 353871234567',
                           helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
                           helperMaxLines: 2,
@@ -339,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? SizedBox(
+                            ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
