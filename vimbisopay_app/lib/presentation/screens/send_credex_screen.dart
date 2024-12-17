@@ -218,8 +218,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
         receiverAccountID: _recipientAccountId!,
         denomination: _selectedDenomination.toString().split('.').last,
         initialAmount: double.parse(_amountController.text),
-        credexType: "PURCHASE",
-        offersOrRequests: "OFFERS",
+        credexType: 'PURCHASE',
+        offersOrRequests: 'OFFERS',
         securedCredex: true,
       );
       
