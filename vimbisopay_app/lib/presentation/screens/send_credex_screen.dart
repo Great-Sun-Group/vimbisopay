@@ -31,7 +31,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAmountFirstEdit = true;
-  String? _recipientAccountId; // Added to store the scanned account ID
+  String? _recipientAccountId;
+  String? _statusMessage;
+  bool _isValidatingRecipient = false;
 
   int get _decimalPlaces => _selectedDenomination == Denomination.CXX ? 3 : 2;
 
@@ -40,13 +42,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize _selectedDenomination based on account's defaultDenom
     _selectedDenomination = Denomination.values.firstWhere(
       (d) => d.toString().split('.').last == widget.senderAccount.defaultDenom,
       orElse: () => Denomination.USD,
     );
     _amountController = TextEditingController(text: _defaultAmount);
     _setupAmountFocusListener();
+    _setupRecipientListener();
   }
 
   void _setupAmountFocusListener() {
@@ -66,11 +68,21 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     });
   }
 
+  void _setupRecipientListener() {
+    _recipientController.addListener(() {
+      // Clear the recipient account ID when the handle changes
+      if (_recipientAccountId != null) {
+        setState(() {
+          _recipientAccountId = null;
+        });
+      }
+    });
+  }
+
   void _handleDenominationChange(Denomination? newValue) {
     if (newValue != null && newValue != _selectedDenomination) {
       setState(() {
         _selectedDenomination = newValue;
-        // Convert the current amount to the new decimal places
         if (_amountController.text.isNotEmpty && !_isAmountFirstEdit) {
           final amount = double.tryParse(_amountController.text) ?? 0.0;
           _amountController.text = amount.toStringAsFixed(_decimalPlaces);
@@ -108,6 +120,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   void _showError(String message) {
     setState(() {
       _errorMessage = _getFormattedErrorMessage(message);
+      _statusMessage = null;
     });
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
@@ -115,6 +128,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           _errorMessage = null;
         });
       }
+    });
+  }
+
+  void _updateStatus(String message) {
+    setState(() {
+      _statusMessage = message;
+      _errorMessage = null;
     });
   }
 
@@ -127,69 +147,146 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     );
 
     if (result != null && mounted) {
-      // Handle the new format where handle and ID are separated by #
       final parts = result.split('#');
       if (parts.length == 2) {
         final handle = parts[0].startsWith('@') ? parts[0].substring(1) : parts[0];
         setState(() {
           _recipientController.text = handle;
           _recipientAccountId = parts[1];
+          _errorMessage = null;
+        });
+      }
+    }
+  }
+
+  Future<bool> _validateRecipient() async {
+    if (_recipientAccountId != null) return true;
+    
+    setState(() {
+      _isValidatingRecipient = true;
+      _errorMessage = null;
+    });
+
+    try {
+      _updateStatus('Validating recipient account...');
+      
+      final accountResult = await widget.accountRepository.getAccountByHandle(_recipientController.text);
+      
+      return accountResult.fold(
+        (failure) {
+          _showError(failure.message ?? 'Failed to validate recipient account');
+          return false;
+        },
+        (account) {
+          setState(() {
+            _recipientAccountId = account.id;
+          });
+          return true;
+        },
+      );
+    } catch (e) {
+      _showError(e.toString());
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isValidatingRecipient = false;
         });
       }
     }
   }
 
   Future<void> _handleSubmit() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        if (_recipientAccountId == null) {
-          // TODO: Call get account by handle to fetch the account ID
-          return;
-        }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-        final credexRequest = CredexRequest(
-          issuerAccountID: widget.senderAccount.accountID,
-          receiverAccountID: _recipientAccountId!, // Now we're sure this is not null
-          denomination: _selectedDenomination.toString().split('.').last,
-          initialAmount: double.parse(_amountController.text),
-          credexType: "PURCHASE",
-          offersOrRequests: "OFFERS",
-          securedCredex: true,
-        );
-        
-        final result = await widget.accountRepository.createCredex(credexRequest);
-        
-        result.fold(
-          (failure) {
-            _showError(failure.toString());
-          },
-          (response) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Successfully sent ${_amountController.text} ${_selectedDenomination.toString().split('.').last} to @${_recipientController.text}',
-                ),
-                backgroundColor: AppColors.success,
+    try {
+      // First validate/fetch recipient account if needed
+      if (!await _validateRecipient()) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      _updateStatus('Creating Credex transaction...');
+
+      final credexRequest = CredexRequest(
+        issuerAccountID: widget.senderAccount.accountID,
+        receiverAccountID: _recipientAccountId!,
+        denomination: _selectedDenomination.toString().split('.').last,
+        initialAmount: double.parse(_amountController.text),
+        credexType: "PURCHASE",
+        offersOrRequests: "OFFERS",
+        securedCredex: true,
+      );
+      
+      final result = await widget.accountRepository.createCredex(credexRequest);
+      
+      result.fold(
+        (failure) {
+          _showError(failure.toString());
+        },
+        (response) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Successfully sent ${_amountController.text} ${_selectedDenomination.toString().split('.').last} to @${_recipientController.text}',
               ),
-            );
-            Navigator.of(context).pop();
-          },
-        );
-      } catch (e) {
-        _showError(e.toString());
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.of(context).pop();
+        },
+      );
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = null;
+        });
       }
     }
+  }
+
+  Widget _buildStatusMessage() {
+    if (_statusMessage == null) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.primary, width: 1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _statusMessage!,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorMessage() {
@@ -250,6 +347,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildStatusMessage(),
                 _buildErrorMessage(),
                 Card(
                   color: AppColors.surface,
@@ -322,6 +420,21 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             borderSide: BorderSide.none,
                             borderRadius: BorderRadius.circular(4),
                           ),
+                          suffixIcon: _isValidatingRecipient
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12.0),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                    ),
+                                  ),
+                                )
+                              : _recipientAccountId != null
+                                  ? const Icon(Icons.check_circle, color: AppColors.success)
+                                  : null,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {

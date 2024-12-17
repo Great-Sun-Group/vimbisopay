@@ -60,6 +60,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       status: HomeStatus.success,
       dashboard: event.dashboard,
       user: event.user,
+      pendingInTransactions: event.pendingInTransactions,
+      pendingOutTransactions: event.pendingOutTransactions,
       error: null,
     ));
   }

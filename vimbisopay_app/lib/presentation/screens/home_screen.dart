@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
@@ -77,7 +78,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            _homeBloc.add(HomeDataLoaded(dashboard: dashboard, user: user));
+            // Extract pending transactions from the first account's dashboard data
+            List<PendingOffer> pendingInTransactions = [];
+            List<PendingOffer> pendingOutTransactions = [];
+            
+            if (dashboard.accounts.isNotEmpty) {
+              final firstAccount = dashboard.accounts.first;
+              pendingInTransactions = firstAccount.pendingInData.data;
+              pendingOutTransactions = firstAccount.pendingOutData.data;
+            }
+
+            _homeBloc.add(HomeDataLoaded(
+              dashboard: dashboard,
+              user: user,
+              pendingInTransactions: pendingInTransactions,
+              pendingOutTransactions: pendingOutTransactions,
+            ));
 
             // Get ledger for all accounts
             final Map<String, List<LedgerEntry>> accountLedgers = {};
@@ -147,7 +163,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            _homeBloc.add(HomeDataLoaded(dashboard: dashboard, user: user));
+            // Extract pending transactions from the first account's dashboard data
+            List<PendingOffer> pendingInTransactions = [];
+            List<PendingOffer> pendingOutTransactions = [];
+            
+            if (dashboard.accounts.isNotEmpty) {
+              final firstAccount = dashboard.accounts.first;
+              pendingInTransactions = firstAccount.pendingInData.data;
+              pendingOutTransactions = firstAccount.pendingOutData.data;
+            }
+
+            _homeBloc.add(HomeDataLoaded(
+              dashboard: dashboard,
+              user: user,
+              pendingInTransactions: pendingInTransactions,
+              pendingOutTransactions: pendingOutTransactions,
+            ));
 
             // Get ledger for all accounts
             final Map<String, List<LedgerEntry>> accountLedgers = {};

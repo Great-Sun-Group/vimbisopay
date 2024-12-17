@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 
 enum HomeStatus {
   initial,
@@ -18,6 +19,8 @@ class HomeState extends Equatable {
   final User? user;
   final Map<String, List<LedgerEntry>> accountLedgers;
   final List<LedgerEntry> combinedLedgerEntries;
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
   final bool hasMoreEntries;
   final String? error;
   final int currentPage;
@@ -28,6 +31,8 @@ class HomeState extends Equatable {
     this.user,
     this.accountLedgers = const {},
     this.combinedLedgerEntries = const [],
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
     this.hasMoreEntries = true,
     this.error,
     this.currentPage = 0,
@@ -37,6 +42,7 @@ class HomeState extends Equatable {
   bool get isRefreshing => status == HomeStatus.refreshing;
   bool get isLoadingMore => status == HomeStatus.loadingMore;
   bool get hasError => error != null;
+  bool get hasPendingTransactions => pendingInTransactions.isNotEmpty || pendingOutTransactions.isNotEmpty;
 
   HomeState copyWith({
     HomeStatus? status,
@@ -44,6 +50,8 @@ class HomeState extends Equatable {
     User? user,
     Map<String, List<LedgerEntry>>? accountLedgers,
     List<LedgerEntry>? combinedLedgerEntries,
+    List<PendingOffer>? pendingInTransactions,
+    List<PendingOffer>? pendingOutTransactions,
     bool? hasMoreEntries,
     String? error,
     int? currentPage,
@@ -54,6 +62,8 @@ class HomeState extends Equatable {
       user: user ?? this.user,
       accountLedgers: accountLedgers ?? this.accountLedgers,
       combinedLedgerEntries: combinedLedgerEntries ?? this.combinedLedgerEntries,
+      pendingInTransactions: pendingInTransactions ?? this.pendingInTransactions,
+      pendingOutTransactions: pendingOutTransactions ?? this.pendingOutTransactions,
       hasMoreEntries: hasMoreEntries ?? this.hasMoreEntries,
       error: error,  // Intentionally not using ?? to allow setting to null
       currentPage: currentPage ?? this.currentPage,
@@ -67,6 +77,8 @@ class HomeState extends Equatable {
         user,
         accountLedgers,
         combinedLedgerEntries,
+        pendingInTransactions,
+        pendingOutTransactions,
         hasMoreEntries,
         error,
         currentPage,

@@ -14,7 +14,7 @@ import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
-  final String baseUrl = 'https://dev.mycredex.dev';
+  final String baseUrl = ApiConfig.baseUrl;
   
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final SecurityService _securityService = SecurityService();
@@ -191,24 +191,39 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, Account>> getAccountByHandle(String handle) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = '$baseUrl/accounts/$handle';
+        final url = '$baseUrl/getAccountByHandle';
         final headers = _authHeaders(token);
+        final body = {'accountHandle': handle};
 
         final response = await _loggedRequest(
-          () => http.get(Uri.parse(url), headers: headers),
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
           url,
-          'GET',
+          'POST',
           headers: headers,
+          body: body,
         );
 
         if (response.statusCode == 200) {
-          final data = json.decode(response.body);
+          final jsonResponse = json.decode(response.body);
+          
+          if (!jsonResponse.containsKey('data') || 
+              !jsonResponse['data'].containsKey('action') ||
+              !jsonResponse['data']['action'].containsKey('details')) {
+            return const Left(InfrastructureFailure('Invalid response format'));
+          }
+
+          final details = jsonResponse['data']['action']['details'];
+          
           return Right(Account(
-            id: data['id'],
-            handle: data['handle'],
-            name: data['name'],
-            defaultDenom: data['defaultDenom'],
-            balances: Map<String, double>.from(data['balances']),
+            id: details['accountID'],
+            handle: details['accountHandle'],
+            name: details['accountName'],
+            defaultDenom: details['defaultDenom'],
+            balances: {}, // Balances not included in this response
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
@@ -258,6 +273,8 @@ class AccountRepositoryImpl implements AccountRepository {
               .map((account) {
                 final accountData = account['data'];
                 final balanceData = accountData['balanceData']['data'];
+                final pendingInData = accountData['pendingInData'];
+                final pendingOutData = accountData['pendingOutData'];
                 
                 return dashboard.DashboardAccount(
                   accountID: accountData['accountID'],
@@ -283,6 +300,26 @@ class AccountRepositoryImpl implements AccountRepository {
                       netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
                     ),
                     netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'],
+                  ),
+                  pendingInData: credex.PendingData(
+                    success: pendingInData['success'],
+                    data: (pendingInData['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: pendingInData['message'],
+                  ),
+                  pendingOutData: credex.PendingData(
+                    success: pendingOutData['success'],
+                    data: (pendingOutData['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: pendingOutData['message'],
                   ),
                 );
               })
