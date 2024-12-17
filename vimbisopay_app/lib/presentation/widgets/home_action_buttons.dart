@@ -89,88 +89,45 @@ class HomeActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: HomeConstants.defaultPadding - 4,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _ActionButton(
-            icon: Icons.payments_outlined,
-            label: 'Send',
-            onTap: () => _handleSendTap(context),
-          ),
-          _ActionButton(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Receive',
-            onTap: () => _handleReceiveTap(context),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: HomeConstants.actionButtonSize,
-            height: HomeConstants.actionButtonSize,
+    return BottomNavigationBar(
+      backgroundColor: AppColors.surface,
+      elevation: 8,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.primary,
+      showSelectedLabels: true,
+      showUnselectedLabels: true,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primary,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: AppColors.primary.withOpacity(0.1),
             ),
-            child: Icon(
-              icon,
-              size: HomeConstants.actionButtonIconSize,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.payments_outlined),
           ),
+          label: 'Send',
         ),
-        const SizedBox(height: HomeConstants.tinyPadding),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: HomeConstants.actionButtonTextSize,
-            fontWeight: FontWeight.w500,
+        BottomNavigationBarItem(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withOpacity(0.1),
+            ),
+            child: const Icon(Icons.account_balance_wallet_outlined),
           ),
+          label: 'Receive',
         ),
       ],
+      onTap: (index) {
+        if (index == 0) {
+          _handleSendTap(context);
+        } else {
+          _handleReceiveTap(context);
+        }
+      },
     );
   }
 }

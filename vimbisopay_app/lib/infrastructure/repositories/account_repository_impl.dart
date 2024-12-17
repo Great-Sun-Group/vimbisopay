@@ -250,6 +250,9 @@ class AccountRepositoryImpl implements AccountRepository {
           final actionDetails = data['data']['action']['details'];
           final dashboardData = data['data']['dashboard'];
           
+          // Create a Set to track unique account handles
+          final seenHandles = <String>{};
+          
           final accountsList = (dashboardData['accounts'] as List)
               .where((account) => account['success'] == true)
               .map((account) {
@@ -283,6 +286,7 @@ class AccountRepositoryImpl implements AccountRepository {
                   ),
                 );
               })
+              .where((account) => seenHandles.add(account.accountHandle)) // Only keep accounts with unique handles
               .toList();
 
           return Right(dashboard.Dashboard(

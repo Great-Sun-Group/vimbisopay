@@ -1,15 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 
-class AccountQRDialog extends StatelessWidget {
+class AccountQRDialog extends StatefulWidget {
   final DashboardAccount account;
 
   const AccountQRDialog({
     Key? key,
     required this.account,
   }) : super(key: key);
+
+  @override
+  State<AccountQRDialog> createState() => _AccountQRDialogState();
+}
+
+class _AccountQRDialogState extends State<AccountQRDialog> {
+  double? _originalBrightness;
+
+  @override
+  void initState() {
+    super.initState();
+    _setBrightnessMax();
+  }
+
+  @override
+  void dispose() {
+    _resetBrightness();
+    super.dispose();
+  }
+
+  Future<void> _setBrightnessMax() async {
+    try {
+      _originalBrightness = await ScreenBrightness().current;
+      await ScreenBrightness().setScreenBrightness(1.0);
+    } catch (e) {
+      debugPrint('Failed to set screen brightness: $e');
+    }
+  }
+
+  Future<void> _resetBrightness() async {
+    if (_originalBrightness != null) {
+      try {
+        await ScreenBrightness().setScreenBrightness(_originalBrightness!);
+      } catch (e) {
+        debugPrint('Failed to reset screen brightness: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +71,7 @@ class AccountQRDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
-                    account.accountName,
+                    widget.account.accountName,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -52,7 +91,7 @@ class AccountQRDialog extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        account.accountHandle,
+                        widget.account.accountHandle,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
@@ -74,7 +113,7 @@ class AccountQRDialog extends StatelessWidget {
                       ],
                     ),
                     child: QrImageView(
-                      data: account.accountID,
+                      data: '${widget.account.accountHandle}#${widget.account.accountID}',
                       version: QrVersions.auto,
                       size: 200,
                       backgroundColor: Colors.white,
@@ -90,7 +129,7 @@ class AccountQRDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Account ID: ${account.accountID}',
+                    'Account ID: ${widget.account.accountID}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

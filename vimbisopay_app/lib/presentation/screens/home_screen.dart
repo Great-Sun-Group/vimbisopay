@@ -14,6 +14,7 @@ import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
@@ -359,13 +360,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildAccountsSection(HomeState state) {
-    final viewPagerHeight = UIUtils.getViewPagerHeight(context);
-    
     return Column(
       children: [
         const SizedBox(height: HomeConstants.defaultPadding),
-        SizedBox(
-          height: viewPagerHeight,
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
+          ),
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => _homeBloc.add(HomePageChanged(index)),
@@ -398,8 +399,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             if (state.dashboard != null) _buildAccountsSection(state),
             const TransactionsList(),
-            // Extra space for action buttons
-            const SizedBox(height: 120),
           ],
         ),
       ),
@@ -439,21 +438,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             backgroundColor: Colors.transparent,
             appBar: _buildAppBar(state),
             body: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: _buildScrollableContent(state),
-                  ),
-                  HomeActionButtons(
-                    accounts: state.dashboard?.accounts,
-                    onSendTap: () {
-                      // TODO: Implement send money
-                    },
-                    accountRepository: _accountRepository,
-                  ),
-                ],
-              ),
+              child: state.isInitialLoading
+                  ? const LoadingAnimation(size: 100)
+                  : _buildScrollableContent(state),
+            ),
+            bottomNavigationBar: HomeActionButtons(
+              accounts: state.dashboard?.accounts,
+              onSendTap: () {
+                // TODO: Implement send money
+              },
+              accountRepository: _accountRepository,
             ),
           );
         },

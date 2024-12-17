@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
@@ -23,29 +25,117 @@ class SendCredexScreen extends StatefulWidget {
 class _SendCredexScreenState extends State<SendCredexScreen> {
   final _formKey = GlobalKey<FormState>();
   final _recipientController = TextEditingController();
-  final _amountController = TextEditingController();
-  Denomination _selectedDenomination = Denomination.USD; // Default to USD
+  late final TextEditingController _amountController;
+  final _amountFocusNode = FocusNode();
+  late final Denomination _selectedDenomination;
   bool _isLoading = false;
+  String? _errorMessage;
+  bool _isAmountFirstEdit = true;
+  String? _recipientAccountId; // Added to store the scanned account ID
+
+  int get _decimalPlaces => _selectedDenomination == Denomination.CXX ? 3 : 2;
+
+  String get _defaultAmount => '0.${'0' * _decimalPlaces}';
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize _selectedDenomination based on account's defaultDenom
+    _selectedDenomination = Denomination.values.firstWhere(
+      (d) => d.toString().split('.').last == widget.senderAccount.defaultDenom,
+      orElse: () => Denomination.USD,
+    );
+    _amountController = TextEditingController(text: _defaultAmount);
+    _setupAmountFocusListener();
+  }
+
+  void _setupAmountFocusListener() {
+    _amountFocusNode.addListener(() {
+      if (_amountFocusNode.hasFocus && _isAmountFirstEdit) {
+        _amountController.text = '';
+        _isAmountFirstEdit = false;
+      } else if (!_amountFocusNode.hasFocus) {
+        if (_amountController.text.isEmpty) {
+          _amountController.text = _defaultAmount;
+          _isAmountFirstEdit = true;
+        } else {
+          final amount = double.tryParse(_amountController.text) ?? 0.0;
+          _amountController.text = amount.toStringAsFixed(_decimalPlaces);
+        }
+      }
+    });
+  }
+
+  void _handleDenominationChange(Denomination? newValue) {
+    if (newValue != null && newValue != _selectedDenomination) {
+      setState(() {
+        _selectedDenomination = newValue;
+        // Convert the current amount to the new decimal places
+        if (_amountController.text.isNotEmpty && !_isAmountFirstEdit) {
+          final amount = double.tryParse(_amountController.text) ?? 0.0;
+          _amountController.text = amount.toStringAsFixed(_decimalPlaces);
+        } else {
+          _amountController.text = _defaultAmount;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
     _recipientController.dispose();
     _amountController.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
+  }
+
+  String _getFormattedErrorMessage(String error) {
+    if (error.toLowerCase().contains('not found')) {
+      return 'The recipient account was not found. Please check the handle and try again.';
+    } else if (error.toLowerCase().contains('insufficient')) {
+      return 'You have insufficient balance to complete this transaction.';
+    } else if (error.toLowerCase().contains('network') || error.toLowerCase().contains('timeout')) {
+      return 'Unable to complete the transaction due to network issues. Please check your connection and try again.';
+    } else if (error.toLowerCase().contains('invalid')) {
+      return 'The transaction details are invalid. Please check the amount and recipient handle.';
+    } else if (error.toLowerCase().contains('unauthorized')) {
+      return 'You are not authorized to perform this transaction. Please log in again.';
+    } else {
+      return 'Unable to send Credex at this time. Please try again later.';
+    }
+  }
+
+  void _showError(String message) {
+    setState(() {
+      _errorMessage = _getFormattedErrorMessage(message);
+    });
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _errorMessage = null;
+        });
+      }
+    });
   }
 
   Future<void> _scanQRCode() async {
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (context) => const ScanQRScreen(),
-        fullscreenDialog: true, // This helps maintain proper navigation stack
+        fullscreenDialog: true,
       ),
     );
 
     if (result != null && mounted) {
-      setState(() {
-        _recipientController.text = result;
-      });
+      // Handle the new format where handle and ID are separated by #
+      final parts = result.split('#');
+      if (parts.length == 2) {
+        final handle = parts[0].startsWith('@') ? parts[0].substring(1) : parts[0];
+        setState(() {
+          _recipientController.text = handle;
+          _recipientAccountId = parts[1];
+        });
+      }
     }
   }
 
@@ -53,15 +143,21 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
+        _errorMessage = null;
       });
 
       try {
+        if (_recipientAccountId == null) {
+          // TODO: Call get account by handle to fetch the account ID
+          return;
+        }
+
         final credexRequest = CredexRequest(
           issuerAccountID: widget.senderAccount.accountID,
-          receiverAccountID: _recipientController.text,
+          receiverAccountID: _recipientAccountId!, // Now we're sure this is not null
           denomination: _selectedDenomination.toString().split('.').last,
           initialAmount: double.parse(_amountController.text),
-          credexType: "PURCHASE", //TODO use the actual credex type
+          credexType: "PURCHASE",
           offersOrRequests: "OFFERS",
           securedCredex: true,
         );
@@ -70,32 +166,22 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
         
         result.fold(
           (failure) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error: ${failure.toString()}'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            _showError(failure.toString());
           },
           (response) {
-            // Show success message and pop
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Credex sent successfully'),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: Text(
+                  'Successfully sent ${_amountController.text} ${_selectedDenomination.toString().split('.').last} to @${_recipientController.text}',
+                ),
+                backgroundColor: AppColors.success,
               ),
             );
             Navigator.of(context).pop();
           },
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showError(e.toString());
       } finally {
         if (mounted) {
           setState(() {
@@ -106,16 +192,52 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     }
   }
 
+  Widget _buildErrorMessage() {
+    if (_errorMessage == null) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.error, width: 1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline,
+            color: AppColors.error,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        Navigator.of(context).pop(); // Ensure clean pop
+        Navigator.of(context).pop();
         return false;
       },
       child: Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Send Credex'),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
@@ -128,8 +250,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Sender account info
+                _buildErrorMessage(),
                 Card(
+                  color: AppColors.surface,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -140,6 +263,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -148,13 +272,14 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         Text(
                           '@${widget.senderAccount.accountHandle}',
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -164,24 +289,52 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '@',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: TextFormField(
                         controller: _recipientController,
-                        decoration: const InputDecoration(
-                          labelText: 'Recipient',
-                          hintText: 'Enter recipient handle or scan QR code',
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'Recipient Handle',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          hintText: 'Enter recipient handle',
+                          hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter recipient';
+                            return 'Please enter recipient handle';
                           }
                           return null;
                         },
                       ),
                     ),
+                    const SizedBox(width: 8),
                     IconButton(
                       onPressed: _scanQRCode,
-                      icon: const Icon(Icons.qr_code_scanner),
+                      icon: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
                       tooltip: 'Scan QR Code',
                     ),
                   ],
@@ -193,17 +346,34 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                       flex: 2,
                       child: TextFormField(
                         controller: _amountController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
+                        focusNode: _amountFocusNode,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: InputDecoration(
                           labelText: 'Amount',
-                          hintText: 'Enter amount to send',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,' + _decimalPlaces.toString() + '}'),
+                          ),
+                        ],
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter amount';
                           }
-                          if (double.tryParse(value) == null) {
+                          final amount = double.tryParse(value);
+                          if (amount == null) {
                             return 'Please enter a valid number';
+                          }
+                          if (amount <= 0) {
+                            return 'Amount must be greater than 0';
                           }
                           return null;
                         },
@@ -213,22 +383,28 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                     Expanded(
                       child: DropdownButtonFormField<Denomination>(
                         value: _selectedDenomination,
-                        decoration: const InputDecoration(
+                        dropdownColor: AppColors.surface,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: InputDecoration(
                           labelText: 'Currency',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                         items: Denomination.values.map((denomination) {
                           return DropdownMenuItem(
                             value: denomination,
-                            child: Text(denomination.toString().split('.').last),
+                            child: Text(
+                              denomination.toString().split('.').last,
+                              style: const TextStyle(color: AppColors.textPrimary),
+                            ),
                           );
                         }).toList(),
-                        onChanged: (Denomination? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedDenomination = newValue;
-                            });
-                          }
-                        },
+                        onChanged: _handleDenominationChange,
                       ),
                     ),
                   ],
@@ -236,15 +412,30 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleSubmit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
                           ),
                         )
-                      : const Text('Send'),
+                      : const Text(
+                          'Send',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ],
             ),
