@@ -314,7 +314,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Phone Number',
                           prefixIcon: Icon(Icons.phone),
-                          hintText: '263712345678 or 353871234567',
                           helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
                           helperMaxLines: 2,
                         ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -14,6 +15,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final Set<String> _processedCredexIds = {};
   bool _isInitialized = false;
+  Timer? _refreshDebounceTimer;
+  static const _refreshDebounceMs = 2000; // 2 seconds debounce
 
   HomeBloc({
     required this.acceptCredexBulk,
@@ -251,13 +254,73 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
   }
 
+  Future<void> _refreshViaLogin() async {
+    Logger.data('Starting refresh via login');
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      final user = await _databaseHelper.getUser();
+      if (user == null || user.password == null) {
+        Logger.error('Cannot refresh: No stored user credentials');
+        await _refreshData(); // Fallback to direct refresh
+        return;
+      }
+
+      final loginResult = await accountRepository.login(
+        phone: user.phone,
+        password: user.password!,
+      );
+
+      loginResult.fold(
+        (failure) async {
+          Logger.error('Login refresh failed, falling back to direct refresh', failure);
+          await _refreshData();
+        },
+        (newUser) async {
+          Logger.data('Login refresh successful, updating dashboard');
+          
+          final pendingInTransactions = newUser.dashboard!.accounts
+              .expand((account) => account.pendingInData.data)
+              .toList();
+          final pendingOutTransactions = newUser.dashboard!.accounts
+              .expand((account) => account.pendingOutData.data)
+              .toList();
+
+          // Preserve existing ledger data while updating dashboard
+          add(HomeDataLoaded(
+            dashboard: newUser.dashboard!,
+            pendingInTransactions: pendingInTransactions,
+            pendingOutTransactions: pendingOutTransactions,
+            keepLoading: true, // Keep loading state while we fetch ledger
+          ));
+
+          // Clear processed IDs to ensure we get fresh ledger data
+          _processedCredexIds.clear();
+
+          if (newUser.dashboard!.accounts.isNotEmpty) {
+            await _loadLedgerData(newUser.dashboard!);
+          } else {
+            add(const HomeLedgerLoaded(
+              accountLedgers: {},
+              combinedEntries: [],
+              hasMore: false,
+            ));
+          }
+        },
+      );
+
+      stopwatch.stop();
+      Logger.performance('Login refresh took ${stopwatch.elapsedMilliseconds}ms');
+    } catch (e, stackTrace) {
+      Logger.error('Error in login refresh, falling back to direct refresh', e, stackTrace);
+      await _refreshData();
+    }
+  }
+
   Future<void> _refreshData() async {
-    Logger.data('Starting data refresh');
+    Logger.data('Starting direct data refresh');
     final stopwatch = Stopwatch()..start();
     
-    // Clear processed IDs to ensure we get fresh data
-    _processedCredexIds.clear();
-
     try {
       final user = await Future(() async {
         return await _databaseHelper.getUser();
@@ -286,12 +349,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           .expand((account) => account.pendingOutData.data)
           .toList();
 
+      // Preserve existing ledger data while updating dashboard
       add(HomeDataLoaded(
         dashboard: user.dashboard!,
         pendingInTransactions: pendingInTransactions,
         pendingOutTransactions: pendingOutTransactions,
-        keepLoading: false,
+        keepLoading: true, // Keep loading state while we fetch ledger
       ));
+
+      // Clear processed IDs to ensure we get fresh ledger data
+      _processedCredexIds.clear();
 
       // Then start loading ledger data if there are accounts
       if (user.dashboard!.accounts.isNotEmpty) {
@@ -316,6 +383,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   @override
   Future<void> close() {
     Logger.lifecycle('HomeBloc closing');
+    _refreshDebounceTimer?.cancel();
     return super.close();
   }
 
@@ -347,7 +415,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       status: HomeStatus.refreshing,
       error: null,
     ));
-    _refreshData();
+
+    // Cancel any pending refresh
+    _refreshDebounceTimer?.cancel();
+
+    // Start new debounced refresh
+    _refreshDebounceTimer = Timer(
+      const Duration(milliseconds: _refreshDebounceMs),
+      () => _refreshViaLogin(),
+    );
   }
 
   void _onLoadMoreStarted(
@@ -377,11 +453,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     ''');
     
     emit(state.copyWith(
-      status: HomeStatus.success,
+      status: event.keepLoading ? HomeStatus.loading : HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
       error: null,
+      // Preserve existing ledger data until new data arrives
       accountLedgers: state.accountLedgers,
       combinedLedgerEntries: state.combinedLedgerEntries,
       hasMoreEntries: state.hasMoreEntries,
