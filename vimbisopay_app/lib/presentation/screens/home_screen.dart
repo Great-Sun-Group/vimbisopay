@@ -81,14 +81,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            // Extract pending transactions from the first account's dashboard data
+            // Extract pending transactions from all accounts
             List<PendingOffer> pendingInTransactions = [];
             List<PendingOffer> pendingOutTransactions = [];
             
-            if (dashboard.accounts.isNotEmpty) {
-              final firstAccount = dashboard.accounts.first;
-              pendingInTransactions = firstAccount.pendingInData.data;
-              pendingOutTransactions = firstAccount.pendingOutData.data;
+            for (final account in dashboard.accounts) {
+              pendingInTransactions.addAll(account.pendingInData.data);
+              pendingOutTransactions.addAll(account.pendingOutData.data);
             }
 
             _homeBloc.add(HomeDataLoaded(
@@ -166,14 +165,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            // Extract pending transactions from the first account's dashboard data
+            // Extract pending transactions from all accounts
             List<PendingOffer> pendingInTransactions = [];
             List<PendingOffer> pendingOutTransactions = [];
             
-            if (dashboard.accounts.isNotEmpty) {
-              final firstAccount = dashboard.accounts.first;
-              pendingInTransactions = firstAccount.pendingInData.data;
-              pendingOutTransactions = firstAccount.pendingOutData.data;
+            for (final account in dashboard.accounts) {
+              pendingInTransactions.addAll(account.pendingInData.data);
+              pendingOutTransactions.addAll(account.pendingOutData.data);
             }
 
             _homeBloc.add(HomeDataLoaded(
