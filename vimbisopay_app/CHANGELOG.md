@@ -36,3 +36,6 @@ Example entry format:
 - trying to upload package
 
 ## [1.0.0+4] - 2024-12-18
+- fixed agrressive pagination
+
+## [1.0.0.+5] - 2024-12-18
