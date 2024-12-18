@@ -39,3 +39,6 @@ Example entry format:
 - fixed agrressive pagination
 
 ## [1.0.0.+5] - 2024-12-18
+- fixed agressive pagination
+
+## [1.0.0+6] - 2024-12-18
