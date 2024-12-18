@@ -257,7 +257,7 @@ class _TransactionsListState extends State<TransactionsList> {
                     Text(
                       offer.formattedInitialAmount,
                       style: TextStyle(
-                        color: isIncoming ? AppColors.success : AppColors.error,
+                        color: isIncoming ? AppColors.success : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -353,13 +353,13 @@ class _TransactionsListState extends State<TransactionsList> {
               style: TextStyle(
                 color: transaction.amount >= 0
                     ? AppColors.success
-                    : AppColors.error,
+                    : Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
             ),
             isThreeLine: true,
-            enabled: true,
+            enabled: false,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 8,
@@ -384,11 +384,53 @@ class _TransactionsListState extends State<TransactionsList> {
         }
       },
       builder: (context, state) {
-        if (state.status == HomeStatus.initial ||
-            ((state.status == HomeStatus.loading || state.status == HomeStatus.success) &&
-             state.combinedLedgerEntries.isEmpty &&
-             state.accountLedgers.isEmpty &&
-             !state.hasPendingTransactions)) {
+        // Always show pending transactions if available, regardless of loading state
+        if (state.hasPendingTransactions) {
+          return Column(
+            children: [
+              _buildPendingTransactionsSection(
+                state.pendingInTransactions,
+                state.pendingOutTransactions,
+                state,
+              ),
+              if (state.status == HomeStatus.loading || state.status == HomeStatus.initial) ...[
+                const Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  ),
+                ),
+              ] else if (state.combinedLedgerEntries.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Text(
+                    'Transaction History',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                _buildLedgerTransactions(state.combinedLedgerEntries),
+              ],
+              if (state.status == HomeStatus.loadingMore)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
+
+        // Show loading indicator only if we don't have any data yet
+        if (state.status == HomeStatus.initial || state.status == HomeStatus.loading) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
@@ -399,18 +441,17 @@ class _TransactionsListState extends State<TransactionsList> {
           );
         }
 
-        if (state.error != null && !state.hasPendingTransactions) {
+        if (state.error != null) {
           return EmptyState(
             icon: Icons.cloud_off_rounded,
             message: state.error!,
             onRetry: () {
-              // Trigger a refresh instead of directly setting empty state
               context.read<HomeBloc>().add(const HomeRefreshStarted());
             },
           );
         }
 
-        if (state.combinedLedgerEntries.isEmpty && !state.hasPendingTransactions) {
+        if (state.combinedLedgerEntries.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
             child: Column(
@@ -449,25 +490,18 @@ class _TransactionsListState extends State<TransactionsList> {
 
         return Column(
           children: [
-            _buildPendingTransactionsSection(
-              state.pendingInTransactions,
-              state.pendingOutTransactions,
-              state,
-            ),
-            if (state.combinedLedgerEntries.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Text(
-                  'Transaction History',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Text(
+                'Transaction History',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              _buildLedgerTransactions(state.combinedLedgerEntries),
-            ],
+            ),
+            _buildLedgerTransactions(state.combinedLedgerEntries),
             if (state.status == HomeStatus.loadingMore)
               const Padding(
                 padding: EdgeInsets.all(16.0),

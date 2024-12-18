@@ -74,17 +74,15 @@ class DatabaseHelper {
                 'password': oldUser['password'],
               });
               
-              if (dashboard.memberTier != null) {
-                await db.insert('member_tiers', {
-                  'memberId': oldUser['memberId'],
-                  'low': dashboard.memberTier.low,
-                  'high': dashboard.memberTier.high,
-                  'firstname': dashboard.firstname,
-                  'lastname': dashboard.lastname,
-                  'defaultDenom': dashboard.defaultDenom,
-                });
-              }
-            } catch (e) {
+              await db.insert('member_tiers', {
+                'memberId': oldUser['memberId'],
+                'low': dashboard.memberTier.low,
+                'high': dashboard.memberTier.high,
+                'firstname': dashboard.firstname,
+                'lastname': dashboard.lastname,
+                'defaultDenom': dashboard.defaultDenom,
+              });
+                        } catch (e) {
               print('Error migrating dashboard data: $e');
               continue;
             }
@@ -232,9 +230,9 @@ class DatabaseHelper {
               'accountId': account.accountID,
               'netCredexAssetsInDefaultDenom': account.balanceData.netCredexAssetsInDefaultDenom ?? '0',
               'securedNetBalances': jsonEncode(account.balanceData.securedNetBalancesByDenom ?? []),
-              'totalPayables': account.balanceData.unsecuredBalances?.totalPayables ?? '0',
-              'totalReceivables': account.balanceData.unsecuredBalances?.totalReceivables ?? '0',
-              'netPayRec': account.balanceData.unsecuredBalances?.netPayRec ?? '0',
+              'totalPayables': account.balanceData.unsecuredBalances.totalPayables ?? '0',
+              'totalReceivables': account.balanceData.unsecuredBalances.totalReceivables ?? '0',
+              'netPayRec': account.balanceData.unsecuredBalances.netPayRec ?? '0',
             });
             
             for (var auth in account.authFor) {
@@ -247,7 +245,7 @@ class DatabaseHelper {
             }
             
             // Process incoming transactions
-            for (var pending in account.pendingInData?.data ?? []) {
+            for (var pending in account.pendingInData.data ?? []) {
               if (!processedCredexIds.contains(pending.credexID)) {
                 await txn.insert('pending_transactions', {
                   'credexId': pending.credexID,
@@ -262,7 +260,7 @@ class DatabaseHelper {
             }
             
             // Process outgoing transactions
-            for (var pending in account.pendingOutData?.data ?? []) {
+            for (var pending in account.pendingOutData.data ?? []) {
               if (!processedCredexIds.contains(pending.credexID)) {
                 await txn.insert('pending_transactions', {
                   'credexId': pending.credexID,
@@ -386,7 +384,7 @@ class DatabaseHelper {
                 counterpartyAccountName: tx['counterpartyName'] as String,
                 secured: tx['isSecured'] == 1,
               )).toList(),
-              message: pendingIn.isEmpty ? "No pending offers found" : "Retrieved ${pendingIn.length} pending offers",
+              message: pendingIn.isEmpty ? 'No pending offers found' : 'Retrieved ${pendingIn.length} pending offers',
             ),
             pendingOutData: credex.PendingData(
               success: true,
@@ -396,7 +394,7 @@ class DatabaseHelper {
                 counterpartyAccountName: tx['counterpartyName'] as String,
                 secured: tx['isSecured'] == 1,
               )).toList(),
-              message: pendingOut.isEmpty ? "No pending outgoing offers found" : "Retrieved ${pendingOut.length} pending outgoing offers",
+              message: pendingOut.isEmpty ? 'No pending outgoing offers found' : 'Retrieved ${pendingOut.length} pending outgoing offers',
             ),
             sendOffersTo: AuthUser(
               firstname: primaryAuth['firstname'] as String,

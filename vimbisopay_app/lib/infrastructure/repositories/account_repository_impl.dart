@@ -12,7 +12,6 @@ import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
@@ -45,25 +44,23 @@ class AccountRepositoryImpl implements AccountRepository {
       return result.fold(
         (failure) async {
           if (!isRetry && failure.message?.toLowerCase().contains('token expired') == true) {
-            // Use stored password for re-authentication
             if (user.password == null) {
               return const Left(InfrastructureFailure('Authentication failed: No stored password'));
             }
 
             final loginResult = await login(
               phone: user.phone,
-              password: user.password!, // Force non-null since we checked above
+              password: user.password!,
             );
 
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
-                // Preserve the password when saving the new user data
                 final userWithPassword = User(
                   memberId: newUser.memberId,
                   phone: newUser.phone,
                   token: newUser.token,
-                  password: user.password, // Keep the existing password
+                  password: user.password,
                   dashboard: newUser.dashboard,
                 );
                 
@@ -126,7 +123,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = '$baseUrl/getLedger'; // Changed back to '/getLedger'
+        final url = '$baseUrl/getLedger';
         final headers = _authHeaders(token);
         final body = {
           'accountID': accountId,
@@ -134,38 +131,24 @@ class AccountRepositoryImpl implements AccountRepository {
           if (numRows != null) 'numRows': numRows,
         };
 
-        Logger.data('Fetching ledger for account $accountId');
-        Logger.data('Request URL: $url');
-        Logger.data('Request body: $body');
-
-        try {
-          final response = await _loggedRequest(
-            () => http.post(
-              Uri.parse(url),
-              headers: headers,
-              body: json.encode(body),
-            ),
-            url,
-            'POST',
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
             headers: headers,
-            body: body,
-          );
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
 
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            Logger.data('Successfully fetched ledger for account $accountId');
-            return Right(data as Map<String, dynamic>);
-          } else {
-            final errorBody = json.decode(response.body);
-            final errorMessage = errorBody['message'] ?? 'Failed to get ledger';
-            Logger.error('Failed to fetch ledger for account $accountId: $errorMessage');
-            Logger.error('Response status: ${response.statusCode}');
-            Logger.error('Response body: ${response.body}');
-            return Left(InfrastructureFailure(errorMessage));
-          }
-        } catch (e, stackTrace) {
-          Logger.error('Exception fetching ledger for account $accountId', e, stackTrace);
-          return Left(InfrastructureFailure('Network error: ${e.toString()}'));
+        if (response.statusCode == 200) {
+          final jsonResponse = json.decode(response.body);
+          return Right(jsonResponse);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
+          return Left(InfrastructureFailure(errorMessage));
         }
       },
     );
@@ -252,7 +235,7 @@ class AccountRepositoryImpl implements AccountRepository {
             handle: details['accountHandle'],
             name: details['accountName'],
             defaultDenom: details['defaultDenom'],
-            balances: {}, // Balances not included in this response
+            balances: {},
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
@@ -338,7 +321,6 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final actionDetails = jsonResponse['data']['action']['details'];
         
-        // Add null checks for required User fields
         final memberId = actionDetails['memberID']?.toString();
         final userPhone = actionDetails['phone']?.toString();
         final token = actionDetails['token']?.toString();
@@ -349,7 +331,6 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final dashboardData = jsonResponse['data']['dashboard'];
         
-        // Create a Set to track unique account handles
         final seenHandles = <String>{};
         
         final accountsList = (dashboardData['accounts'] as List)
@@ -436,7 +417,7 @@ class AccountRepositoryImpl implements AccountRepository {
           memberId: memberId,
           phone: userPhone,
           token: token,
-          password: password, // Include password in user object
+          password: password,
           dashboard: dashboardObj,
         );
         

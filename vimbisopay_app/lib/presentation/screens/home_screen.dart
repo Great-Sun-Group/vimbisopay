@@ -234,13 +234,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       create: (context) => _homeBloc,
       child: BlocBuilder<HomeBloc, HomeState>(
         builder: (context, state) {
+          // Show loading only if we don't have dashboard data yet
+          if (state.status == HomeStatus.loading && state.dashboard == null) {
+            return const Scaffold(
+              backgroundColor: AppColors.background,
+              body: Center(
+                child: LoadingAnimation(size: 100),
+              ),
+            );
+          }
+
           return Scaffold(
             backgroundColor: Colors.transparent,
             appBar: _buildAppBar(state),
             body: SafeArea(
-              child: state.isInitialLoading
-                  ? const LoadingAnimation(size: 100)
-                  : _buildScrollableContent(state),
+              child: _buildScrollableContent(state),
             ),
             bottomNavigationBar: HomeActionButtons(
               accounts: state.dashboard?.accounts,

@@ -29,55 +29,66 @@ class LedgerEntry {
   factory LedgerEntry.fromJson(Map<String, dynamic> json, {required String accountId, required String accountName}) {
     // Validate required fields
     if (!json.containsKey('credexID')) {
-      throw FormatException('Missing credexID in ledger entry');
+      throw const FormatException('Missing credexID in ledger entry');
     }
     if (!json.containsKey('timestamp')) {
-      throw FormatException('Missing timestamp in ledger entry');
+      throw const FormatException('Missing timestamp in ledger entry');
     }
     if (!json.containsKey('type')) {
-      throw FormatException('Missing type in ledger entry');
+      throw const FormatException('Missing type in ledger entry');
     }
     if (!json.containsKey('amount')) {
-      throw FormatException('Missing amount in ledger entry');
+      throw const FormatException('Missing amount in ledger entry');
     }
     if (!json.containsKey('denomination')) {
-      throw FormatException('Missing denomination in ledger entry');
+      throw const FormatException('Missing denomination in ledger entry');
     }
     if (!json.containsKey('description')) {
-      throw FormatException('Missing description in ledger entry');
+      throw const FormatException('Missing description in ledger entry');
     }
     if (!json.containsKey('counterpartyAccountName')) {
-      throw FormatException('Missing counterpartyAccountName in ledger entry');
+      throw const FormatException('Missing counterpartyAccountName in ledger entry');
     }
     if (!json.containsKey('formattedAmount')) {
-      throw FormatException('Missing formattedAmount in ledger entry');
+      throw const FormatException('Missing formattedAmount in ledger entry');
     }
 
     final timestamp = json['timestamp'];
     DateTime parsedTimestamp;
 
     try {
-      if (timestamp is Map<String, dynamic> && 
-          timestamp.containsKey('year') && 
-          timestamp.containsKey('month') && 
-          timestamp.containsKey('day') && 
-          timestamp.containsKey('hour') && 
-          timestamp.containsKey('minute') && 
-          timestamp.containsKey('second')) {
-        // Handle nested timestamp structure
-        parsedTimestamp = DateTime(
-          _getLowValue(timestamp['year']),
-          _getLowValue(timestamp['month']),
-          _getLowValue(timestamp['day']),
-          _getLowValue(timestamp['hour']),
-          _getLowValue(timestamp['minute']),
-          _getLowValue(timestamp['second']),
-        );
+      if (timestamp is Map<String, dynamic>) {
+        if (timestamp.containsKey('year') &&
+            timestamp.containsKey('month') &&
+            timestamp.containsKey('day') &&
+            timestamp.containsKey('hour') &&
+            timestamp.containsKey('minute') &&
+            timestamp.containsKey('second')) {
+          
+          // Extract values from the nested low/high structure
+          final year = (timestamp['year'] as Map<String, dynamic>)['low'] as int;
+          final month = (timestamp['month'] as Map<String, dynamic>)['low'] as int;
+          final day = (timestamp['day'] as Map<String, dynamic>)['low'] as int;
+          final hour = (timestamp['hour'] as Map<String, dynamic>)['low'] as int;
+          final minute = (timestamp['minute'] as Map<String, dynamic>)['low'] as int;
+          final second = (timestamp['second'] as Map<String, dynamic>)['low'] as int;
+
+          parsedTimestamp = DateTime(
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+          );
+        } else {
+          throw const FormatException('Missing required timestamp fields');
+        }
       } else if (timestamp is String) {
         // Handle ISO string timestamp
         parsedTimestamp = DateTime.parse(timestamp);
       } else {
-        throw FormatException('Invalid timestamp format');
+        throw const FormatException('Invalid timestamp format');
       }
     } catch (e) {
       throw FormatException('Error parsing timestamp: $e');
@@ -90,7 +101,7 @@ class LedgerEntry {
       } else if (json['amount'] is num) {
         parsedAmount = (json['amount'] as num).toDouble();
       } else {
-        throw FormatException('Invalid amount format');
+        throw const FormatException('Invalid amount format');
       }
     } catch (e) {
       throw FormatException('Error parsing amount: $e');
@@ -108,15 +119,5 @@ class LedgerEntry {
       accountId: accountId,
       accountName: accountName,
     );
-  }
-
-  static int _getLowValue(dynamic field) {
-    if (field is Map<String, dynamic> && field.containsKey('low')) {
-      return field['low'] as int;
-    } else if (field is int) {
-      return field;
-    } else {
-      throw FormatException('Invalid timestamp field format');
-    }
   }
 }
