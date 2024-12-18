@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 
 abstract class HomeEvent extends Equatable {
@@ -34,23 +33,23 @@ class HomeLoadMoreStarted extends HomeEvent {
 
 class HomeDataLoaded extends HomeEvent {
   final Dashboard dashboard;
-  final User user;
   final List<PendingOffer> pendingInTransactions;
   final List<PendingOffer> pendingOutTransactions;
+  final bool keepLoading;
 
   const HomeDataLoaded({
     required this.dashboard,
-    required this.user,
     this.pendingInTransactions = const [],
     this.pendingOutTransactions = const [],
+    this.keepLoading = false,
   });
 
   @override
   List<Object> get props => [
     dashboard, 
-    user, 
     pendingInTransactions, 
-    pendingOutTransactions
+    pendingOutTransactions,
+    keepLoading,
   ];
 }
 

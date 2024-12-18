@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'dart:math';
-import 'package:country_picker/country_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -20,140 +17,76 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _verifyPasswordController = TextEditingController();
-  final _accountRepository = AccountRepositoryImpl();
-  final _random = Random();
-  bool _acceptedTerms = false;
-  String? _passwordError;
-  String? _verifyPasswordError;
+  final _confirmPasswordController = TextEditingController();
+  final _repository = AccountRepositoryImpl();
+  bool _isFormValid = false;
   bool _isLoading = false;
-  Country _selectedCountry = Country(
-    phoneCode: '263',
-    countryCode: 'ZW',
-    e164Sc: 0,
-    geographic: true,
-    level: 1,
-    name: 'Zimbabwe',
-    example: '771234567',
-    displayName: 'Zimbabwe (ZW)',
-    displayNameNoCountryCode: 'Zimbabwe',
-    e164Key: '263',
-  );
 
-  Widget _buildInfoBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.info.withOpacity(0.3),
-        ),
-      ),
-      child: const Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: AppColors.info,
-                size: 24,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Why we need your information',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.info,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Your phone number will be your unique identifier for secure transactions. We use your name to personalize your experience and verify your identity when sending or receiving money.',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
-  bool _validatePhoneNumber(String phoneNumber) {
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'\s+'), '');
-    return cleanPhone.length >= 7 && cleanPhone.length <= 15;
+  void _validateForm() {
+    setState(() {
+      _isFormValid = _firstNameController.text.isNotEmpty &&
+                     _lastNameController.text.isNotEmpty &&
+                     _phoneController.text.isNotEmpty && 
+                     _passwordController.text.isNotEmpty &&
+                     _confirmPasswordController.text.isNotEmpty &&
+                     _passwordController.text == _confirmPasswordController.text &&
+                     _passwordController.text.length >= 6;
+    });
   }
 
-  void _showCountryPicker() {
-    showCountryPicker(
-      context: context,
-      showPhoneCode: true,
-      onSelect: (Country country) {
-        setState(() {
-          _selectedCountry = country;
-        });
-      },
-      countryListTheme: CountryListThemeData(
-        borderRadius: BorderRadius.circular(12),
-        backgroundColor: AppColors.surface,
-        textStyle: const TextStyle(color: AppColors.textPrimary),
-        searchTextStyle: const TextStyle(color: AppColors.textPrimary),
-        inputDecoration: InputDecoration(
-          labelText: 'Search',
-          labelStyle: const TextStyle(color: AppColors.textSecondary),
-          prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.primary),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _launchTermsUrl() async {
-    final Uri url = Uri.parse('https://docs.mycredex.app/index.html');
-    if (!await launchUrl(url)) {
-      throw Exception('Could not launch $url');
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your phone number';
     }
+    if (!RegExp(r'^[0-9]{3}[0-9]+$').hasMatch(value)) {
+      return 'Start with country code (e.g. 263 or 353)';
+    }
+    if (value.length < 10) {
+      return 'Phone number is too short';
+    }
+    return null;
   }
 
   void _showError(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Error', style: TextStyle(color: AppColors.error)),
-        content: Text(message, style: const TextStyle(color: AppColors.textPrimary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
-      ),
+          title: const Text(
+            'Error',
+            style: TextStyle(color: AppColors.error),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Future<void> _onCreateAccount() async {
-    if (!_formKey.currentState!.validate() || !_acceptedTerms) {
-      return;
-    }
+  Future<void> _handleCreateAccount() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -163,60 +96,64 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => WillPopScope(
-          onWillPop: () async => false,
-          child: const Center(
+        builder: (BuildContext context) {
+          return const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-          ),
-        ),
-      );
-
-      final fullPhoneNumber = '+${_selectedCountry.phoneCode}${_phoneController.text.replaceAll(RegExp(r'\s+'), '')}';
-
-      final onboardResponse = await _accountRepository.onboardMember(
-        firstName: _firstNameController.text,
-        lastName: _lastNameController.text,
-        phone: fullPhoneNumber,
-        password: _passwordController.text,
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context); // Remove loading dialog
-
-      final onboardSuccess = await onboardResponse.fold(
-        (failure) async {
-          _showError(failure.message ?? 'Failed to create account. Please try again.');
-          return false;
-        },
-        (_) async => true,
-      );
-
-      if (!onboardSuccess) return;
-
-      final loginResult = await _accountRepository.login(
-        phone: fullPhoneNumber,
-        password: _passwordController.text,
-      );
-
-      if (!mounted) return;
-
-      loginResult.fold(
-        (failure) {
-          _showError(failure.message ?? 'Failed to login after account creation. Please try logging in manually.');
-        },
-        (user) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SecuritySetupScreen(user: user),
             ),
           );
         },
       );
+
+      if (!mounted) return;
+
+      final phoneNumber = '+${_phoneController.text}';
+      final password = _passwordController.text;
+      
+      final result = await _repository.onboardMember(
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
+        phone: phoneNumber,
+        password: password,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Remove loading dialog
+
+        result.fold(
+          (failure) {
+            _showError(failure.message ?? 'Failed to create account');
+          },
+          (success) async {
+            if (success) {
+              Logger.interaction('Account created successfully, attempting login');
+              // After successful onboarding, attempt login
+              final loginResult = await _repository.login(
+                phone: phoneNumber,
+                password: password,
+              );
+
+              loginResult.fold(
+                (failure) {
+                  Logger.error('Failed to login after account creation', failure);
+                  _showError('Account created but login failed. Please try logging in manually.');
+                },
+                (user) {
+                  Logger.interaction('Login successful, navigating to security setup');
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/security-setup',
+                    arguments: user,
+                  );
+                },
+              );
+            } else {
+              _showError('Failed to create account. Please try again.');
+            }
+          },
+        );
+      }
     } catch (e) {
-      print(e);
       if (mounted) {
         Navigator.pop(context); // Remove loading dialog
         _showError('An unexpected error occurred. Please try again.');
@@ -249,275 +186,171 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       labelStyle: const TextStyle(color: AppColors.textSecondary),
       helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
       errorStyle: const TextStyle(color: AppColors.error),
+      prefixIconColor: AppColors.primary,
     );
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Create Account'),
+        title: const Text(
+          'Create Account',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
         backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Theme(
-        data: Theme.of(context).copyWith(
-          inputDecorationTheme: inputDecorationTheme,
-        ),
+      body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Welcome to VimbisoPay!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: inputDecorationTheme,
+            ),
+            child: Form(
+              key: _formKey,
+              onChanged: _validateForm,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Welcome to VimbisoPay!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Create your account to start sending and receiving money securely across borders.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Create your account to start sending and receiving money securely.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                _buildInfoBanner(),
-                TextFormField(
-                  controller: _firstNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'First Name',
-                    helperText: 'Enter your legal first name as it appears on your ID',
+                  const SizedBox(height: 32),
+                  TextFormField(
+                    controller: _firstNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'First Name',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your first name';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your first name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Last Name',
-                    helperText: 'Enter your legal last name as it appears on your ID',
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _lastNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Last Name',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your last name';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your last name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Phone Number',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textPrimary,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      prefixIcon: Icon(Icons.phone),
+                      hintText: '263712345678 or 353871234567',
+                      helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                      helperMaxLines: 2,
+                    ),
+                    keyboardType: TextInputType.phone,
+                    enabled: !_isLoading,
+                    validator: _validatePhone,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock),
+                      helperText: 'At least 6 characters',
+                    ),
+                    obscureText: true,
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      helperText: 'Re-enter your password',
+                    ),
+                    obscureText: true,
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: _isFormValid && !_isLoading ? _handleCreateAccount : null,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textPrimary,
+                      disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            border: Border.all(
-                              color: AppColors.primary.withOpacity(0.3),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
                             ),
-                            borderRadius: BorderRadius.circular(8),
+                          )
+                        : const Text(
+                            'Create Account',
+                            style: TextStyle(fontSize: 16),
                           ),
-                          child: InkWell(
-                            onTap: _showCountryPicker,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Text(_selectedCountry.flagEmoji),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '+${_selectedCountry.phoneCode}',
-                                    style: const TextStyle(color: AppColors.textPrimary),
-                                  ),
-                                  const Icon(
-                                    Icons.arrow_drop_down,
-                                    color: AppColors.primary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _phoneController,
-                            decoration: InputDecoration(
-                              hintText: _selectedCountry.example,
-                              helperText: 'This will be your unique login identifier',
-                            ),
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your phone number';
-                              }
-                              if (!_validatePhoneNumber(value)) {
-                                return 'Please enter a valid phone number';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    errorText: _passwordError,
-                    helperText: 'Must be at least 6 characters long',
-                    suffixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters long';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _verifyPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Verify Password',
-                    errorText: _verifyPasswordError,
-                    helperText: 'Re-enter your password to confirm',
-                    suffixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please verify your password';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  title: Wrap(
-                    children: [
-                      const Text(
-                        'I accept the ',
-                        style: TextStyle(color: AppColors.textPrimary),
-                      ),
-                      GestureDetector(
-                        onTap: _launchTermsUrl,
-                        child: const Text(
-                          'terms and conditions',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  value: _acceptedTerms,
-                  onChanged: (bool? value) {
-                    setState(() {
-                      _acceptedTerms = value ?? false;
-                    });
-                  },
-                  activeColor: AppColors.primary,
-                  checkColor: AppColors.textPrimary,
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _isLoading || !_acceptedTerms ? null : _onCreateAccount,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
-                          ),
-                        )
-                      : const Text(
-                          'Create Account',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-  }
-}
-
-// Debug-only extension that will be tree-shaken in release builds
-extension CreateAccountDebug on _CreateAccountScreenState {
-  String _generateRandomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz';
-    return String.fromCharCodes(Iterable.generate(
-        length, (_) => chars.codeUnitAt(_random.nextInt(chars.length))));
-  }
-
-  String _generateRandomPhoneNumber() {
-    final randomDigits = List.generate(7, (_) => _random.nextInt(10)).join();
-    return '77$randomDigits';
-  }
-
-  void _debugFillTestData() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomName = _generateRandomString(5);
-    
-    _firstNameController.text = 'Test$randomName';
-    _lastNameController.text = 'User$timestamp'.substring(0, 10);
-    _phoneController.text = _generateRandomPhoneNumber();
-    
-    final password = 'pass${timestamp.toString().substring(8)}';
-    _passwordController.text = password;
-    _verifyPasswordController.text = password;
-    
-    setState(() {
-      _acceptedTerms = true;
-    });
   }
 }

@@ -12,6 +12,7 @@ import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
@@ -44,15 +45,29 @@ class AccountRepositoryImpl implements AccountRepository {
       return result.fold(
         (failure) async {
           if (!isRetry && failure.message?.toLowerCase().contains('token expired') == true) {
+            // Use stored password for re-authentication
+            if (user.password == null) {
+              return const Left(InfrastructureFailure('Authentication failed: No stored password'));
+            }
+
             final loginResult = await login(
               phone: user.phone,
-              password: 'password', // TODO using dummy password as specified
+              password: user.password!, // Force non-null since we checked above
             );
 
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
-                final saveResult = await saveUser(newUser);
+                // Preserve the password when saving the new user data
+                final userWithPassword = User(
+                  memberId: newUser.memberId,
+                  phone: newUser.phone,
+                  token: newUser.token,
+                  password: user.password, // Keep the existing password
+                  dashboard: newUser.dashboard,
+                );
+                
+                final saveResult = await saveUser(userWithPassword);
                 
                 return saveResult.fold(
                   (saveFailure) => Left(saveFailure),
@@ -104,6 +119,59 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+    required String accountId,
+    int? startRow,
+    int? numRows,
+  }) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/getLedger'; // Changed back to '/getLedger'
+        final headers = _authHeaders(token);
+        final body = {
+          'accountID': accountId,
+          if (startRow != null) 'startRow': startRow,
+          if (numRows != null) 'numRows': numRows,
+        };
+
+        Logger.data('Fetching ledger for account $accountId');
+        Logger.data('Request URL: $url');
+        Logger.data('Request body: $body');
+
+        try {
+          final response = await _loggedRequest(
+            () => http.post(
+              Uri.parse(url),
+              headers: headers,
+              body: json.encode(body),
+            ),
+            url,
+            'POST',
+            headers: headers,
+            body: body,
+          );
+
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            Logger.data('Successfully fetched ledger for account $accountId');
+            return Right(data as Map<String, dynamic>);
+          } else {
+            final errorBody = json.decode(response.body);
+            final errorMessage = errorBody['message'] ?? 'Failed to get ledger';
+            Logger.error('Failed to fetch ledger for account $accountId: $errorMessage');
+            Logger.error('Response status: ${response.statusCode}');
+            Logger.error('Response body: ${response.body}');
+            return Left(InfrastructureFailure(errorMessage));
+          }
+        } catch (e, stackTrace) {
+          Logger.error('Exception fetching ledger for account $accountId', e, stackTrace);
+          return Left(InfrastructureFailure('Network error: ${e.toString()}'));
+        }
+      },
+    );
+  }
+
+  @override
   Future<Either<Failure, User?>> getCurrentUser() async {
     try {
       final user = await _databaseHelper.getUser();
@@ -142,45 +210,6 @@ class AccountRepositoryImpl implements AccountRepository {
           return Right(Map<String, double>.from(data['balances']));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get balances';
-          return Left(InfrastructureFailure(errorMessage));
-        }
-      },
-    );
-  }
-
-  @override
-  Future<Either<Failure, Map<String, dynamic>>> getLedger({
-    required String accountId,
-    int? startRow,
-    int? numRows,
-  }) async {
-    return _executeAuthenticatedRequest(
-      request: (token) async {
-        final url = '$baseUrl/getLedger';
-        final headers = _authHeaders(token);
-        final body = {
-          'accountID': accountId,
-          if (startRow != null) 'startRow': startRow,
-          if (numRows != null) 'numRows': numRows,
-        };
-
-        final response = await _loggedRequest(
-          () => http.post(
-            Uri.parse(url),
-            headers: headers,
-            body: json.encode(body),
-          ),
-          url,
-          'POST',
-          headers: headers,
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          return Right(data as Map<String, dynamic>);
-        } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -227,120 +256,6 @@ class AccountRepositoryImpl implements AccountRepository {
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
-          return Left(InfrastructureFailure(errorMessage));
-        }
-      },
-    );
-  }
-
-  @override
-  Future<Either<Failure, dashboard.Dashboard>> getMemberDashboardByPhone(String phone) async {
-    return _executeAuthenticatedRequest(
-      request: (token) async {
-        final url = '$baseUrl/getMemberDashboardByPhone';
-        final headers = _authHeaders(token);
-        final body = {'phone': phone};
-
-        final response = await _loggedRequest(
-          () => http.post(
-            Uri.parse(url),
-            headers: headers,
-            body: json.encode(body),
-          ),
-          url,
-          'POST',
-          headers: headers,
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          
-          if (!data.containsKey('data') || 
-              !data['data'].containsKey('action') ||
-              !data['data'].containsKey('dashboard')) {
-            return const Left(InfrastructureFailure('Invalid response format'));
-          }
-
-          final actionDetails = data['data']['action']['details'];
-          final dashboardData = data['data']['dashboard'];
-          
-          // Create a Set to track unique account handles
-          final seenHandles = <String>{};
-          
-          final accountsList = (dashboardData['accounts'] as List)
-              .where((account) => account['success'] == true)
-              .map((account) {
-                final accountData = account['data'];
-                final balanceData = accountData['balanceData']['data'];
-                final pendingInData = accountData['pendingInData'];
-                final pendingOutData = accountData['pendingOutData'];
-                
-                return dashboard.DashboardAccount(
-                  accountID: accountData['accountID'],
-                  accountName: accountData['accountName'],
-                  accountHandle: accountData['accountHandle'],
-                  defaultDenom: accountData['defaultDenom'],
-                  isOwnedAccount: accountData['isOwnedAccount'],
-                  authFor: (accountData['authFor'] as List)
-                      .map((auth) => dashboard.AuthUser(
-                            firstname: auth['firstname'],
-                            lastname: auth['lastname'],
-                            memberID: auth['memberID'],
-                          ))
-                      .toList(),
-                  balanceData: dashboard.BalanceData(
-                    securedNetBalancesByDenom: 
-                        (balanceData['securedNetBalancesByDenom'] as List)
-                            .map((balance) => balance.toString())
-                            .toList(),
-                    unsecuredBalances: dashboard.UnsecuredBalances(
-                      totalPayables: balanceData['unsecuredBalancesInDefaultDenom']['totalPayables'],
-                      totalReceivables: balanceData['unsecuredBalancesInDefaultDenom']['totalReceivables'],
-                      netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
-                    ),
-                    netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'],
-                  ),
-                  pendingInData: credex.PendingData(
-                    success: pendingInData['success'],
-                    data: (pendingInData['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: pendingInData['message'],
-                  ),
-                  pendingOutData: credex.PendingData(
-                    success: pendingOutData['success'],
-                    data: (pendingOutData['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: pendingOutData['message'],
-                  ),
-                );
-              })
-              .where((account) => seenHandles.add(account.accountHandle)) // Only keep accounts with unique handles
-              .toList();
-
-          return Right(dashboard.Dashboard(
-            id: actionDetails['memberID'],
-            memberHandle: actionDetails['memberHandle'],
-            firstname: actionDetails['firstname'],
-            lastname: actionDetails['lastname'],
-            defaultDenom: actionDetails['defaultDenom'],
-            memberTier: dashboard.MemberTier(
-              low: actionDetails['memberTier']['low'],
-              high: actionDetails['memberTier']['high'],
-            ),
-            remainingAvailableUSD: actionDetails['remainingAvailableUSD'],
-            accounts: accountsList,
-          ));
-        } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get dashboard';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -416,16 +331,113 @@ class AccountRepositoryImpl implements AccountRepository {
         
         if (!jsonResponse.containsKey('data') || 
             !jsonResponse['data'].containsKey('action') ||
-            !jsonResponse['data']['action'].containsKey('details')) {
+            !jsonResponse['data']['action'].containsKey('details') ||
+            !jsonResponse['data'].containsKey('dashboard')) {
           return const Left(InfrastructureFailure('Invalid response format'));
         }
 
         final actionDetails = jsonResponse['data']['action']['details'];
         
+        // Add null checks for required User fields
+        final memberId = actionDetails['memberID']?.toString();
+        final userPhone = actionDetails['phone']?.toString();
+        final token = actionDetails['token']?.toString();
+        
+        if (memberId == null || userPhone == null || token == null) {
+          return const Left(InfrastructureFailure('Missing required user fields in response'));
+        }
+
+        final dashboardData = jsonResponse['data']['dashboard'];
+        
+        // Create a Set to track unique account handles
+        final seenHandles = <String>{};
+        
+        final accountsList = (dashboardData['accounts'] as List)
+            .where((account) => account['success'] == true)
+            .map((account) {
+              final accountData = account['data'];
+              final balanceData = accountData['balanceData']['data'];
+              final pendingInData = accountData['pendingInData'];
+              final pendingOutData = accountData['pendingOutData'];
+              final sendOffersToData = accountData['sendOffersTo'];
+              
+              return dashboard.DashboardAccount(
+                accountID: accountData['accountID'],
+                accountName: accountData['accountName'],
+                accountHandle: accountData['accountHandle'],
+                defaultDenom: accountData['defaultDenom'],
+                isOwnedAccount: accountData['isOwnedAccount'],
+                authFor: (accountData['authFor'] as List)
+                    .map((auth) => dashboard.AuthUser(
+                          firstname: auth['firstname'],
+                          lastname: auth['lastname'],
+                          memberID: auth['memberID'],
+                        ))
+                    .toList(),
+                balanceData: dashboard.BalanceData(
+                  securedNetBalancesByDenom: 
+                      (balanceData['securedNetBalancesByDenom'] as List)
+                          .map((balance) => balance.toString())
+                          .toList(),
+                  unsecuredBalances: dashboard.UnsecuredBalances(
+                    totalPayables: balanceData['unsecuredBalancesInDefaultDenom']['totalPayables'],
+                    totalReceivables: balanceData['unsecuredBalancesInDefaultDenom']['totalReceivables'],
+                    netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
+                  ),
+                  netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'],
+                ),
+                pendingInData: credex.PendingData(
+                  success: pendingInData['success'],
+                  data: (pendingInData['data'] as List).map((offer) => credex.PendingOffer(
+                    credexID: offer['credexID'],
+                    formattedInitialAmount: offer['formattedInitialAmount'],
+                    counterpartyAccountName: offer['counterpartyAccountName'],
+                    secured: offer['secured'],
+                  )).toList(),
+                  message: pendingInData['message'],
+                ),
+                pendingOutData: credex.PendingData(
+                  success: pendingOutData['success'],
+                  data: (pendingOutData['data'] as List).map((offer) => credex.PendingOffer(
+                    credexID: offer['credexID'],
+                    formattedInitialAmount: offer['formattedInitialAmount'],
+                    counterpartyAccountName: offer['counterpartyAccountName'],
+                    secured: offer['secured'],
+                  )).toList(),
+                  message: pendingOutData['message'],
+                ),
+                sendOffersTo: dashboard.AuthUser(
+                  firstname: sendOffersToData['firstname'],
+                  lastname: sendOffersToData['lastname'],
+                  memberID: sendOffersToData['memberID'],
+                ),
+              );
+            })
+            .where((account) => seenHandles.add(account.accountHandle))
+            .toList();
+
+        final dashboardObj = dashboard.Dashboard(
+          id: actionDetails['memberID'],
+          memberTier: dashboard.MemberTier(
+            low: dashboardData['memberTier']['low'],
+            high: dashboardData['memberTier']['high'],
+          ),
+          remainingAvailableUSD: dashboard.RemainingAvailable(
+            low: dashboardData['remainingAvailableUSD']['low'],
+            high: dashboardData['remainingAvailableUSD']['high'],
+          ),
+          accounts: accountsList,
+          firstname: actionDetails['firstname'],
+          lastname: actionDetails['lastname'],
+          defaultDenom: actionDetails['defaultDenom']?.toString(),
+        );
+        
         final user = User(
-          memberId: actionDetails['memberID'],
-          phone: actionDetails['phone'],
-          token: actionDetails['token'],
+          memberId: memberId,
+          phone: userPhone,
+          token: token,
+          password: password, // Include password in user object
+          dashboard: dashboardObj,
         );
         
         return Right(user);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -16,7 +17,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isSubmitted = false;
 
   @override
+  void initState() {
+    super.initState();
+    Logger.lifecycle('ForgotPasswordScreen initialized');
+  }
+
+  @override
   void dispose() {
+    Logger.lifecycle('ForgotPasswordScreen disposing');
     _phoneController.dispose();
     super.dispose();
   }
@@ -139,7 +147,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              Logger.interaction('Returning to login from forgot password success');
+              Navigator.of(context).pop();
+            },
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
               backgroundColor: AppColors.primary,
@@ -158,20 +169,60 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Error',
+            style: TextStyle(color: AppColors.error),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
+      Logger.interaction('Submitting forgot password request');
       setState(() {
         _isLoading = true;
       });
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        // TODO: Implement actual password reset API call
+        await Future.delayed(const Duration(seconds: 2));
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isSubmitted = true;
-        });
+        if (mounted) {
+          Logger.interaction('Password reset instructions sent successfully');
+          setState(() {
+            _isLoading = false;
+            _isSubmitted = true;
+          });
+        }
+      } catch (e) {
+        Logger.error('Error sending password reset instructions', e);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showError('Failed to send reset instructions. Please try again.');
+        }
       }
     }
   }
@@ -217,7 +268,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            Logger.interaction('Returning to login from forgot password');
+            Navigator.of(context).pop();
+          },
         ),
       ),
       body: SafeArea(

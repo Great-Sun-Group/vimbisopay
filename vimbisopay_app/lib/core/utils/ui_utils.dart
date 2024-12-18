@@ -20,9 +20,10 @@ class UIUtils {
     return getScreenDimensions(context).height * HomeConstants.accountCardHeight;
   }
 
-  static String getInitials(String firstname, String lastname) {
-    return '${firstname.isNotEmpty ? firstname[0] : ''}${lastname.isNotEmpty ? lastname[0] : ''}'
-        .toUpperCase();
+  static String getInitials(String? firstname, String? lastname) {
+    final first = firstname?.isNotEmpty == true ? firstname![0] : '';
+    final last = lastname?.isNotEmpty == true ? lastname![0] : '';
+    return '$first$last'.toUpperCase();
   }
 
   static BoxDecoration get gradientBackground => BoxDecoration(

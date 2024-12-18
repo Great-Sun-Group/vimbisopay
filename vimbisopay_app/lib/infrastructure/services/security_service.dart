@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
 import 'package:flutter/services.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class SecurityService {
   final FlutterSecureStorage _storage;
@@ -9,78 +10,99 @@ class SecurityService {
   static const String _pinKey = 'user_pin';
   static const String _useBiometricKey = 'use_biometric';
   static const String _lastAuthTimeKey = 'last_auth_time';
-  static const int _authValidityDuration = 30; // 5 minutes in seconds
+  static const int _authValidityDuration = 300; // 5 minutes in seconds
 
   SecurityService()
       : _storage = const FlutterSecureStorage(),
-        _localAuth = LocalAuthentication();
+        _localAuth = LocalAuthentication() {
+    Logger.lifecycle('SecurityService initialized');
+  }
 
   Future<String?> getSecurePin() async {
-    if (await requiresAuthentication()) {
-      if (await usesBiometric()) {
-        final (authenticated, _) = await authenticateWithBiometrics();
-        if (authenticated) {
-          return _storage.read(key: _pinKey);
+    Logger.data('Attempting to get secure PIN');
+    try {
+      if (await requiresAuthentication()) {
+        Logger.state('Authentication required for PIN access');
+        if (await usesBiometric()) {
+          Logger.state('Biometric is enabled, attempting biometric auth');
+          final (authenticated, error) = await authenticateWithBiometrics();
+          if (authenticated) {
+            Logger.data('Biometric auth successful, retrieving PIN');
+            return _storage.read(key: _pinKey);
+          }
+          Logger.error('Biometric auth failed', error);
         }
-        // Biometric failed, check for valid PIN
+        
+        Logger.data('Checking for valid PIN');
+        final pin = await _storage.read(key: _pinKey);
+        if (pin != null) {
+          Logger.data('PIN found');
+          return pin;
+        }
+        
+        Logger.error('Authentication failed - no valid PIN found');
+        throw Exception('Authentication required');
       }
-      
-      // Check if we have a valid PIN
-      final pin = await _storage.read(key: _pinKey);
-      if (pin != null) {
-        return pin;
-      }
-      
-      // Both biometric and PIN checks failed
-      throw Exception('Authentication required');
+      Logger.data('No authentication required, retrieving PIN');
+      return _storage.read(key: _pinKey);
+    } catch (e, stack) {
+      Logger.error('Error in getSecurePin', e, stack);
+      rethrow;
     }
-    return _storage.read(key: _pinKey);
   }
 
   Future<bool> isBiometricAvailable() async {
+    Logger.data('Checking biometric availability');
     try {
       final isDeviceSupported = await _localAuth.isDeviceSupported();
+      Logger.data('Device biometric support: $isDeviceSupported');
       if (!isDeviceSupported) {
         return false;
       }
 
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      Logger.data('Can check biometrics: $canCheckBiometrics');
       if (!canCheckBiometrics) {
         return false;
       }
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      Logger.data('Available biometrics: $availableBiometrics');
       return availableBiometrics.isNotEmpty;
     } on PlatformException catch (e) {
-      print('Error checking biometric availability: ${e.message}');
+      Logger.error('Platform error checking biometric availability', e);
       return false;
-    } catch (e) {
-      print('Unexpected error checking biometric availability: $e');
+    } catch (e, stack) {
+      Logger.error('Unexpected error checking biometric availability', e, stack);
       return false;
     }
   }
 
   Future<(bool, String?)> authenticateWithBiometrics() async {
+    Logger.interaction('Starting biometric authentication');
     try {
-      // Check if we have a recent successful authentication
       if (await _isRecentlyAuthenticated()) {
+        Logger.state('Recent authentication found, skipping biometric');
         return (true, null);
       }
 
       final isAvailable = await isBiometricAvailable();
+      Logger.state('Biometric availability: $isAvailable');
       if (!isAvailable) {
         return (false, 'Biometric authentication is not available on this device');
       }
 
+      Logger.interaction('Prompting biometric authentication');
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Please authenticate to access the app',
         options: const AuthenticationOptions(
-          stickyAuth: false,
+          stickyAuth: true,
           biometricOnly: true,
           useErrorDialogs: true,
         ),
       );
 
+      Logger.state('Biometric authentication result: $authenticated');
       if (authenticated) {
         await _markAuthenticationTime();
       }
@@ -109,13 +131,16 @@ class SecurityService {
           errorMessage = e.message ?? 'An error occurred during biometric authentication';
       }
       
+      Logger.error('Biometric authentication error', e);
       return (false, errorMessage);
-    } catch (e) {
+    } catch (e, stack) {
+      Logger.error('Unexpected biometric authentication error', e, stack);
       return (false, 'An unexpected error occurred during authentication');
     }
   }
 
   Future<void> _markAuthenticationTime() async {
+    Logger.data('Marking authentication time');
     await _storage.write(
       key: _lastAuthTimeKey,
       value: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -123,34 +148,47 @@ class SecurityService {
   }
 
   Future<bool> _isRecentlyAuthenticated() async {
+    Logger.data('Checking recent authentication');
     final lastAuthTimeStr = await _storage.read(key: _lastAuthTimeKey);
-    if (lastAuthTimeStr == null) return false;
+    if (lastAuthTimeStr == null) {
+      Logger.data('No recent authentication found');
+      return false;
+    }
 
     final lastAuthTime = DateTime.fromMillisecondsSinceEpoch(int.parse(lastAuthTimeStr));
     final now = DateTime.now();
     final difference = now.difference(lastAuthTime).inSeconds;
 
-    return difference < _authValidityDuration;
+    final isRecent = difference < _authValidityDuration;
+    Logger.data('Recent authentication check: $isRecent (${difference}s ago)');
+    return isRecent;
   }
 
   Future<void> setPin(String pin) async {
+    Logger.data('Setting new PIN');
     await _storage.write(key: _pinKey, value: pin);
     await _storage.write(key: _useBiometricKey, value: 'false');
     await _markAuthenticationTime();
+    Logger.state('PIN set successfully');
   }
 
   Future<void> setBiometricEnabled() async {
+    Logger.data('Enabling biometric authentication');
     final (isAuthenticated, error) = await authenticateWithBiometrics();
     if (!isAuthenticated) {
+      Logger.error('Failed to enable biometric', error);
       throw Exception(error ?? 'Failed to enable biometric authentication');
     }
     await _storage.write(key: _useBiometricKey, value: 'true');
     await _markAuthenticationTime();
+    Logger.state('Biometric enabled successfully');
   }
 
   Future<bool> verifyPin(String pin) async {
+    Logger.interaction('Verifying PIN');
     final storedPin = await _storage.read(key: _pinKey);
     final isValid = storedPin == pin;
+    Logger.state('PIN verification result: $isValid');
     if (isValid) {
       await _markAuthenticationTime();
     }
@@ -158,20 +196,30 @@ class SecurityService {
   }
 
   Future<bool> usesBiometric() async {
+    Logger.data('Checking if biometric is enabled');
     final value = await _storage.read(key: _useBiometricKey);
-    return value == 'true';
+    final usesBiometric = value == 'true';
+    Logger.data('Biometric enabled: $usesBiometric');
+    return usesBiometric;
   }
 
   Future<bool> isSecuritySetup() async {
+    Logger.data('Checking security setup');
     final usesBiometric = await this.usesBiometric();
     final hasPin = await _storage.read(key: _pinKey) != null;
-    return usesBiometric || hasPin;
+    final isSetup = usesBiometric || hasPin;
+    Logger.state('Security setup status: $isSetup (biometric: $usesBiometric, hasPin: $hasPin)');
+    return isSetup;
   }
 
   Future<bool> requiresAuthentication() async {
+    Logger.data('Checking if authentication is required');
     if (!await isSecuritySetup()) {
+      Logger.state('No authentication required - security not setup');
       return false;
     }
-    return !await _isRecentlyAuthenticated();
+    final requiresAuth = !await _isRecentlyAuthenticated();
+    Logger.state('Authentication required: $requiresAuth');
+    return requiresAuth;
   }
 }

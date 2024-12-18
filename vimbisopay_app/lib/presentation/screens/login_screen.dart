@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -221,10 +222,11 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       final phoneNumber = '+${_phoneController.text}';
+      final password = _passwordController.text;
       
       final result = await _repository.login(
         phone: phoneNumber,
-        password: _passwordController.text,
+        password: password,
       );
 
       if (mounted) {
@@ -238,13 +240,27 @@ class _LoginScreenState extends State<LoginScreen> {
               'We couldn\'t log you in. Please check your phone number and password, then try again.',
             );
           },
-          (user) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AuthScreen(user: user),
-              ),
+          (user) async {
+            Logger.interaction('Login successful, saving user data');
+            // Save user with password
+            final userWithPassword = User(
+              memberId: user.memberId,
+              phone: user.phone,
+              token: user.token,
+              password: password,
+              dashboard: user.dashboard,
             );
+            
+            await _databaseHelper.saveUser(userWithPassword);
+            
+            if (mounted) {
+              Logger.interaction('Navigating to auth screen');
+              Navigator.pushReplacementNamed(
+                context,
+                '/auth',
+                arguments: userWithPassword,
+              );
+            }
           },
         );
       }

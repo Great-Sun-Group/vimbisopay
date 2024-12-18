@@ -46,15 +46,22 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   void _acceptBulkTransactions(BuildContext context) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(_selectedTransactions.toList()));
+    final homeState = context.read<HomeBloc>().state;
+    final credexIds = _selectedTransactions.map((uniqueId) {
+      return homeState.pendingInTransactions
+          .firstWhere((offer) => offer.uniqueIdentifier == uniqueId)
+          .credexID;
+    }).toList();
+    
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(credexIds));
     setState(() {
       _selectionMode = false;
       _selectedTransactions.clear();
     });
   }
 
-  void _acceptSingleTransaction(BuildContext context, String credexId) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([credexId]));
+  void _acceptSingleTransaction(BuildContext context, PendingOffer offer) {
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([offer.credexID]));
   }
 
   Widget _buildPendingTransactionsSection(
@@ -159,8 +166,9 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   Widget _buildPendingTransactionTile(PendingOffer offer, bool isIncoming, HomeState state) {
-    final bool isSelected = _selectedTransactions.contains(offer.credexID);
-    final bool isProcessing = state.processingCredexIds.contains(offer.credexID);
+    final uniqueId = offer.uniqueIdentifier;
+    final bool isSelected = _selectedTransactions.contains(uniqueId);
+    final bool isProcessing = state.isProcessingTransaction(uniqueId);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -174,9 +182,9 @@ class _TransactionsListState extends State<TransactionsList> {
                   ? () {
                       setState(() {
                         if (isSelected) {
-                          _selectedTransactions.remove(offer.credexID);
+                          _selectedTransactions.remove(uniqueId);
                         } else {
-                          _selectedTransactions.add(offer.credexID);
+                          _selectedTransactions.add(uniqueId);
                         }
                       });
                     }
@@ -195,9 +203,9 @@ class _TransactionsListState extends State<TransactionsList> {
                           : (bool? value) {
                               setState(() {
                                 if (value == true) {
-                                  _selectedTransactions.add(offer.credexID);
+                                  _selectedTransactions.add(uniqueId);
                                 } else {
-                                  _selectedTransactions.remove(offer.credexID);
+                                  _selectedTransactions.remove(uniqueId);
                                 }
                               });
                             },
@@ -259,7 +267,7 @@ class _TransactionsListState extends State<TransactionsList> {
                       ElevatedButton(
                         onPressed: (state.status == HomeStatus.acceptingCredex || isProcessing)
                             ? null
-                            : () => _acceptSingleTransaction(context, offer.credexID),
+                            : () => _acceptSingleTransaction(context, offer),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -290,6 +298,75 @@ class _TransactionsListState extends State<TransactionsList> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLedgerTransactions(List<LedgerEntry> transactions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: transactions.map((transaction) {
+        final dateFormat = DateFormat('MMM d, yyyy h:mm a');
+        final formattedDate = dateFormat.format(transaction.timestamp);
+
+        return Semantics(
+          label: _getTransactionSemanticLabel(transaction),
+          child: ListTile(
+            leading: Icon(
+              _getTransactionIcon(transaction.type, transaction.amount),
+              color: transaction.amount >= 0
+                  ? AppColors.success
+                  : AppColors.error,
+              size: 28,
+            ),
+            title: Text(
+              transaction.description,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  transaction.counterpartyAccountName,
+                  style: TextStyle(
+                    color: AppColors.primary.withOpacity(0.8),
+                    fontSize: 13,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formattedDate,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            trailing: Text(
+              transaction.formattedAmount,
+              style: TextStyle(
+                color: transaction.amount >= 0
+                    ? AppColors.success
+                    : AppColors.error,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            isThreeLine: true,
+            enabled: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -327,11 +404,8 @@ class _TransactionsListState extends State<TransactionsList> {
             icon: Icons.cloud_off_rounded,
             message: state.error!,
             onRetry: () {
-              context.read<HomeBloc>().add(const HomeLedgerLoaded(
-                    accountLedgers: {},
-                    combinedEntries: [],
-                    hasMore: true,
-                  ));
+              // Trigger a refresh instead of directly setting empty state
+              context.read<HomeBloc>().add(const HomeRefreshStarted());
             },
           );
         }
@@ -373,113 +447,37 @@ class _TransactionsListState extends State<TransactionsList> {
           );
         }
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPendingTransactionsSection(
-                state.pendingInTransactions,
-                state.pendingOutTransactions,
-                state,
+        return Column(
+          children: [
+            _buildPendingTransactionsSection(
+              state.pendingInTransactions,
+              state.pendingOutTransactions,
+              state,
+            ),
+            if (state.combinedLedgerEntries.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text(
+                  'Transaction History',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
-              if (state.combinedLedgerEntries.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Transaction History',
-                      textAlign: TextAlign.start,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: state.combinedLedgerEntries.length,
-                  itemBuilder: (context, index) {
-                    final transaction = state.combinedLedgerEntries[index];
-                    final dateFormat = DateFormat('MMM d, yyyy h:mm a');
-                    final formattedDate = dateFormat.format(transaction.timestamp);
-
-                    return Semantics(
-                      label: _getTransactionSemanticLabel(transaction),
-                      child: ListTile(
-                        leading: Icon(
-                          _getTransactionIcon(transaction.type, transaction.amount),
-                          color: transaction.amount >= 0
-                              ? AppColors.success
-                              : AppColors.error,
-                          size: 28,
-                        ),
-                        title: Text(
-                          transaction.description,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              transaction.counterpartyAccountName,
-                              style: TextStyle(
-                                color: AppColors.primary.withOpacity(0.8),
-                                fontSize: 13,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              formattedDate,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                        trailing: Text(
-                          transaction.formattedAmount,
-                          style: TextStyle(
-                            color: transaction.amount >= 0
-                                ? AppColors.success
-                                : AppColors.error,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        isThreeLine: true,
-                        enabled: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              if (state.status == HomeStatus.loadingMore)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(AppColors.primary),
-                    ),
-                  ),
-                ),
+              _buildLedgerTransactions(state.combinedLedgerEntries),
             ],
-          ),
+            if (state.status == HomeStatus.loadingMore)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

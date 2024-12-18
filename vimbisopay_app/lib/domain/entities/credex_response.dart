@@ -98,6 +98,18 @@ class AuthUser {
     required this.firstname,
     required this.memberID,
   });
+
+  Map<String, dynamic> toMap() => {
+    'lastname': lastname,
+    'firstname': firstname,
+    'memberID': memberID,
+  };
+
+  factory AuthUser.fromMap(Map<String, dynamic> map) => AuthUser(
+    lastname: map['lastname'] as String,
+    firstname: map['firstname'] as String,
+    memberID: map['memberID'] as String,
+  );
 }
 
 class BalanceData {
@@ -110,6 +122,18 @@ class BalanceData {
     required this.data,
     required this.message,
   });
+
+  Map<String, dynamic> toMap() => {
+    'success': success,
+    'data': data.toMap(),
+    'message': message,
+  };
+
+  factory BalanceData.fromMap(Map<String, dynamic> map) => BalanceData(
+    success: map['success'] as bool,
+    data: BalanceDataDetails.fromMap(map['data']),
+    message: map['message'] as String,
+  );
 }
 
 class BalanceDataDetails {
@@ -122,6 +146,18 @@ class BalanceDataDetails {
     required this.unsecuredBalancesInDefaultDenom,
     required this.netCredexAssetsInDefaultDenom,
   });
+
+  Map<String, dynamic> toMap() => {
+    'securedNetBalancesByDenom': securedNetBalancesByDenom,
+    'unsecuredBalancesInDefaultDenom': unsecuredBalancesInDefaultDenom.toMap(),
+    'netCredexAssetsInDefaultDenom': netCredexAssetsInDefaultDenom,
+  };
+
+  factory BalanceDataDetails.fromMap(Map<String, dynamic> map) => BalanceDataDetails(
+    securedNetBalancesByDenom: List<String>.from(map['securedNetBalancesByDenom']),
+    unsecuredBalancesInDefaultDenom: UnsecuredBalances.fromMap(map['unsecuredBalancesInDefaultDenom']),
+    netCredexAssetsInDefaultDenom: map['netCredexAssetsInDefaultDenom'] as String,
+  );
 }
 
 class UnsecuredBalances {
@@ -134,6 +170,18 @@ class UnsecuredBalances {
     required this.totalReceivables,
     required this.netPayRec,
   });
+
+  Map<String, dynamic> toMap() => {
+    'totalPayables': totalPayables,
+    'totalReceivables': totalReceivables,
+    'netPayRec': netPayRec,
+  };
+
+  factory UnsecuredBalances.fromMap(Map<String, dynamic> map) => UnsecuredBalances(
+    totalPayables: map['totalPayables'] as String,
+    totalReceivables: map['totalReceivables'] as String,
+    netPayRec: map['netPayRec'] as String,
+  );
 }
 
 class PendingData {
@@ -146,6 +194,20 @@ class PendingData {
     required this.data,
     required this.message,
   });
+
+  Map<String, dynamic> toMap() => {
+    'success': success,
+    'data': data.map((x) => x.toMap()).toList(),
+    'message': message,
+  };
+
+  factory PendingData.fromMap(Map<String, dynamic> map) => PendingData(
+    success: map['success'] as bool,
+    data: List<PendingOffer>.from(
+      (map['data'] as List).map((x) => PendingOffer.fromMap(x)),
+    ),
+    message: map['message'] as String,
+  );
 }
 
 class PendingOffer {
@@ -154,12 +216,34 @@ class PendingOffer {
   final String counterpartyAccountName;
   final bool secured;
 
+  // Computed unique identifier that combines multiple fields
+  String get uniqueIdentifier {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final amount = double.tryParse(formattedInitialAmount.replaceAll(RegExp(r'[^\d.-]'), '')) ?? 0.0;
+    final type = secured ? 'secured' : 'unsecured';
+    return '${counterpartyAccountName.replaceAll(' ', '')}_${timestamp}_${amount}_$type';
+  }
+
   PendingOffer({
     required this.credexID,
     required this.formattedInitialAmount,
     required this.counterpartyAccountName,
     required this.secured,
   });
+
+  Map<String, dynamic> toMap() => {
+    'credexID': credexID,
+    'formattedInitialAmount': formattedInitialAmount,
+    'counterpartyAccountName': counterpartyAccountName,
+    'secured': secured,
+  };
+
+  factory PendingOffer.fromMap(Map<String, dynamic> map) => PendingOffer(
+    credexID: map['credexID'] as String,
+    formattedInitialAmount: map['formattedInitialAmount'] as String,
+    counterpartyAccountName: map['counterpartyAccountName'] as String,
+    secured: map['secured'] as bool,
+  );
 }
 
 class SendOffersTo {
@@ -172,4 +256,16 @@ class SendOffersTo {
     required this.firstname,
     required this.lastname,
   });
+
+  Map<String, dynamic> toMap() => {
+    'memberID': memberID,
+    'firstname': firstname,
+    'lastname': lastname,
+  };
+
+  factory SendOffersTo.fromMap(Map<String, dynamic> map) => SendOffersTo(
+    memberID: map['memberID'] as String,
+    firstname: map['firstname'] as String,
+    lastname: map['lastname'] as String,
+  );
 }
