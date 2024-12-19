@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
@@ -14,6 +16,7 @@ import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
@@ -37,7 +40,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     _setupScrollListener();
     WidgetsBinding.instance.addObserver(this);
-    _homeBloc = HomeBloc();
+    _homeBloc = HomeBloc(
+      acceptCredexBulk: AcceptCredexBulk(_accountRepository),
+    );
     _loadInitialData();
   }
 
@@ -76,7 +81,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            _homeBloc.add(HomeDataLoaded(dashboard: dashboard, user: user));
+            // Extract pending transactions from all accounts
+            List<PendingOffer> pendingInTransactions = [];
+            List<PendingOffer> pendingOutTransactions = [];
+            
+            for (final account in dashboard.accounts) {
+              pendingInTransactions.addAll(account.pendingInData.data);
+              pendingOutTransactions.addAll(account.pendingOutData.data);
+            }
+
+            _homeBloc.add(HomeDataLoaded(
+              dashboard: dashboard,
+              user: user,
+              pendingInTransactions: pendingInTransactions,
+              pendingOutTransactions: pendingOutTransactions,
+            ));
 
             // Get ledger for all accounts
             final Map<String, List<LedgerEntry>> accountLedgers = {};
@@ -146,7 +165,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return;
             }
 
-            _homeBloc.add(HomeDataLoaded(dashboard: dashboard, user: user));
+            // Extract pending transactions from all accounts
+            List<PendingOffer> pendingInTransactions = [];
+            List<PendingOffer> pendingOutTransactions = [];
+            
+            for (final account in dashboard.accounts) {
+              pendingInTransactions.addAll(account.pendingInData.data);
+              pendingOutTransactions.addAll(account.pendingOutData.data);
+            }
+
+            _homeBloc.add(HomeDataLoaded(
+              dashboard: dashboard,
+              user: user,
+              pendingInTransactions: pendingInTransactions,
+              pendingOutTransactions: pendingOutTransactions,
+            ));
 
             // Get ledger for all accounts
             final Map<String, List<LedgerEntry>> accountLedgers = {};
@@ -359,13 +392,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildAccountsSection(HomeState state) {
-    final viewPagerHeight = UIUtils.getViewPagerHeight(context);
-    
     return Column(
       children: [
         const SizedBox(height: HomeConstants.defaultPadding),
-        SizedBox(
-          height: viewPagerHeight,
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
+          ),
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => _homeBloc.add(HomePageChanged(index)),
@@ -398,8 +431,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             if (state.dashboard != null) _buildAccountsSection(state),
             const TransactionsList(),
-            // Extra space for action buttons
-            const SizedBox(height: 120),
           ],
         ),
       ),
@@ -439,20 +470,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             backgroundColor: Colors.transparent,
             appBar: _buildAppBar(state),
             body: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: _buildScrollableContent(state),
-                  ),
-                  HomeActionButtons(
-                    accounts: state.dashboard?.accounts,
-                    onSendTap: () {
-                      // TODO: Implement send money
-                    },
-                  ),
-                ],
-              ),
+              child: state.isInitialLoading
+                  ? const LoadingAnimation(size: 100)
+                  : _buildScrollableContent(state),
+            ),
+            bottomNavigationBar: HomeActionButtons(
+              accounts: state.dashboard?.accounts,
+              onSendTap: () {
+                // TODO: Implement send money
+              },
+              accountRepository: _accountRepository,
             ),
           );
         },

@@ -1,4 +1,5 @@
 import 'package:vimbisopay_app/domain/entities/base_entity.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 
 enum MemberTierType {
   open(0, 10.0, false, true, false, false, false, false),    // Free tier
@@ -93,6 +94,8 @@ class DashboardAccount {
   final bool isOwnedAccount;
   final List<AuthUser> authFor;
   final BalanceData balanceData;
+  final credex.PendingData pendingInData;
+  final credex.PendingData pendingOutData;
 
   const DashboardAccount({
     required this.accountID,
@@ -102,6 +105,8 @@ class DashboardAccount {
     required this.isOwnedAccount,
     required this.authFor,
     required this.balanceData,
+    required this.pendingInData,
+    required this.pendingOutData,
   });
 }
 

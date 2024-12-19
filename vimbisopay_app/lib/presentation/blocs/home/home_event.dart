@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 
 abstract class HomeEvent extends Equatable {
   const HomeEvent();
@@ -34,14 +35,23 @@ class HomeLoadMoreStarted extends HomeEvent {
 class HomeDataLoaded extends HomeEvent {
   final Dashboard dashboard;
   final User user;
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
 
   const HomeDataLoaded({
     required this.dashboard,
     required this.user,
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
   });
 
   @override
-  List<Object> get props => [dashboard, user];
+  List<Object> get props => [
+    dashboard, 
+    user, 
+    pendingInTransactions, 
+    pendingOutTransactions
+  ];
 }
 
 class HomeLedgerLoaded extends HomeEvent {
@@ -66,4 +76,17 @@ class HomeErrorOccurred extends HomeEvent {
 
   @override
   List<Object?> get props => [message];
+}
+
+class HomeAcceptCredexBulkStarted extends HomeEvent {
+  final List<String> credexIds;
+
+  const HomeAcceptCredexBulkStarted(this.credexIds);
+
+  @override
+  List<Object> get props => [credexIds];
+}
+
+class HomeAcceptCredexBulkCompleted extends HomeEvent {
+  const HomeAcceptCredexBulkCompleted();
 }

@@ -4,15 +4,17 @@ import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
-  final String baseUrl = 'https://dev.mycredex.dev';
+  final String baseUrl = ApiConfig.baseUrl;
   
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final SecurityService _securityService = SecurityService();
@@ -189,24 +191,39 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, Account>> getAccountByHandle(String handle) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = '$baseUrl/accounts/$handle';
+        final url = '$baseUrl/getAccountByHandle';
         final headers = _authHeaders(token);
+        final body = {'accountHandle': handle};
 
         final response = await _loggedRequest(
-          () => http.get(Uri.parse(url), headers: headers),
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
           url,
-          'GET',
+          'POST',
           headers: headers,
+          body: body,
         );
 
         if (response.statusCode == 200) {
-          final data = json.decode(response.body);
+          final jsonResponse = json.decode(response.body);
+          
+          if (!jsonResponse.containsKey('data') || 
+              !jsonResponse['data'].containsKey('action') ||
+              !jsonResponse['data']['action'].containsKey('details')) {
+            return const Left(InfrastructureFailure('Invalid response format'));
+          }
+
+          final details = jsonResponse['data']['action']['details'];
+          
           return Right(Account(
-            id: data['id'],
-            handle: data['handle'],
-            name: data['name'],
-            defaultDenom: data['defaultDenom'],
-            balances: Map<String, double>.from(data['balances']),
+            id: details['accountID'],
+            handle: details['accountHandle'],
+            name: details['accountName'],
+            defaultDenom: details['defaultDenom'],
+            balances: {}, // Balances not included in this response
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
@@ -217,7 +234,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, Dashboard>> getMemberDashboardByPhone(String phone) async {
+  Future<Either<Failure, dashboard.Dashboard>> getMemberDashboardByPhone(String phone) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
         final url = '$baseUrl/getMemberDashboardByPhone';
@@ -248,48 +265,74 @@ class AccountRepositoryImpl implements AccountRepository {
           final actionDetails = data['data']['action']['details'];
           final dashboardData = data['data']['dashboard'];
           
+          // Create a Set to track unique account handles
+          final seenHandles = <String>{};
+          
           final accountsList = (dashboardData['accounts'] as List)
               .where((account) => account['success'] == true)
               .map((account) {
                 final accountData = account['data'];
                 final balanceData = accountData['balanceData']['data'];
+                final pendingInData = accountData['pendingInData'];
+                final pendingOutData = accountData['pendingOutData'];
                 
-                return DashboardAccount(
+                return dashboard.DashboardAccount(
                   accountID: accountData['accountID'],
                   accountName: accountData['accountName'],
                   accountHandle: accountData['accountHandle'],
                   defaultDenom: accountData['defaultDenom'],
                   isOwnedAccount: accountData['isOwnedAccount'],
                   authFor: (accountData['authFor'] as List)
-                      .map((auth) => AuthUser(
+                      .map((auth) => dashboard.AuthUser(
                             firstname: auth['firstname'],
                             lastname: auth['lastname'],
                             memberID: auth['memberID'],
                           ))
                       .toList(),
-                  balanceData: BalanceData(
+                  balanceData: dashboard.BalanceData(
                     securedNetBalancesByDenom: 
                         (balanceData['securedNetBalancesByDenom'] as List)
                             .map((balance) => balance.toString())
                             .toList(),
-                    unsecuredBalances: UnsecuredBalances(
+                    unsecuredBalances: dashboard.UnsecuredBalances(
                       totalPayables: balanceData['unsecuredBalancesInDefaultDenom']['totalPayables'],
                       totalReceivables: balanceData['unsecuredBalancesInDefaultDenom']['totalReceivables'],
                       netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
                     ),
                     netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'],
                   ),
+                  pendingInData: credex.PendingData(
+                    success: pendingInData['success'],
+                    data: (pendingInData['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: pendingInData['message'],
+                  ),
+                  pendingOutData: credex.PendingData(
+                    success: pendingOutData['success'],
+                    data: (pendingOutData['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: pendingOutData['message'],
+                  ),
                 );
               })
+              .where((account) => seenHandles.add(account.accountHandle)) // Only keep accounts with unique handles
               .toList();
 
-          return Right(Dashboard(
+          return Right(dashboard.Dashboard(
             id: actionDetails['memberID'],
             memberHandle: actionDetails['memberHandle'],
             firstname: actionDetails['firstname'],
             lastname: actionDetails['lastname'],
             defaultDenom: actionDetails['defaultDenom'],
-            memberTier: MemberTier(
+            memberTier: dashboard.MemberTier(
               low: actionDetails['memberTier']['low'],
               high: actionDetails['memberTier']['high'],
             ),
@@ -393,5 +436,146 @@ class AccountRepositoryImpl implements AccountRepository {
     } catch (e) {
       return Left(InfrastructureFailure(e.toString()));
     }
+  }
+
+  @override
+  Future<Either<Failure, credex.CredexResponse>> createCredex(CredexRequest request) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/createCredex';
+        final headers = _authHeaders(token);
+        final body = request.toJson();
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          final jsonResponse = json.decode(response.body);
+          final data = jsonResponse['data'];
+          final action = data['action'];
+          final dashboard = data['dashboard'];
+          final dashboardData = dashboard['data'];
+          final balanceData = dashboardData['balanceData'];
+
+          return Right(credex.CredexResponse(
+            message: jsonResponse['message'],
+            data: credex.CredexData(
+              action: credex.CredexAction(
+                id: action['id'],
+                type: action['type'],
+                timestamp: action['timestamp'],
+                actor: action['actor'],
+                details: credex.CredexActionDetails(
+                  amount: action['details']['amount'],
+                  denomination: action['details']['denomination'],
+                  securedCredex: action['details']['securedCredex'],
+                  receiverAccountID: action['details']['receiverAccountID'],
+                  receiverAccountName: action['details']['receiverAccountName'],
+                ),
+              ),
+              dashboard: credex.CredexDashboard(
+                success: dashboard['success'],
+                data: credex.CredexDashboardData(
+                  accountID: dashboardData['accountID'],
+                  accountName: dashboardData['accountName'],
+                  accountHandle: dashboardData['accountHandle'],
+                  defaultDenom: dashboardData['defaultDenom'],
+                  isOwnedAccount: dashboardData['isOwnedAccount'],
+                  authFor: (dashboardData['authFor'] as List).map((auth) => credex.AuthUser(
+                    lastname: auth['lastname'],
+                    firstname: auth['firstname'],
+                    memberID: auth['memberID'],
+                  )).toList(),
+                  balanceData: credex.BalanceData(
+                    success: balanceData['success'],
+                    data: credex.BalanceDataDetails(
+                      securedNetBalancesByDenom: 
+                          (balanceData['data']['securedNetBalancesByDenom'] as List)
+                              .map((balance) => balance.toString())
+                              .toList(),
+                      unsecuredBalancesInDefaultDenom: credex.UnsecuredBalances(
+                        totalPayables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalPayables'],
+                        totalReceivables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalReceivables'],
+                        netPayRec: balanceData['data']['unsecuredBalancesInDefaultDenom']['netPayRec'],
+                      ),
+                      netCredexAssetsInDefaultDenom: balanceData['data']['netCredexAssetsInDefaultDenom'],
+                    ),
+                    message: balanceData['message'],
+                  ),
+                  pendingInData: credex.PendingData(
+                    success: dashboardData['pendingInData']['success'],
+                    data: (dashboardData['pendingInData']['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: dashboardData['pendingInData']['message'],
+                  ),
+                  pendingOutData: credex.PendingData(
+                    success: dashboardData['pendingOutData']['success'],
+                    data: (dashboardData['pendingOutData']['data'] as List).map((offer) => credex.PendingOffer(
+                      credexID: offer['credexID'],
+                      formattedInitialAmount: offer['formattedInitialAmount'],
+                      counterpartyAccountName: offer['counterpartyAccountName'],
+                      secured: offer['secured'],
+                    )).toList(),
+                    message: dashboardData['pendingOutData']['message'],
+                  ),
+                  sendOffersTo: credex.SendOffersTo(
+                    memberID: dashboardData['sendOffersTo']['memberID'],
+                    firstname: dashboardData['sendOffersTo']['firstname'],
+                    lastname: dashboardData['sendOffersTo']['lastname'],
+                  ),
+                ),
+                message: dashboard['message'],
+              ),
+            ),
+          ));
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to create Credex';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, bool>> acceptCredexBulk(List<String> credexIds) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/acceptCredexBulk';
+        final headers = _authHeaders(token);
+        final body = {'credexIDs': credexIds};
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transactions';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
   }
 }

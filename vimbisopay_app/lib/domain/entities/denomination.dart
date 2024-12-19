@@ -1,0 +1,4 @@
+enum Denomination {
+  USD,
+  CXX,
+}

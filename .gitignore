@@ -53,3 +53,4 @@ app.*.map.json
 !.thunder/thunder-collection_*.json
 !.thunder/thunder-environment_*.json
 !.thunder/thunder-client.json
+vimbisopay_app/scripts/github_config.sh
