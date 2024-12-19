@@ -1,7 +1,8 @@
 class HomeConstants {
   static const int ledgerPageSize = 20;
   static const double accountCardHeight = 0.40; 
-  static const double appBarHeight = 72.0;
+  static const double appBarHeight = 90.0;
+  static const double avatarSize = 45.0;
   
   // Button dimensions
   static const double actionButtonSize = 50.0;

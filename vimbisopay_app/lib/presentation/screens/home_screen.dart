@@ -16,6 +16,7 @@ import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
+import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -140,27 +141,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildUserAvatar(HomeState state) {
     return Padding(
       padding: const EdgeInsets.only(
-        left: 12.0,
-        top: 12.0,
-        bottom: 12.0,
+        left: 16.0,
+        top: 16.0,
+        bottom: 16.0,
       ),
-      child: CircleAvatar(
-        backgroundColor: AppColors.primary.withOpacity(0.1),
-        child: state.dashboard != null
-            ? Text(
-                UIUtils.getInitials(
-                  state.dashboard!.firstname,
-                  state.dashboard!.lastname,
-                ),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            : const Icon(
-                Icons.person_outline,
-                color: AppColors.primary,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            radius: HomeConstants.avatarSize / 2,
+            backgroundColor: AppColors.primary.withOpacity(0.1),
+            child: state.dashboard != null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.person,
+                        color: AppColors.primary,
+                        size: HomeConstants.avatarSize / 2,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        UIUtils.getInitials(
+                          state.dashboard!.firstname,
+                          state.dashboard!.lastname,
+                        ),
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: HomeConstants.captionTextSize,
+                        ),
+                      ),
+                    ],
+                  )
+                : Icon(
+                    Icons.person_outline,
+                    color: AppColors.primary,
+                    size: HomeConstants.avatarSize / 2,
+                  ),
+          ),
+          if (state.dashboard?.memberTier != null)
+            Positioned(
+              right: -8,
+              bottom: -8,
+              child: MemberTierBadge(
+                tierType: state.dashboard!.memberTier.type,
               ),
+            ),
+        ],
       ),
     );
   }
