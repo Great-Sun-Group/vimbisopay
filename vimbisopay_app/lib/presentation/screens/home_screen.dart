@@ -26,7 +26,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  final PageController _pageController = PageController();
+  late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
   final AccountRepository _accountRepository = AccountRepositoryImpl();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     Logger.lifecycle('HomeScreen initialized');
+    _pageController = PageController(initialPage: 0);
     _setupScrollListener();
     WidgetsBinding.instance.addObserver(this);
     _checkUserAndInitialize();
@@ -201,15 +202,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
           ),
-          child: PageView.builder(
-            controller: _pageController,
-            onPageChanged: (index) {
-              Logger.interaction('Account page changed to $index');
-              _homeBloc.add(HomePageChanged(index));
+          child: BlocListener<HomeBloc, HomeState>(
+            listenWhen: (previous, current) => previous.currentPage != current.currentPage,
+            listener: (context, state) {
+              if (_pageController.page?.round() != state.currentPage) {
+                _pageController.animateToPage(
+                  state.currentPage,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
             },
-            itemCount: state.dashboard!.accounts.length,
-            itemBuilder: (context, index) => AccountCard(
-              account: state.dashboard!.accounts[index],
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                Logger.interaction('Account page changed to $index');
+                _homeBloc.add(HomePageChanged(index));
+              },
+              itemCount: state.dashboard!.accounts.length,
+              itemBuilder: (context, index) => AccountCard(
+                account: state.dashboard!.accounts[index],
+              ),
             ),
           ),
         ),
