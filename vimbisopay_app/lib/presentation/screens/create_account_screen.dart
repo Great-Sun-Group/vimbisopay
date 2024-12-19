@@ -347,10 +347,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                     _validateForm();
                                   });
                                 },
-                                child: Text.rich(
+                                child: const Text.rich(
                                   TextSpan(
                                     text: 'I agree to the ',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: AppColors.textSecondary,
                                     ),
                                     children: [

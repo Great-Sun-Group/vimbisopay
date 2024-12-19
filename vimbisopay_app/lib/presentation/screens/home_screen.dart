@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.person,
                         color: AppColors.primary,
                         size: HomeConstants.avatarSize / 2,
@@ -166,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           state.dashboard!.firstname,
                           state.dashboard!.lastname,
                         ),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: HomeConstants.captionTextSize,
@@ -174,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ],
                   )
-                : Icon(
+                : const Icon(
                     Icons.person_outline,
                     color: AppColors.primary,
                     size: HomeConstants.avatarSize / 2,

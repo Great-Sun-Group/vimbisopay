@@ -47,7 +47,14 @@ class _TransactionsListState extends State<TransactionsList> {
 
   void _acceptBulkTransactions(BuildContext context) {
     final homeState = context.read<HomeBloc>().state;
-    final credexIds = _selectedTransactions.map((uniqueId) {
+    // Filter out any selected transactions that are already being processed
+    final validSelectedTransactions = _selectedTransactions.where((uniqueId) {
+      return !homeState.isProcessingTransaction(uniqueId);
+    }).toList();
+    
+    if (validSelectedTransactions.isEmpty) return;
+
+    final credexIds = validSelectedTransactions.map((uniqueId) {
       return homeState.pendingInTransactions
           .firstWhere((offer) => offer.uniqueIdentifier == uniqueId)
           .credexID;
@@ -176,10 +183,11 @@ class _TransactionsListState extends State<TransactionsList> {
         elevation: isSelected ? 2 : 0,
         color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
         child: InkWell(
-          onTap: (state.status == HomeStatus.acceptingCredex || isProcessing)
+                  onTap: isProcessing
               ? null
               : _selectionMode
                   ? () {
+                      if (state.status == HomeStatus.acceptingCredex) return;
                       setState(() {
                         if (isSelected) {
                           _selectedTransactions.remove(uniqueId);
@@ -198,9 +206,10 @@ class _TransactionsListState extends State<TransactionsList> {
                     padding: const EdgeInsets.only(right: 8.0),
                     child: Checkbox(
                       value: isSelected,
-                      onChanged: (state.status == HomeStatus.acceptingCredex || isProcessing)
+                      onChanged: isProcessing
                           ? null
                           : (bool? value) {
+                              if (state.status == HomeStatus.acceptingCredex) return;
                               setState(() {
                                 if (value == true) {
                                   _selectedTransactions.add(uniqueId);
@@ -381,6 +390,17 @@ class _TransactionsListState extends State<TransactionsList> {
               backgroundColor: AppColors.error,
             ),
           );
+        }
+        
+        // Clear selection for any transactions that are being processed
+        if (state.processingCredexIds.isNotEmpty) {
+          setState(() {
+            _selectedTransactions.removeWhere((uniqueId) {
+              final offer = state.pendingInTransactions
+                  .firstWhere((o) => o.uniqueIdentifier == uniqueId);
+              return state.isProcessingTransaction(offer.credexID);
+            });
+          });
         }
       },
       builder: (context, state) {
