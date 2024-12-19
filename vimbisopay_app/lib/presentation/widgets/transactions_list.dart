@@ -46,29 +46,15 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   void _acceptBulkTransactions(BuildContext context) {
-    final homeState = context.read<HomeBloc>().state;
-    // Filter out any selected transactions that are already being processed
-    final validSelectedTransactions = _selectedTransactions.where((uniqueId) {
-      return !homeState.isProcessingTransaction(uniqueId);
-    }).toList();
-    
-    if (validSelectedTransactions.isEmpty) return;
-
-    final credexIds = validSelectedTransactions.map((uniqueId) {
-      return homeState.pendingInTransactions
-          .firstWhere((offer) => offer.uniqueIdentifier == uniqueId)
-          .credexID;
-    }).toList();
-    
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(credexIds));
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(_selectedTransactions.toList()));
     setState(() {
       _selectionMode = false;
       _selectedTransactions.clear();
     });
   }
 
-  void _acceptSingleTransaction(BuildContext context, PendingOffer offer) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([offer.credexID]));
+  void _acceptSingleTransaction(BuildContext context, String credexId) {
+    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([credexId]));
   }
 
   Widget _buildPendingTransactionsSection(
@@ -173,9 +159,8 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   Widget _buildPendingTransactionTile(PendingOffer offer, bool isIncoming, HomeState state) {
-    final uniqueId = offer.uniqueIdentifier;
-    final bool isSelected = _selectedTransactions.contains(uniqueId);
-    final bool isProcessing = state.isProcessingTransaction(uniqueId);
+    final bool isSelected = _selectedTransactions.contains(offer.credexID);
+    final bool isProcessing = state.processingCredexIds.contains(offer.credexID);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -183,16 +168,15 @@ class _TransactionsListState extends State<TransactionsList> {
         elevation: isSelected ? 2 : 0,
         color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
         child: InkWell(
-                  onTap: isProcessing
+          onTap: (state.status == HomeStatus.acceptingCredex || isProcessing)
               ? null
               : _selectionMode
                   ? () {
-                      if (state.status == HomeStatus.acceptingCredex) return;
                       setState(() {
                         if (isSelected) {
-                          _selectedTransactions.remove(uniqueId);
+                          _selectedTransactions.remove(offer.credexID);
                         } else {
-                          _selectedTransactions.add(uniqueId);
+                          _selectedTransactions.add(offer.credexID);
                         }
                       });
                     }
@@ -206,15 +190,14 @@ class _TransactionsListState extends State<TransactionsList> {
                     padding: const EdgeInsets.only(right: 8.0),
                     child: Checkbox(
                       value: isSelected,
-                      onChanged: isProcessing
+                      onChanged: (state.status == HomeStatus.acceptingCredex || isProcessing)
                           ? null
                           : (bool? value) {
-                              if (state.status == HomeStatus.acceptingCredex) return;
                               setState(() {
                                 if (value == true) {
-                                  _selectedTransactions.add(uniqueId);
+                                  _selectedTransactions.add(offer.credexID);
                                 } else {
-                                  _selectedTransactions.remove(uniqueId);
+                                  _selectedTransactions.remove(offer.credexID);
                                 }
                               });
                             },
@@ -276,7 +259,7 @@ class _TransactionsListState extends State<TransactionsList> {
                       ElevatedButton(
                         onPressed: (state.status == HomeStatus.acceptingCredex || isProcessing)
                             ? null
-                            : () => _acceptSingleTransaction(context, offer),
+                            : () => _acceptSingleTransaction(context, offer.credexID),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
