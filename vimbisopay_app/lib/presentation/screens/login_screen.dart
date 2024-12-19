@@ -306,7 +306,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Form(
                   key: _formKey,
-                  onChanged: _validateForm,
                   child: Column(
                     children: [
                       TextFormField(
@@ -319,6 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         keyboardType: TextInputType.phone,
                         enabled: !_isLoading,
+                        onChanged: (_) => _validateForm(),
                         validator: _validatePhone,
                       ),
                       const SizedBox(height: 16),
@@ -331,6 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         obscureText: true,
                         enabled: !_isLoading,
+                        onChanged: (_) => _validateForm(),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your password';

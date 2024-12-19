@@ -238,12 +238,48 @@ class PendingOffer {
     'secured': secured,
   };
 
-  factory PendingOffer.fromMap(Map<String, dynamic> map) => PendingOffer(
-    credexID: map['credexID'] as String,
-    formattedInitialAmount: map['formattedInitialAmount'] as String,
-    counterpartyAccountName: map['counterpartyAccountName'] as String,
-    secured: map['secured'] as bool,
-  );
+  factory PendingOffer.fromMap(Map<String, dynamic> map) {
+    // Parse and format the amount
+    String formattedAmount;
+    try {
+      if (map.containsKey('initialAmount') && map['initialAmount'] != null) {
+        double amount;
+        if (map['initialAmount'] is String) {
+          amount = double.parse(map['initialAmount']);
+        } else if (map['initialAmount'] is num) {
+          amount = (map['initialAmount'] as num).toDouble();
+        } else {
+          throw const FormatException('Invalid amount format');
+        }
+        
+        // If formattedInitialAmount is missing or invalid, format the amount ourselves
+        if (!map.containsKey('formattedInitialAmount') || 
+            map['formattedInitialAmount'] == null || 
+            map['formattedInitialAmount'].toString().isEmpty) {
+          final sign = amount >= 0 ? '+' : '';
+          final denomination = map['denomination'] ?? 'CXX'; // Fallback to CXX if denomination is missing
+          formattedAmount = '$sign${amount.toStringAsFixed(2)} $denomination';
+        } else {
+          formattedAmount = map['formattedInitialAmount'].toString();
+        }
+      } else if (map.containsKey('formattedInitialAmount') && 
+                 map['formattedInitialAmount'] != null && 
+                 map['formattedInitialAmount'].toString().isNotEmpty) {
+        formattedAmount = map['formattedInitialAmount'].toString();
+      } else {
+        formattedAmount = '0.00 CXX'; // Fallback if no amount information is available
+      }
+    } catch (e) {
+      formattedAmount = '0.00 CXX'; // Fallback in case of any parsing errors
+    }
+
+    return PendingOffer(
+      credexID: map['credexID'] as String,
+      formattedInitialAmount: formattedAmount,
+      counterpartyAccountName: map['counterpartyAccountName'] as String,
+      secured: map['secured'] as bool,
+    );
+  }
 }
 
 class SendOffersTo {

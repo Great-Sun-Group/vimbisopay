@@ -49,9 +49,6 @@ class LedgerEntry {
     if (!json.containsKey('counterpartyAccountName')) {
       throw const FormatException('Missing counterpartyAccountName in ledger entry');
     }
-    if (!json.containsKey('formattedAmount')) {
-      throw const FormatException('Missing formattedAmount in ledger entry');
-    }
 
     final timestamp = json['timestamp'];
     DateTime parsedTimestamp;
@@ -97,14 +94,37 @@ class LedgerEntry {
     double parsedAmount;
     try {
       if (json['amount'] is String) {
-        parsedAmount = double.parse(json['amount']);
+        final amountStr = json['amount'].toString();
+        if (amountStr == 'NaN') {
+          // Handle NaN case by defaulting to 0.0
+          parsedAmount = 0.0;
+        } else {
+          parsedAmount = double.parse(amountStr);
+        }
       } else if (json['amount'] is num) {
         parsedAmount = (json['amount'] as num).toDouble();
       } else {
         throw const FormatException('Invalid amount format');
       }
     } catch (e) {
-      throw FormatException('Error parsing amount: $e');
+      // If parsing fails for any reason, default to 0.0
+      parsedAmount = 0.0;
+    }
+
+    // Format amount if formattedAmount is missing or invalid
+    String formattedAmount;
+    try {
+      if (json.containsKey('formattedAmount') && json['formattedAmount'] != null && json['formattedAmount'].toString().isNotEmpty) {
+        formattedAmount = json['formattedAmount'].toString();
+      } else {
+        // Format the amount with 2 decimal places and add denomination
+        final sign = parsedAmount >= 0 ? '+' : '';
+        formattedAmount = '$sign${parsedAmount.toStringAsFixed(2)} ${json['denomination']}';
+      }
+    } catch (e) {
+      // Fallback formatting if there's any error
+      final sign = parsedAmount >= 0 ? '+' : '';
+      formattedAmount = '$sign${parsedAmount.toStringAsFixed(2)} ${json['denomination']}';
     }
 
     return LedgerEntry(
@@ -115,7 +135,7 @@ class LedgerEntry {
       denomination: json['denomination'].toString(),
       description: json['description'].toString(),
       counterpartyAccountName: json['counterpartyAccountName'].toString(),
-      formattedAmount: json['formattedAmount'].toString(),
+      formattedAmount: formattedAmount,
       accountId: accountId,
       accountName: accountName,
     );

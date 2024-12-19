@@ -287,7 +287,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 child: Form(
                   key: _formKey,
-                  onChanged: _validateForm,
                   child: Column(
                     children: [
                       TextFormField(
@@ -300,6 +299,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         keyboardType: TextInputType.phone,
                         enabled: !_isLoading,
+                        onChanged: (_) => _validateForm(),
                         validator: _validatePhone,
                       ),
                       const SizedBox(height: 24),

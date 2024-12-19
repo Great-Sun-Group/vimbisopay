@@ -7,7 +7,6 @@ import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
-import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final AcceptCredexBulk acceptCredexBulk;
@@ -15,8 +14,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final Set<String> _processedCredexIds = {};
   bool _isInitialized = false;
-  Timer? _refreshDebounceTimer;
-  static const _refreshDebounceMs = 2000; // 2 seconds debounce
 
   HomeBloc({
     required this.acceptCredexBulk,
@@ -63,10 +60,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _processedCredexIds.clear();
 
     try {
-      final user = await Future(() async {
-        return await _databaseHelper.getUser();
-      });
-      
+      final user = await _databaseHelper.getUser();
       if (user == null) {
         add(const HomeErrorOccurred('User not found'));
         return;
@@ -77,12 +71,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         return;
       }
 
-      Logger.data('''Dashboard loaded from storage:
-        Name: ${user.dashboard!.firstname} ${user.dashboard!.lastname}
-        Accounts: ${user.dashboard!.accounts.length}
-      ''');
-
-      // Immediately emit dashboard with pending transactions
       final pendingInTransactions = user.dashboard!.accounts
           .expand((account) => account.pendingInData.data)
           .toList();
@@ -94,14 +82,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         dashboard: user.dashboard!,
         pendingInTransactions: pendingInTransactions,
         pendingOutTransactions: pendingOutTransactions,
-        keepLoading: false,
+        keepLoading: user.dashboard!.accounts.isNotEmpty,
       ));
 
-      // Then start loading ledger data if there are accounts
       if (user.dashboard!.accounts.isNotEmpty) {
         await _loadLedgerData(user.dashboard!);
       } else {
-        Logger.data('No accounts found, skipping ledger data load');
         add(const HomeLedgerLoaded(
           accountLedgers: {},
           combinedEntries: [],
@@ -120,7 +106,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Future<void> _loadLedgerData(dashboard) async {
     Logger.data('Loading ledger data for accounts');
     
-    // Set loading state for ledger data specifically
     add(const HomeLoadStarted());
     
     final Map<String, List<LedgerEntry>> accountLedgers = {};
@@ -131,7 +116,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final totalAccounts = dashboard.accounts.length;
 
     try {
-      // Process accounts in batches of 2
       final accounts = dashboard.accounts;
       for (int i = 0; i < accounts.length; i += 2) {
         final batch = accounts.skip(i).take(2);
@@ -142,7 +126,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final result = await accountRepository.getLedger(
             accountId: account.accountID,
             startRow: 0,
-            numRows: HomeConstants.ledgerPageSize,
+            numRows: 20,
           );
 
           processedAccounts++;
@@ -153,8 +137,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               Logger.error('Failed to fetch ledger for account ${account.accountID}', failure);
               errors.add('Failed to load ledger for ${account.accountName}');
               
-              if (isLastAccount && !hasMoreEntries) {
-                Logger.data('Last account processed, no more entries available');
+              if (isLastAccount && allEntries.isEmpty) {
                 add(const HomeLedgerLoaded(
                   accountLedgers: {},
                   combinedEntries: [],
@@ -169,22 +152,25 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                 }
 
                 final data = response['data'];
-                final ledger = data['dashboard']?['ledger'] as List? ?? 
-                             data['action']?['details']?['ledger'] as List?;
+                if (!data.containsKey('dashboard')) {
+                  throw 'Invalid response structure: missing dashboard field';
+                }
+
+                final dashboard = data['dashboard'];
+                final ledgerData = dashboard['ledger'] as List?;
                 
-                if (ledger == null) {
+                if (ledgerData == null) {
                   throw 'Invalid response structure: missing ledger data';
                 }
 
-                final pagination = data['dashboard']?['pagination'] as Map<String, dynamic>?;
+                final pagination = dashboard['pagination'] as Map<String, dynamic>?;
                 final hasMore = pagination?['hasMore'] as bool? ?? false;
                 
                 if (hasMore) {
                   hasMoreEntries = true;
-                  Logger.data('More entries available for account: ${account.accountName}');
                 }
 
-                final entries = ledger.map((entry) {
+                final entries = ledgerData.map((entry) {
                   try {
                     return LedgerEntry.fromJson(
                       entry as Map<String, dynamic>,
@@ -192,7 +178,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                       accountName: account.accountName,
                     );
                   } catch (e) {
-                    Logger.error('Error parsing ledger entry for account ${account.accountID}', e);
+                    Logger.error('Error parsing ledger entry', e);
                     return null;
                   }
                 }).whereType<LedgerEntry>().toList();
@@ -200,17 +186,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                 if (entries.isNotEmpty) {
                   accountLedgers[account.accountID] = entries;
                   allEntries.addAll(entries);
-                  Logger.data('Successfully processed ${entries.length} entries for ${account.accountName}');
-                } else {
-                  Logger.data('No ledger entries found for account: ${account.accountName}');
                 }
 
                 if (isLastAccount) {
-                  Logger.data('Last account processed, hasMore: $hasMoreEntries');
                   if (allEntries.isNotEmpty) {
                     final uniqueEntries = _deduplicateAndSortEntries(allEntries);
-                    Logger.data('Total unique entries: ${uniqueEntries.length}');
-
                     add(HomeLedgerLoaded(
                       accountLedgers: accountLedgers,
                       combinedEntries: uniqueEntries,
@@ -219,7 +199,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                   } else if (errors.isNotEmpty) {
                     add(HomeErrorOccurred(errors.join('\n')));
                   } else {
-                    Logger.data('No ledger entries found for any accounts');
                     add(const HomeLedgerLoaded(
                       accountLedgers: {},
                       combinedEntries: [],
@@ -227,13 +206,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                     ));
                   }
                 }
-
               } catch (e) {
-                Logger.error('Error processing ledger data for account ${account.accountID}', e);
+                Logger.error('Error processing ledger data', e);
                 errors.add('Error processing ledger for ${account.accountName}');
                 
-                if (isLastAccount && !hasMoreEntries) {
-                  Logger.data('Last account processed with error, no more entries available');
+                if (isLastAccount && allEntries.isEmpty) {
                   add(const HomeLedgerLoaded(
                     accountLedgers: {},
                     combinedEntries: [],
@@ -244,9 +221,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             },
           );
         }
-
-        // Allow UI to update between batches
-        await Future.delayed(Duration.zero);
       }
     } catch (e, stackTrace) {
       Logger.error('Error in _loadLedgerData', e, stackTrace);
@@ -262,7 +236,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       final user = await _databaseHelper.getUser();
       if (user == null || user.password == null) {
         Logger.error('Cannot refresh: No stored user credentials');
-        await _refreshData(); // Fallback to direct refresh
+        add(const HomeErrorOccurred('Unable to refresh data: No stored credentials'));
         return;
       }
 
@@ -273,8 +247,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
       loginResult.fold(
         (failure) async {
-          Logger.error('Login refresh failed, falling back to direct refresh', failure);
-          await _refreshData();
+          Logger.error('Login refresh failed', failure);
+          add(HomeErrorOccurred(failure.message ?? 'Failed to refresh data'));
         },
         (newUser) async {
           Logger.data('Login refresh successful, updating dashboard');
@@ -286,15 +260,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               .expand((account) => account.pendingOutData.data)
               .toList();
 
-          // Preserve existing ledger data while updating dashboard
+          // Update local storage with new data
+          await _databaseHelper.saveUser(newUser);
+
           add(HomeDataLoaded(
             dashboard: newUser.dashboard!,
             pendingInTransactions: pendingInTransactions,
             pendingOutTransactions: pendingOutTransactions,
-            keepLoading: true, // Keep loading state while we fetch ledger
+            keepLoading: true,
           ));
 
-          // Clear processed IDs to ensure we get fresh ledger data
           _processedCredexIds.clear();
 
           if (newUser.dashboard!.accounts.isNotEmpty) {
@@ -312,93 +287,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       stopwatch.stop();
       Logger.performance('Login refresh took ${stopwatch.elapsedMilliseconds}ms');
     } catch (e, stackTrace) {
-      Logger.error('Error in login refresh, falling back to direct refresh', e, stackTrace);
-      await _refreshData();
+      Logger.error('Error in login refresh', e, stackTrace);
+      add(HomeErrorOccurred(e.toString()));
     }
   }
 
-  Future<void> _refreshData() async {
-    Logger.data('Starting direct data refresh');
-    final stopwatch = Stopwatch()..start();
-    
-    try {
-      final user = await Future(() async {
-        return await _databaseHelper.getUser();
-      });
-      
-      if (user == null) {
-        add(const HomeErrorOccurred('User not found'));
-        return;
-      }
-
-      if (user.dashboard == null) {
-        add(const HomeErrorOccurred('Dashboard data not available'));
-        return;
-      }
-
-      Logger.data('''Dashboard refreshed successfully:
-        Name: ${user.dashboard!.firstname} ${user.dashboard!.lastname}
-        Accounts: ${user.dashboard!.accounts.length}
-      ''');
-
-      // Immediately emit dashboard with pending transactions
-      final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => account.pendingInData.data)
-          .toList();
-      final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => account.pendingOutData.data)
-          .toList();
-
-      // Preserve existing ledger data while updating dashboard
-      add(HomeDataLoaded(
-        dashboard: user.dashboard!,
-        pendingInTransactions: pendingInTransactions,
-        pendingOutTransactions: pendingOutTransactions,
-        keepLoading: true, // Keep loading state while we fetch ledger
-      ));
-
-      // Clear processed IDs to ensure we get fresh ledger data
-      _processedCredexIds.clear();
-
-      // Then start loading ledger data if there are accounts
-      if (user.dashboard!.accounts.isNotEmpty) {
-        await _loadLedgerData(user.dashboard!);
-      } else {
-        Logger.data('No accounts found after refresh, skipping ledger data load');
-        add(const HomeLedgerLoaded(
-          accountLedgers: {},
-          combinedEntries: [],
-          hasMore: false,
-        ));
-      }
-
-      stopwatch.stop();
-      Logger.performance('Data refresh took ${stopwatch.elapsedMilliseconds}ms');
-    } catch (e, stackTrace) {
-      Logger.error('Failed to refresh data', e, stackTrace);
-      add(const HomeErrorOccurred('Failed to refresh data'));
-    }
-  }
-
-  @override
-  Future<void> close() {
-    Logger.lifecycle('HomeBloc closing');
-    _refreshDebounceTimer?.cancel();
-    return super.close();
-  }
-
-  void _onPageChanged(
-    HomePageChanged event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onPageChanged(HomePageChanged event, Emitter<HomeState> emit) {
     Logger.interaction('Page changed to ${event.page}');
     emit(state.copyWith(currentPage: event.page));
   }
 
-  void _onLoadStarted(
-    HomeLoadStarted event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onLoadStarted(HomeLoadStarted event, Emitter<HomeState> emit) {
     Logger.state('Initial loading started');
     emit(state.copyWith(
       status: HomeStatus.loading,
@@ -406,30 +305,18 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     ));
   }
 
-  void _onRefreshStarted(
-    HomeRefreshStarted event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onRefreshStarted(HomeRefreshStarted event, Emitter<HomeState> emit) {
     Logger.state('Refresh started');
     emit(state.copyWith(
       status: HomeStatus.refreshing,
       error: null,
     ));
 
-    // Cancel any pending refresh
-    _refreshDebounceTimer?.cancel();
-
-    // Start new debounced refresh
-    _refreshDebounceTimer = Timer(
-      const Duration(milliseconds: _refreshDebounceMs),
-      () => _refreshViaLogin(),
-    );
+    // Immediately trigger refresh without debounce
+    _refreshViaLogin();
   }
 
-  void _onLoadMoreStarted(
-    HomeLoadMoreStarted event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) {
     if (!state.hasMoreEntries) {
       Logger.state('Load more ignored - no more entries available');
       return;
@@ -442,10 +329,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     ));
   }
 
-  void _onDataLoaded(
-    HomeDataLoaded event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onDataLoaded(HomeDataLoaded event, Emitter<HomeState> emit) {
     Logger.data('''Dashboard data loaded:
       Accounts: ${event.dashboard.accounts.length}
       Pending In: ${event.pendingInTransactions.length}
@@ -458,17 +342,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
       error: null,
-      // Preserve existing ledger data until new data arrives
-      accountLedgers: state.accountLedgers,
-      combinedLedgerEntries: state.combinedLedgerEntries,
-      hasMoreEntries: state.hasMoreEntries,
     ));
   }
 
-  void _onLedgerLoaded(
-    HomeLedgerLoaded event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onLedgerLoaded(HomeLedgerLoaded event, Emitter<HomeState> emit) {
     Logger.data('''Ledger data loaded:
       Total Entries: ${event.combinedEntries.length}
       Has More: ${event.hasMore}
@@ -481,26 +358,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
       error: null,
-      dashboard: state.dashboard,
-      pendingInTransactions: state.pendingInTransactions,
-      pendingOutTransactions: state.pendingOutTransactions,
     ));
   }
 
-  void _onErrorOccurred(
-    HomeErrorOccurred event,
-    Emitter<HomeState> emit,
-  ) {
+  void _onErrorOccurred(HomeErrorOccurred event, Emitter<HomeState> emit) {
     Logger.error('Home error occurred: ${event.message}');
     emit(state.copyWith(
       status: HomeStatus.error,
       error: event.message,
-      dashboard: state.dashboard,
-      accountLedgers: state.accountLedgers,
-      combinedLedgerEntries: state.combinedLedgerEntries,
-      pendingInTransactions: state.pendingInTransactions,
-      pendingOutTransactions: state.pendingOutTransactions,
-      hasMoreEntries: state.hasMoreEntries,
     ));
   }
 

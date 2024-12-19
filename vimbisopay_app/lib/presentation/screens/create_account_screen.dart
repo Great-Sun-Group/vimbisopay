@@ -219,7 +219,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   ),
                   child: Form(
                     key: _formKey,
-                    onChanged: _validateForm,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -247,6 +246,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           enabled: !_isLoading,
+                          onChanged: (_) => _validateForm(),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your first name';
@@ -262,6 +262,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           enabled: !_isLoading,
+                          onChanged: (_) => _validateForm(),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your last name';
@@ -280,6 +281,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                           keyboardType: TextInputType.phone,
                           enabled: !_isLoading,
+                          onChanged: (_) => _validateForm(),
                           validator: _validatePhone,
                         ),
                         const SizedBox(height: 16),
@@ -292,6 +294,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                           obscureText: true,
                           enabled: !_isLoading,
+                          onChanged: (_) => _validateForm(),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter a password';
@@ -312,6 +315,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                           obscureText: true,
                           enabled: !_isLoading,
+                          onChanged: (_) => _validateForm(),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please confirm your password';
