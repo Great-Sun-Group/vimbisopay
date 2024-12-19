@@ -126,7 +126,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final result = await accountRepository.getLedger(
             accountId: account.accountID,
             startRow: 0,
-            numRows: 20,
+            numRows: 2,
           );
 
           processedAccounts++;
@@ -194,7 +194,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                     add(HomeLedgerLoaded(
                       accountLedgers: accountLedgers,
                       combinedEntries: uniqueEntries,
-                      hasMore: hasMoreEntries,
+                      hasMore: false,
                     ));
                   } else if (errors.isNotEmpty) {
                     add(HomeErrorOccurred(errors.join('\n')));
@@ -319,6 +319,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) {
     if (!state.hasMoreEntries) {
       Logger.state('Load more ignored - no more entries available');
+      emit(state.copyWith(
+        status: HomeStatus.success,
+        error: null,
+      ));
       return;
     }
     

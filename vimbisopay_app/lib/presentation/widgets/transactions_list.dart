@@ -418,16 +418,29 @@ class _TransactionsListState extends State<TransactionsList> {
                   ),
                 ),
                 _buildLedgerTransactions(state.combinedLedgerEntries),
-              ],
-              if (state.status == HomeStatus.loadingMore)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                if (!state.hasMoreEntries)
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: Text(
+                        "No more ledger entries",
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (state.status == HomeStatus.loadingMore)
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
                     ),
                   ),
-                ),
+              ],
             ],
           );
         }
@@ -505,7 +518,20 @@ class _TransactionsListState extends State<TransactionsList> {
               ),
             ),
             _buildLedgerTransactions(state.combinedLedgerEntries),
-            if (state.status == HomeStatus.loadingMore)
+            if (!state.hasMoreEntries)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text(
+                    "No more ledger entries",
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              )
+            else if (state.status == HomeStatus.loadingMore)
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
