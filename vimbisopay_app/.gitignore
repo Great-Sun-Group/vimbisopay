@@ -47,3 +47,4 @@ app.*.map.json
 # Sensitive configuration files
 lib/core/config/api_config.dart
 lib/core/config/encryption_config.dart
+scripts/github_config.sh
