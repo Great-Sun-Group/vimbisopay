@@ -51,3 +51,6 @@ Example entry format:
 - Dashboad updates
 
 ## [1.0.0+9] - 2024-12-20
+
+## [1.0.0+10] - 2024-12-20
+- New Dashboard updates
