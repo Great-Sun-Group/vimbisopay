@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 
 abstract class HomeEvent extends Equatable {
   const HomeEvent();
@@ -87,4 +88,26 @@ class HomeAcceptCredexBulkStarted extends HomeEvent {
 
 class HomeAcceptCredexBulkCompleted extends HomeEvent {
   const HomeAcceptCredexBulkCompleted();
+}
+
+class HomeCancelCredexStarted extends HomeEvent {
+  final String credexId;
+
+  const HomeCancelCredexStarted(this.credexId);
+
+  @override
+  List<Object> get props => [credexId];
+}
+
+class HomeCancelCredexCompleted extends HomeEvent {
+  const HomeCancelCredexCompleted();
+}
+
+class CreateCredexEvent extends HomeEvent {
+  final CredexRequest request;
+
+  const CreateCredexEvent(this.request);
+
+  @override
+  List<Object> get props => [request];
 }

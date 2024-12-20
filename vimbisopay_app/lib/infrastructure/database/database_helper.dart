@@ -412,4 +412,76 @@ class DatabaseHelper {
       await txn.delete('users');
     });
   }
+
+  Future<void> updateAccountPendingTransactions(String accountId, List<PendingOffer> pendingIn, List<PendingOffer> pendingOut) async {
+    final Database db = await database;
+    await db.transaction((txn) async {
+      // Delete existing pending transactions for this account
+      await txn.delete(
+        'pending_transactions',
+        where: 'accountId = ?',
+        whereArgs: [accountId],
+      );
+      
+      // Insert new pending transactions
+      for (var pending in pendingIn) {
+        await txn.insert('pending_transactions', {
+          'credexId': pending.credexID,
+          'accountId': accountId,
+          'amount': pending.formattedInitialAmount ?? '0',
+          'counterpartyName': pending.counterpartyAccountName ?? '',
+          'isSecured': pending.secured ? 1 : 0,
+          'direction': 'in',
+        });
+      }
+      
+      for (var pending in pendingOut) {
+        await txn.insert('pending_transactions', {
+          'credexId': pending.credexID,
+          'accountId': accountId,
+          'amount': pending.formattedInitialAmount ?? '0',
+          'counterpartyName': pending.counterpartyAccountName ?? '',
+          'isSecured': pending.secured ? 1 : 0,
+          'direction': 'out',
+        });
+      }
+    });
+  }
+
+  Future<void> updatePendingTransactions(credex.CredexResponse response) async {
+    for (var account in response.data.dashboard.accounts) {
+      await updateAccountPendingTransactions(
+        account.accountID,
+        List<PendingOffer>.from(account.pendingInData ?? []),
+        List<PendingOffer>.from(account.pendingOutData ?? [])
+      );
+    }
+  }
+
+  Future<(List<PendingOffer>, List<PendingOffer>)> getAllPendingTransactions() async {
+    final Database db = await database;
+    final List<Map<String, dynamic>> pendingTxs = await db.query('pending_transactions');
+    
+    final pendingIn = pendingTxs
+        .where((tx) => tx['direction'] == 'in')
+        .map((tx) => PendingOffer(
+              credexID: tx['credexId'] as String,
+              formattedInitialAmount: tx['amount'] as String,
+              counterpartyAccountName: tx['counterpartyName'] as String,
+              secured: tx['isSecured'] == 1,
+            ))
+        .toList();
+    
+    final pendingOut = pendingTxs
+        .where((tx) => tx['direction'] == 'out')
+        .map((tx) => PendingOffer(
+              credexID: tx['credexId'] as String,
+              formattedInitialAmount: tx['amount'] as String,
+              counterpartyAccountName: tx['counterpartyName'] as String,
+              secured: tx['isSecured'] == 1,
+            ))
+        .toList();
+    
+    return (pendingIn, pendingOut);
+  }
 }

@@ -524,4 +524,34 @@ class AccountRepositoryImpl implements AccountRepository {
       },
     );
   }
+
+  @override
+  Future<Either<Failure, bool>> cancelCredex(String credexId) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/cancelCredex';
+        final headers = _authHeaders(token);
+        final body = {'credexID': credexId};
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to cancel Credex transaction';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
 }

@@ -10,6 +10,7 @@ enum HomeStatus {
   refreshing,
   loadingMore,
   acceptingCredex,
+  cancellingCredex,
 }
 
 class HomeState extends Equatable {
@@ -23,6 +24,7 @@ class HomeState extends Equatable {
   final bool hasMoreEntries;
   final int currentPage;
   final String? error;
+  final String? message;
 
   const HomeState({
     this.status = HomeStatus.initial,
@@ -35,12 +37,14 @@ class HomeState extends Equatable {
     this.hasMoreEntries = false,
     this.currentPage = 0,
     this.error,
+    this.message,
   });
 
   bool get isInitialLoading => status == HomeStatus.loading && dashboard == null;
   bool get isRefreshing => status == HomeStatus.refreshing;
   bool get isLoadingMore => status == HomeStatus.loadingMore;
   bool get isAcceptingCredex => status == HomeStatus.acceptingCredex;
+  bool get isCancellingCredex => status == HomeStatus.cancellingCredex;
   bool get hasError => status == HomeStatus.error;
 
   bool get hasPendingTransactions => 
@@ -60,6 +64,7 @@ class HomeState extends Equatable {
     bool? hasMoreEntries,
     int? currentPage,
     String? error,
+    String? message,
   }) {
     return HomeState(
       status: status ?? this.status,
@@ -72,6 +77,7 @@ class HomeState extends Equatable {
       hasMoreEntries: hasMoreEntries ?? this.hasMoreEntries,
       currentPage: currentPage ?? this.currentPage,
       error: error,
+      message: message,
     );
   }
 
@@ -87,5 +93,6 @@ class HomeState extends Equatable {
         hasMoreEntries,
         currentPage,
         error,
+        message,
       ];
 }
