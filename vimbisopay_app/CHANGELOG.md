@@ -45,3 +45,6 @@ Example entry format:
 - We are now using the updated dashboard structure 
 
 ## [1.0.0+7] - 2024-12-20
+- new dashboard changes
+
+## [1.0.0+8] - 2024-12-20
