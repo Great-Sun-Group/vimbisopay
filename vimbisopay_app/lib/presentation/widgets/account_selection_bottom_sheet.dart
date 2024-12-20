@@ -4,7 +4,8 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
-import 'package:vimbisopay_app/main.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 
 enum AccountSelectionAction {
   send,
@@ -15,12 +16,14 @@ class AccountSelectionBottomSheet extends StatelessWidget {
   final List<DashboardAccount> accounts;
   final AccountSelectionAction action;
   final AccountRepository accountRepository;
+  final HomeBloc homeBloc;
 
   const AccountSelectionBottomSheet({
     Key? key,
     required this.accounts,
     required this.action,
     required this.accountRepository,
+    required this.homeBloc,
   }) : super(key: key);
 
   void _handleAccountSelection(BuildContext context, DashboardAccount account) {
@@ -49,6 +52,7 @@ class AccountSelectionBottomSheet extends StatelessWidget {
         arguments: SendCredexArguments(
           senderAccount: account,
           accountRepository: accountRepository,
+          homeBloc: homeBloc,
         ),
       );
     }

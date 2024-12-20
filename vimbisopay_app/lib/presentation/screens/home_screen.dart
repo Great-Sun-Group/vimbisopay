@@ -17,6 +17,7 @@ import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -293,45 +294,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             bottomNavigationBar: HomeActionButtons(
               accounts: state.dashboard?.accounts,
-              onSendTap: () {
-                Logger.interaction('Send money button tapped');
-                if (state.dashboard?.accounts.isNotEmpty == true) {
-                  final senderAccount = state.dashboard!.accounts[state.currentPage];
-                  Navigator.pushNamed(
-                    context,
-                    '/send-credex',
-                    arguments: SendCredexArguments(
-                      senderAccount: senderAccount,
-                      accountRepository: _accountRepository,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'No accounts available to send from',
-                        style: TextStyle(color: AppColors.textPrimary),
-                      ),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              },
               accountRepository: _accountRepository,
+              homeBloc: _homeBloc,
             ),
           );
         },
       ),
     );
   }
-}
-
-class SendCredexArguments {
-  final dynamic senderAccount;
-  final AccountRepository accountRepository;
-
-  SendCredexArguments({
-    required this.senderAccount,
-    required this.accountRepository,
-  });
 }

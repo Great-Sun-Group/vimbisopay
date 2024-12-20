@@ -332,9 +332,9 @@ class DatabaseHelper {
               ),
               netCredexAssetsInDefaultDenom: balance['netCredexAssetsInDefaultDenom'] as String,
             ),
-            pendingInData: credex.PendingData(
+            pendingInData: PendingData(
               success: true,
-              data: pendingIn.map((tx) => credex.PendingOffer(
+              data: pendingIn.map((tx) => PendingOffer(
                 credexID: tx['credexId'] as String,
                 formattedInitialAmount: tx['amount'] as String,
                 counterpartyAccountName: tx['counterpartyName'] as String,
@@ -342,9 +342,9 @@ class DatabaseHelper {
               )).toList(),
               message: pendingIn.isEmpty ? 'No pending offers found' : 'Retrieved ${pendingIn.length} pending offers',
             ),
-            pendingOutData: credex.PendingData(
+            pendingOutData: PendingData(
               success: true,
-              data: pendingOut.map((tx) => credex.PendingOffer(
+              data: pendingOut.map((tx) => PendingOffer(
                 credexID: tx['credexId'] as String,
                 formattedInitialAmount: tx['amount'] as String,
                 counterpartyAccountName: tx['counterpartyName'] as String,
@@ -352,7 +352,7 @@ class DatabaseHelper {
               )).toList(),
               message: pendingOut.isEmpty ? 'No pending outgoing offers found' : 'Retrieved ${pendingOut.length} pending outgoing offers',
             ),
-            sendOffersTo: credex.SendOffersTo(
+            sendOffersTo: SendOffersTo(
               firstname: tierData['firstname'] as String,
               lastname: tierData['lastname'] as String,
               memberID: memberId,

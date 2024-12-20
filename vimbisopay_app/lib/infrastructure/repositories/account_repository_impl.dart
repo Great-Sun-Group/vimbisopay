@@ -332,64 +332,39 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final dashboardData = jsonResponse['data']['dashboard'];
         
-          final dashboardObj = dashboard.Dashboard(
-            id: actionDetails['memberID'],
-            member: dashboard.DashboardMember(
-              memberID: actionDetails['memberID'],
-              memberTier: dashboardData['member']['memberTier'],
-              firstname: dashboardData['member']['firstname'],
-              lastname: dashboardData['member']['lastname'],
-              memberHandle: dashboardData['member']['memberHandle'] as String? ?? '',
-              defaultDenom: dashboardData['member']['defaultDenom'],
-            ),
-            accounts: (dashboardData['accounts'] as List).map((accountData) => dashboard.DashboardAccount(
-              accountID: accountData['accountID'],
-              accountName: accountData['accountName'],
-              accountHandle: accountData['accountHandle'],
-              defaultDenom: accountData['defaultDenom'],
-              isOwnedAccount: accountData['isOwnedAccount'],
-              balanceData: dashboard.BalanceData(
-                securedNetBalancesByDenom: List<String>.from(
-                  accountData['balanceData']['securedNetBalancesByDenom']
-                ),
-                unsecuredBalances: dashboard.UnsecuredBalances(
-                  totalPayables: accountData['balanceData']['unsecuredBalancesInDefaultDenom']['totalPayables'],
-                  totalReceivables: accountData['balanceData']['unsecuredBalancesInDefaultDenom']['totalReceivables'],
-                  netPayRec: accountData['balanceData']['unsecuredBalancesInDefaultDenom']['netPayRec'],
-                ),
-                netCredexAssetsInDefaultDenom: accountData['balanceData']['netCredexAssetsInDefaultDenom'],
-              ),
-              pendingInData: credex.PendingData(
-                success: true,
-                data: List<credex.PendingOffer>.from(
-                  (accountData['pendingInData'] as List? ?? []).map((offer) => credex.PendingOffer(
-                    credexID: offer['credexID'],
-                    formattedInitialAmount: offer['formattedInitialAmount'],
-                    counterpartyAccountName: offer['counterpartyAccountName'],
-                    secured: offer['secured'],
-                  )),
-                ),
-                message: 'Pending offers retrieved',
-              ),
-              pendingOutData: credex.PendingData(
-                success: true,
-                data: List<credex.PendingOffer>.from(
-                  (accountData['pendingOutData'] as List? ?? []).map((offer) => credex.PendingOffer(
-                    credexID: offer['credexID'],
-                    formattedInitialAmount: offer['formattedInitialAmount'],
-                    counterpartyAccountName: offer['counterpartyAccountName'],
-                    secured: offer['secured'],
-                  )),
-                ),
-                message: 'Pending outgoing offers retrieved',
-              ),
-              sendOffersTo: credex.SendOffersTo(
-                firstname: accountData['sendOffersTo']['firstname'],
-                lastname: accountData['sendOffersTo']['lastname'],
-                memberID: accountData['sendOffersTo']['memberID'] as String,
-              ),
-            )).toList(),
-          );
+          final dashboardObj = dashboard.Dashboard.fromMap({
+            'member': {
+              'memberID': actionDetails['memberID'],
+              'memberTier': dashboardData['member']['memberTier'],
+              'firstname': dashboardData['member']['firstname'],
+              'lastname': dashboardData['member']['lastname'],
+              'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
+              'defaultDenom': dashboardData['member']['defaultDenom'],
+            },
+            'accounts': dashboardData['accounts'].map((accountData) => {
+              'accountID': accountData['accountID'],
+              'accountName': accountData['accountName'],
+              'accountHandle': accountData['accountHandle'],
+              'defaultDenom': accountData['defaultDenom'],
+              'isOwnedAccount': accountData['isOwnedAccount'],
+              'balanceData': {
+                'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
+                'unsecuredBalancesInDefaultDenom': accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
+                'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
+              },
+              'pendingInData': {
+                'success': true,
+                'data': accountData['pendingInData'] ?? [],
+                'message': 'Pending offers retrieved',
+              },
+              'pendingOutData': {
+                'success': true,
+                'data': accountData['pendingOutData'] ?? [],
+                'message': 'Pending outgoing offers retrieved',
+              },
+              'sendOffersTo': accountData['sendOffersTo'],
+            }).toList(),
+          });
         
         final user = User(
           memberId: memberId,

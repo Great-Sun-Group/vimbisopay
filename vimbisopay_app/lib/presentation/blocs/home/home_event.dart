@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 
 abstract class HomeEvent extends Equatable {
   const HomeEvent();

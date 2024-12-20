@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
@@ -78,10 +79,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           .expand((account) => account.pendingOutData.data)
           .toList();
 
+      // Convert to List<PendingOffer>
+      final List<PendingOffer> inTransactions = pendingInTransactions.map((offer) => offer).toList();
+      final List<PendingOffer> outTransactions = pendingOutTransactions.map((offer) => offer).toList();
+
       add(HomeDataLoaded(
         dashboard: user.dashboard!,
-        pendingInTransactions: pendingInTransactions,
-        pendingOutTransactions: pendingOutTransactions,
+        pendingInTransactions: inTransactions,
+        pendingOutTransactions: outTransactions,
         keepLoading: user.dashboard!.accounts.isNotEmpty,
       ));
 
@@ -260,13 +265,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               .expand((account) => account.pendingOutData.data)
               .toList();
 
+          // Convert to List<PendingOffer>
+          final List<PendingOffer> inTransactions = pendingInTransactions.map((offer) => offer).toList();
+          final List<PendingOffer> outTransactions = pendingOutTransactions.map((offer) => offer).toList();
+
           // Update local storage with new data
           await _databaseHelper.saveUser(newUser);
 
           add(HomeDataLoaded(
             dashboard: newUser.dashboard!,
-            pendingInTransactions: pendingInTransactions,
-            pendingOutTransactions: pendingOutTransactions,
+            pendingInTransactions: inTransactions,
+            pendingOutTransactions: outTransactions,
             keepLoading: true,
           ));
 

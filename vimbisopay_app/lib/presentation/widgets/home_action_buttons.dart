@@ -6,18 +6,21 @@ import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_selection_bottom_sheet.dart';
-import 'package:vimbisopay_app/main.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 
 class HomeActionButtons extends StatelessWidget {
   final List<DashboardAccount>? accounts;
   final VoidCallback? onSendTap;
   final AccountRepository accountRepository;
+  final HomeBloc homeBloc;
 
   const HomeActionButtons({
     super.key,
     this.accounts,
     this.onSendTap,
     required this.accountRepository,
+    required this.homeBloc,
   });
 
   void _handleSendTap(BuildContext context) {
@@ -43,6 +46,7 @@ class HomeActionButtons extends StatelessWidget {
         arguments: SendCredexArguments(
           senderAccount: accounts!.first,
           accountRepository: accountRepository,
+          homeBloc: homeBloc,
         ),
       );
     } else {
@@ -51,11 +55,12 @@ class HomeActionButtons extends StatelessWidget {
         context: context,
         backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (context) => AccountSelectionBottomSheet(
-          accounts: accounts!,
-          action: AccountSelectionAction.send,
-          accountRepository: accountRepository,
-        ),
+          builder: (context) => AccountSelectionBottomSheet(
+            accounts: accounts!,
+            action: AccountSelectionAction.send,
+            accountRepository: accountRepository,
+            homeBloc: homeBloc,
+          ),
       );
     }
   }
@@ -107,11 +112,12 @@ class HomeActionButtons extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => AccountSelectionBottomSheet(
-        accounts: accounts!,
-        action: AccountSelectionAction.receive,
-        accountRepository: accountRepository,
-      ),
+          builder: (context) => AccountSelectionBottomSheet(
+            accounts: accounts!,
+            action: AccountSelectionAction.receive,
+            accountRepository: accountRepository,
+            homeBloc: homeBloc,
+          ),
     );
   }
 

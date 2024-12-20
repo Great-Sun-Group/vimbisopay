@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/credex_response.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';

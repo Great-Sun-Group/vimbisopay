@@ -15,20 +15,11 @@ import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
-}
-
-class SendCredexArguments {
-  final DashboardAccount senderAccount;
-  final AccountRepository accountRepository;
-
-  SendCredexArguments({
-    required this.senderAccount,
-    required this.accountRepository,
-  });
 }
 
 class MyApp extends StatelessWidget {
@@ -87,6 +78,7 @@ class MyApp extends StatelessWidget {
             builder: (context) => SendCredexScreen(
               senderAccount: args.senderAccount,
               accountRepository: args.accountRepository,
+              homeBloc: args.homeBloc,
             ),
             settings: settings,
           );
