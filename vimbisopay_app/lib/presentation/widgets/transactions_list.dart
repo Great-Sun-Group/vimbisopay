@@ -423,7 +423,7 @@ class _TransactionsListState extends State<TransactionsList> {
                     padding: EdgeInsets.all(16.0),
                     child: Center(
                       child: Text(
-                        "No more ledger entries",
+                        'No more ledger entries',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -523,7 +523,7 @@ class _TransactionsListState extends State<TransactionsList> {
                 padding: EdgeInsets.all(16.0),
                 child: Center(
                   child: Text(
-                    "No more ledger entries",
+                    'No more ledger entries',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,

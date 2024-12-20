@@ -224,7 +224,7 @@ class Dashboard extends Entity {
   String? get lastname => member.lastname;
   String? get defaultDenom => member.defaultDenom;
   MemberTier get memberTier => MemberTier(low: 0, high: member.memberTier);
-  RemainingAvailable get remainingAvailableUSD => RemainingAvailable(low: 0, high: 0);
+  RemainingAvailable get remainingAvailableUSD => const RemainingAvailable(low: 0, high: 0);
 
   // Permission getters based on member tier
   bool get canIssueSecuredCredex => member.memberTier >= 5;

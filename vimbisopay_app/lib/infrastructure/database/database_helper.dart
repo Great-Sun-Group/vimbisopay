@@ -282,7 +282,7 @@ class DatabaseHelper {
         whereArgs: [memberId],
       );
       
-      List<DashboardAccount> dashboardAccounts = [];
+      final List<DashboardAccount> dashboardAccounts = [];
       for (final account in accounts) {
         final accountId = account['accountId'] as String;
         

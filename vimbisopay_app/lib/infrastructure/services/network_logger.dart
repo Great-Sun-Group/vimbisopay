@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class NetworkLogger {
-  static final JsonEncoder _encoder = const JsonEncoder.withIndent('  ');
+  static const JsonEncoder _encoder = JsonEncoder.withIndent('  ');
   static const int _maxLineLength = 800;
 
   static void _printLongString(String text) {
