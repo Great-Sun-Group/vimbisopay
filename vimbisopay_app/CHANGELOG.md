@@ -48,3 +48,6 @@ Example entry format:
 - new dashboard changes
 
 ## [1.0.0+8] - 2024-12-20
+- Dashboad updates
+
+## [1.0.0+9] - 2024-12-20
