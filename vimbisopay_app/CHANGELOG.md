@@ -42,3 +42,6 @@ Example entry format:
 - fixed agressive pagination
 
 ## [1.0.0+6] - 2024-12-18
+- We are now using the updated dashboard structure 
+
+## [1.0.0+7] - 2024-12-20
