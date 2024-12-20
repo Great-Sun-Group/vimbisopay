@@ -238,15 +238,52 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           _showError(failure.toString());
         },
         (response) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Successfully sent ${_amountController.text} ${_selectedDenomination.toString().split('.').last} to @${_recipientController.text}',
+          // Show transaction details
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              title: const Text(
+                'Transaction Complete',
+                style: TextStyle(color: AppColors.textPrimary),
               ),
-              backgroundColor: AppColors.success,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    response.message,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Transaction ID: ${response.data.action.id}',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'New Balance: ${response.data.dashboard.accounts.first.balanceData.securedNetBalancesByDenom.firstWhere(
+                      (balance) => balance.contains(_selectedDenomination.toString().split('.').last),
+                      orElse: () => '0.0 ${_selectedDenomination.toString().split('.').last}',
+                    )}',
+                    style: const TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                    Navigator.of(context).pop(); // Return to previous screen
+                  },
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(color: AppColors.primary),
+                  ),
+                ),
+              ],
             ),
           );
-          Navigator.of(context).pop();
         },
       );
     } catch (e) {
@@ -528,8 +565,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           }
                           if (amount <= 0) {
                             return 'Amount must be greater than 0';
-                          }
-                          if (amount > _availableBalance) {
                           }
                           if (amount > _availableBalance) {
                             return 'Amount exceeds available balance';

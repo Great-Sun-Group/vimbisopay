@@ -1,5 +1,6 @@
 import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:flutter/foundation.dart' show listEquals;
 
 enum MemberTierType {
   open(0, 10.0, false, true, false, false, false, false),    // Free tier
@@ -158,11 +159,10 @@ class DashboardAccount {
   final String accountHandle;
   final String defaultDenom;
   final bool isOwnedAccount;
-  final List<AuthUser> authFor;
   final BalanceData balanceData;
   final credex.PendingData pendingInData;
   final credex.PendingData pendingOutData;
-  final AuthUser sendOffersTo;
+  final credex.SendOffersTo sendOffersTo;
 
   const DashboardAccount({
     required this.accountID,
@@ -170,7 +170,6 @@ class DashboardAccount {
     required this.accountHandle,
     required this.defaultDenom,
     required this.isOwnedAccount,
-    required this.authFor,
     required this.balanceData,
     required this.pendingInData,
     required this.pendingOutData,
@@ -183,11 +182,14 @@ class DashboardAccount {
     'accountHandle': accountHandle,
     'defaultDenom': defaultDenom,
     'isOwnedAccount': isOwnedAccount,
-    'authFor': authFor.map((x) => x.toMap()).toList(),
     'balanceData': balanceData.toMap(),
     'pendingInData': pendingInData.toMap(),
     'pendingOutData': pendingOutData.toMap(),
-    'sendOffersTo': sendOffersTo.toMap(),
+    'sendOffersTo': {
+      'memberID': sendOffersTo.memberID,
+      'firstname': sendOffersTo.firstname,
+      'lastname': sendOffersTo.lastname,
+    },
   };
 
   factory DashboardAccount.fromMap(Map<String, dynamic> map) => DashboardAccount(
@@ -196,63 +198,53 @@ class DashboardAccount {
     accountHandle: map['accountHandle'] as String,
     defaultDenom: map['defaultDenom'] as String,
     isOwnedAccount: map['isOwnedAccount'] as bool,
-    authFor: List<AuthUser>.from(
-      (map['authFor'] as List).map((x) => AuthUser.fromMap(x)),
-    ),
     balanceData: BalanceData.fromMap(map['balanceData']),
     pendingInData: credex.PendingData.fromMap(map['pendingInData']),
     pendingOutData: credex.PendingData.fromMap(map['pendingOutData']),
-    sendOffersTo: AuthUser.fromMap(map['sendOffersTo']),
+    sendOffersTo: credex.SendOffersTo(
+      memberID: map['sendOffersTo']['memberID'] as String,
+      firstname: map['sendOffersTo']['firstname'] as String,
+      lastname: map['sendOffersTo']['lastname'] as String,
+    ),
   );
 }
 
 class Dashboard extends Entity {
-  final MemberTier memberTier;
-  final RemainingAvailable remainingAvailableUSD;
+  final DashboardMember member;
   final List<DashboardAccount> accounts;
-  // Keep these for backward compatibility with UI
-  final String? firstname;
-  final String? lastname;
-  final String? defaultDenom;
 
   const Dashboard({
     required String id,
-    required this.memberTier,
-    required this.remainingAvailableUSD,
+    required this.member,
     required this.accounts,
-    this.firstname,
-    this.lastname,
-    this.defaultDenom,
   }) : super(id);
 
-  bool get canIssueSecuredCredex => memberTier.canIssueSecuredCredex;
-  double get dailySecuredCredexLimit => memberTier.dailySecuredCredexLimit;
-  bool get canIssueUnsecuredCredex => memberTier.canIssueUnsecuredCredex;
-  bool get canCreateAdditionalAccounts => memberTier.canCreateAdditionalAccounts;
-  bool get canBeAddedToAccount => memberTier.canBeAddedToAccount;
-  bool get canAddOthersToAccount => memberTier.canAddOthersToAccount;
-  bool get canRequestRecurringPayments => memberTier.canRequestRecurringPayments;
+  // Backward compatibility getters
+  String? get firstname => member.firstname;
+  String? get lastname => member.lastname;
+  String? get defaultDenom => member.defaultDenom;
+  MemberTier get memberTier => MemberTier(low: 0, high: member.memberTier);
+  RemainingAvailable get remainingAvailableUSD => RemainingAvailable(low: 0, high: 0);
+
+  // Permission getters based on member tier
+  bool get canIssueSecuredCredex => member.memberTier >= 5;
+  double get dailySecuredCredexLimit => 100.0;
+  bool get canIssueUnsecuredCredex => member.memberTier >= 5;
+  bool get canCreateAdditionalAccounts => member.memberTier >= 5;
+  bool get canBeAddedToAccount => member.memberTier >= 5;
+  bool get canAddOthersToAccount => member.memberTier >= 5;
+  bool get canRequestRecurringPayments => member.memberTier >= 5;
 
   Map<String, dynamic> toMap() => {
     'id': id,
-    'memberTier': memberTier.toMap(),
-    'remainingAvailableUSD': remainingAvailableUSD.toMap(),
-    'accounts': accounts.map((x) => x.toMap()).toList(),
-    'firstname': firstname,
-    'lastname': lastname,
-    'defaultDenom': defaultDenom,
+    'member': member.toMap(),
+    'accounts': accounts.map((account) => account.toMap()).toList(),
   };
 
   factory Dashboard.fromMap(Map<String, dynamic> map) => Dashboard(
-    id: map['id'] as String,
-    memberTier: MemberTier.fromMap(map['memberTier']),
-    remainingAvailableUSD: RemainingAvailable.fromMap(map['remainingAvailableUSD']),
-    accounts: List<DashboardAccount>.from(
-      (map['accounts'] as List).map((x) => DashboardAccount.fromMap(x)),
-    ),
-    firstname: map['firstname'] as String?,
-    lastname: map['lastname'] as String?,
-    defaultDenom: map['defaultDenom'] as String?,
+    id: map['member']['memberID'] as String,
+    member: DashboardMember.fromMap(map['member']),
+    accounts: (map['accounts'] as List).map((account) => DashboardAccount.fromMap(account)).toList(),
   );
 
   @override
@@ -260,10 +252,57 @@ class Dashboard extends Entity {
     if (identical(this, other)) return true;
     return other is Dashboard &&
         other.id == id &&
-        other.memberTier.low == memberTier.low &&
-        other.memberTier.high == memberTier.high;
+        other.member == member &&
+        listEquals(accounts, other.accounts);
   }
 
   @override
-  int get hashCode => Object.hash(id, memberTier.low, memberTier.high);
+  int get hashCode => Object.hash(id, member, Object.hashAll(accounts));
+}
+
+class DashboardMember {
+  final String memberID;
+  final int memberTier;
+  final String firstname;
+  final String lastname;
+  final String? memberHandle;
+  final String defaultDenom;
+
+  const DashboardMember({
+    required this.memberID,
+    required this.memberTier,
+    required this.firstname,
+    required this.lastname,
+    this.memberHandle,
+    required this.defaultDenom,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'memberID': memberID,
+    'memberTier': memberTier,
+    'firstname': firstname,
+    'lastname': lastname,
+    'memberHandle': memberHandle,
+    'defaultDenom': defaultDenom,
+  };
+
+  factory DashboardMember.fromMap(Map<String, dynamic> map) => DashboardMember(
+    memberID: map['memberID'] as String,
+    memberTier: map['memberTier'] as int,
+    firstname: map['firstname'] as String,
+    lastname: map['lastname'] as String,
+    memberHandle: map['memberHandle'] as String?,
+    defaultDenom: map['defaultDenom'] as String,
+  );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is DashboardMember &&
+        other.memberID == memberID &&
+        other.memberTier == memberTier;
+  }
+
+  @override
+  int get hashCode => Object.hash(memberID, memberTier);
 }

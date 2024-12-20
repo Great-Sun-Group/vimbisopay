@@ -126,7 +126,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final result = await accountRepository.getLedger(
             accountId: account.accountID,
             startRow: 0,
-            numRows: 2,
+            numRows: 20,
           );
 
           processedAccounts++;

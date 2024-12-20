@@ -51,40 +51,56 @@ class CredexActionDetails {
 }
 
 class CredexDashboard {
-  final bool success;
-  final CredexDashboardData data;
-  final String message;
+  final DashboardMember member;
+  final List<DashboardAccount> accounts;
 
   CredexDashboard({
-    required this.success,
-    required this.data,
-    required this.message,
+    required this.member,
+    required this.accounts,
   });
 }
 
-class CredexDashboardData {
+class DashboardMember {
+  final String memberID;
+  final int memberTier;
+  final String firstname;
+  final String lastname;
+  final String? memberHandle;
+  final String defaultDenom;
+
+  DashboardMember({
+    required this.memberID,
+    required this.memberTier,
+    required this.firstname,
+    required this.lastname,
+    this.memberHandle,
+    required this.defaultDenom,
+  });
+}
+
+class DashboardAccount {
   final String accountID;
   final String accountName;
   final String accountHandle;
+  final String accountType;
   final String defaultDenom;
   final bool isOwnedAccount;
-  final List<AuthUser> authFor;
-  final BalanceData balanceData;
-  final PendingData pendingInData;
-  final PendingData pendingOutData;
   final SendOffersTo sendOffersTo;
+  final BalanceData balanceData;
+  final List<PendingOffer> pendingInData;
+  final List<PendingOffer> pendingOutData;
 
-  CredexDashboardData({
+  DashboardAccount({
     required this.accountID,
     required this.accountName,
     required this.accountHandle,
+    required this.accountType,
     required this.defaultDenom,
     required this.isOwnedAccount,
-    required this.authFor,
+    required this.sendOffersTo,
     required this.balanceData,
     required this.pendingInData,
     required this.pendingOutData,
-    required this.sendOffersTo,
   });
 }
 
@@ -113,35 +129,11 @@ class AuthUser {
 }
 
 class BalanceData {
-  final bool success;
-  final BalanceDataDetails data;
-  final String message;
-
-  BalanceData({
-    required this.success,
-    required this.data,
-    required this.message,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'success': success,
-    'data': data.toMap(),
-    'message': message,
-  };
-
-  factory BalanceData.fromMap(Map<String, dynamic> map) => BalanceData(
-    success: map['success'] as bool,
-    data: BalanceDataDetails.fromMap(map['data']),
-    message: map['message'] as String,
-  );
-}
-
-class BalanceDataDetails {
   final List<String> securedNetBalancesByDenom;
   final UnsecuredBalances unsecuredBalancesInDefaultDenom;
   final String netCredexAssetsInDefaultDenom;
 
-  BalanceDataDetails({
+  BalanceData({
     required this.securedNetBalancesByDenom,
     required this.unsecuredBalancesInDefaultDenom,
     required this.netCredexAssetsInDefaultDenom,
@@ -153,11 +145,26 @@ class BalanceDataDetails {
     'netCredexAssetsInDefaultDenom': netCredexAssetsInDefaultDenom,
   };
 
-  factory BalanceDataDetails.fromMap(Map<String, dynamic> map) => BalanceDataDetails(
-    securedNetBalancesByDenom: List<String>.from(map['securedNetBalancesByDenom']),
-    unsecuredBalancesInDefaultDenom: UnsecuredBalances.fromMap(map['unsecuredBalancesInDefaultDenom']),
-    netCredexAssetsInDefaultDenom: map['netCredexAssetsInDefaultDenom'] as String,
-  );
+  factory BalanceData.fromMap(Map<String, dynamic> map) {
+    final balanceData = map['balanceData'] ?? map;
+    return BalanceData(
+      securedNetBalancesByDenom: List<String>.from(balanceData['securedNetBalancesByDenom']),
+      unsecuredBalancesInDefaultDenom: UnsecuredBalances.fromMap(balanceData['unsecuredBalancesInDefaultDenom']),
+      netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'] as String,
+    );
+  }
+
+  BalanceData copyWith({
+    List<String>? securedNetBalancesByDenom,
+    UnsecuredBalances? unsecuredBalancesInDefaultDenom,
+    String? netCredexAssetsInDefaultDenom,
+  }) {
+    return BalanceData(
+      securedNetBalancesByDenom: securedNetBalancesByDenom ?? this.securedNetBalancesByDenom,
+      unsecuredBalancesInDefaultDenom: unsecuredBalancesInDefaultDenom ?? this.unsecuredBalancesInDefaultDenom,
+      netCredexAssetsInDefaultDenom: netCredexAssetsInDefaultDenom ?? this.netCredexAssetsInDefaultDenom,
+    );
+  }
 }
 
 class UnsecuredBalances {

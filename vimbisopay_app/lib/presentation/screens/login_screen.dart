@@ -25,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // Set default values for testing
+    _phoneController.text = '263778177125';
+    _passwordController.text = 'password';
+    _validateForm();
     _loadSavedUser();
   }
 

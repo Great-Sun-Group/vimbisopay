@@ -15,11 +15,13 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
-  Future<Database> get database async {
+  Future<Database> get _db async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
+
+  Future<Database> get database => _db;
 
   Future<Database> _initDatabase() async {
     final String path = join(await getDatabasesPath(), 'vimbisopay.db');
@@ -151,17 +153,6 @@ class DatabaseHelper {
     ''');
     
     await db.execute('''
-      CREATE TABLE auth_users(
-        accountId TEXT NOT NULL,
-        memberId TEXT NOT NULL,
-        firstname TEXT NOT NULL,
-        lastname TEXT NOT NULL,
-        PRIMARY KEY (accountId, memberId),
-        FOREIGN KEY (accountId) REFERENCES accounts (accountId)
-      )
-    ''');
-    
-    await db.execute('''
       CREATE TABLE pending_transactions(
         credexId TEXT PRIMARY KEY,
         accountId TEXT NOT NULL,
@@ -177,10 +168,10 @@ class DatabaseHelper {
   Future<void> saveUser(User user) async {
     try {
       final Database db = await database;
+      final processedCredexIds = <String>{};
       await db.transaction((txn) async {
         // Delete existing data
         await txn.delete('pending_transactions');
-        await txn.delete('auth_users');
         await txn.delete('balance_data');
         await txn.delete('accounts');
         await txn.delete('remaining_available');
@@ -200,23 +191,17 @@ class DatabaseHelper {
           
           await txn.insert('member_tiers', {
             'memberId': user.memberId,
-            'low': dashboard.memberTier.low,
-            'high': dashboard.memberTier.high,
-            'firstname': dashboard.firstname,
-            'lastname': dashboard.lastname,
-            'defaultDenom': dashboard.defaultDenom,
+            'low': 0,  // Default values since we only have memberTier now
+            'high': dashboard.member.memberTier,
+            'firstname': dashboard.member.firstname,
+            'lastname': dashboard.member.lastname,
+            'defaultDenom': dashboard.member.defaultDenom,
           });
           
-          await txn.insert('remaining_available', {
-            'memberId': user.memberId,
-            'low': dashboard.remainingAvailableUSD.low,
-            'high': dashboard.remainingAvailableUSD.high,
-          });
+          // No need to insert remaining_available as it's not used in new structure
           
-          // Track processed credexIds to avoid duplicates
-          final processedCredexIds = <String>{};
-          
-          for (var account in dashboard.accounts) {
+          // Save all accounts
+          for (final account in dashboard.accounts) {
             await txn.insert('accounts', {
               'accountId': account.accountID,
               'memberId': user.memberId,
@@ -234,15 +219,6 @@ class DatabaseHelper {
               'totalReceivables': account.balanceData.unsecuredBalances.totalReceivables ?? '0',
               'netPayRec': account.balanceData.unsecuredBalances.netPayRec ?? '0',
             });
-            
-            for (var auth in account.authFor) {
-              await txn.insert('auth_users', {
-                'accountId': account.accountID,
-                'memberId': auth.memberID,
-                'firstname': auth.firstname ?? '',
-                'lastname': auth.lastname ?? '',
-              });
-            }
             
             // Process incoming transactions
             for (var pending in account.pendingInData.data ?? []) {
@@ -296,32 +272,22 @@ class DatabaseHelper {
         where: 'memberId = ?',
         whereArgs: [memberId],
       );
-      
-      final List<Map<String, dynamic>> remaining = await db.query(
-        'remaining_available',
-        where: 'memberId = ?',
-        whereArgs: [memberId],
-      );
-      
+
+      if (tiers.isEmpty) return null;
+      final tierData = tiers.first;
+
       final List<Map<String, dynamic>> accounts = await db.query(
         'accounts',
         where: 'memberId = ?',
         whereArgs: [memberId],
       );
       
-      final List<DashboardAccount> dashboardAccounts = [];
-      
-      for (var account in accounts) {
+      List<DashboardAccount> dashboardAccounts = [];
+      for (final account in accounts) {
         final accountId = account['accountId'] as String;
         
         final List<Map<String, dynamic>> balances = await db.query(
           'balance_data',
-          where: 'accountId = ?',
-          whereArgs: [accountId],
-        );
-        
-        final List<Map<String, dynamic>> authUsers = await db.query(
-          'auth_users',
           where: 'accountId = ?',
           whereArgs: [accountId],
         );
@@ -351,22 +317,12 @@ class DatabaseHelper {
           final pendingIn = pendingTxs.where((tx) => tx['direction'] == 'in').toList();
           final pendingOut = pendingTxs.where((tx) => tx['direction'] == 'out').toList();
 
-          final primaryAuth = authUsers.firstWhere(
-            (auth) => auth['memberId'] == memberId,
-            orElse: () => authUsers.first,
-          );
-          
           dashboardAccounts.add(DashboardAccount(
             accountID: accountId,
             accountName: account['accountName'] as String,
             accountHandle: account['accountHandle'] as String,
             defaultDenom: account['defaultDenom'] as String,
             isOwnedAccount: account['isOwnedAccount'] == 1,
-            authFor: authUsers.map((auth) => AuthUser(
-              firstname: auth['firstname'] as String,
-              lastname: auth['lastname'] as String,
-              memberID: auth['memberId'] as String,
-            )).toList(),
             balanceData: BalanceData(
               securedNetBalancesByDenom: securedBalances,
               unsecuredBalances: UnsecuredBalances(
@@ -396,32 +352,30 @@ class DatabaseHelper {
               )).toList(),
               message: pendingOut.isEmpty ? 'No pending outgoing offers found' : 'Retrieved ${pendingOut.length} pending outgoing offers',
             ),
-            sendOffersTo: AuthUser(
-              firstname: primaryAuth['firstname'] as String,
-              lastname: primaryAuth['lastname'] as String,
-              memberID: primaryAuth['memberId'] as String,
+            sendOffersTo: credex.SendOffersTo(
+              firstname: tierData['firstname'] as String,
+              lastname: tierData['lastname'] as String,
+              memberID: memberId,
             ),
           ));
         }
       }
       
       Dashboard? dashboard;
-      if (tiers.isNotEmpty && remaining.isNotEmpty) {
+      if (tiers.isNotEmpty && dashboardAccounts.isNotEmpty) {
         final tierData = tiers.first;
+        
         dashboard = Dashboard(
           id: memberId,
-          memberTier: MemberTier(
-            low: tierData['low'] as int,
-            high: tierData['high'] as int,
-          ),
-          remainingAvailableUSD: RemainingAvailable(
-            low: remaining.first['low'] as int,
-            high: remaining.first['high'] as int,
+          member: DashboardMember(
+            memberID: memberId,
+            memberTier: tierData['high'] as int,
+            firstname: tierData['firstname'] as String,
+            lastname: tierData['lastname'] as String,
+            memberHandle: null,
+            defaultDenom: tierData['defaultDenom'] as String,
           ),
           accounts: dashboardAccounts,
-          firstname: tierData['firstname'] as String?,
-          lastname: tierData['lastname'] as String?,
-          defaultDenom: tierData['defaultDenom'] as String?,
         );
       }
       
@@ -451,7 +405,6 @@ class DatabaseHelper {
     final Database db = await database;
     await db.transaction((txn) async {
       await txn.delete('pending_transactions');
-      await txn.delete('auth_users');
       await txn.delete('balance_data');
       await txn.delete('accounts');
       await txn.delete('remaining_available');
