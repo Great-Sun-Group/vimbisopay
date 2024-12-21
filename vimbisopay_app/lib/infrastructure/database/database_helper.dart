@@ -222,8 +222,8 @@ class DatabaseHelper {
             });
             
             Logger.data('Processing pending transactions for account ${account.accountName}');
-            Logger.data('Raw pending in count: ${account.pendingInData.data?.length ?? 0}');
-            Logger.data('Raw pending out count: ${account.pendingOutData.data?.length ?? 0}');
+            Logger.data('Raw pending in count: ${account.pendingInData.data.length ?? 0}');
+            Logger.data('Raw pending out count: ${account.pendingOutData.data.length ?? 0}');
             
             // Process incoming transactions
             for (var pending in account.pendingInData.data ?? []) {
@@ -465,8 +465,8 @@ class DatabaseHelper {
     
     for (var account in response.data.dashboard.accounts) {
       Logger.data('Updating account ${account.accountName}:');
-      Logger.data('- Pending in: ${account.pendingInData?.length ?? 0}');
-      Logger.data('- Pending out: ${account.pendingOutData?.length ?? 0}');
+      Logger.data('- Pending in: ${account.pendingInData.length ?? 0}');
+      Logger.data('- Pending out: ${account.pendingOutData.length ?? 0}');
       
       final Database db = await database;
       // Convert credex.PendingOffer to database records directly

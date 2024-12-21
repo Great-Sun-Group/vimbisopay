@@ -2,12 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
-import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
@@ -647,16 +645,16 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
 
           // Update pending transactions in database with mapped data
           // Create PendingData objects with the mapped offer
-          final pendingInData = dashboard.PendingData(
+          const pendingInData = dashboard.PendingData(
             success: true,
             data: [],
-            message: "No pending incoming transactions",
+            message: 'No pending incoming transactions',
           );
           
           final pendingOutData = dashboard.PendingData(
             success: true,
             data: [dashboardPendingOffer],
-            message: "Pending outgoing transactions updated",
+            message: 'Pending outgoing transactions updated',
           );
 
           // Update transactions in database with original response

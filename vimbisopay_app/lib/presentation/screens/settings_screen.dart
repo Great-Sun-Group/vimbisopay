@@ -108,7 +108,7 @@ class SettingsScreen extends StatelessWidget {
 
                 if (confirmed == true) {
                   Logger.interaction('User confirmed logout');
-                  final storage = const FlutterSecureStorage();
+                  const storage = FlutterSecureStorage();
                   await storage.deleteAll();
                   Logger.state('Secure storage cleared for logout');
                   if (context.mounted) {

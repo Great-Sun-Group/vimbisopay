@@ -79,9 +79,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
       Logger.data('User accounts: ${user.dashboard!.accounts.length}');
       Logger.data(
-          'Raw pending in data: ${user.dashboard!.accounts.map((a) => a.pendingInData.data?.length ?? 0).reduce((a, b) => a + b)}');
+          'Raw pending in data: ${user.dashboard!.accounts.map((a) => a.pendingInData.data.length ?? 0).reduce((a, b) => a + b)}');
       Logger.data(
-          'Raw pending out data: ${user.dashboard!.accounts.map((a) => a.pendingOutData.data?.length ?? 0).reduce((a, b) => a + b)}');
+          'Raw pending out data: ${user.dashboard!.accounts.map((a) => a.pendingOutData.data.length ?? 0).reduce((a, b) => a + b)}');
 
       final pendingInTransactions = user.dashboard!.accounts
           .expand((account) => (account.pendingInData.data ?? []))

@@ -20,7 +20,7 @@ class TransactionsList extends StatefulWidget {
 class _TransactionsListState extends State<TransactionsList> {
   final Set<String> _selectedTransactions = {};
   bool _selectionMode = false;
-  bool _wasCancelling = false;
+  final bool _wasCancelling = false;
   String? _cancellingId;
 
   IconData _getTransactionIcon(String type, double amount) {
@@ -170,7 +170,7 @@ class _TransactionsListState extends State<TransactionsList> {
     final bool isProcessing = state.processingCredexIds.contains(offer.credexID);
     final bool isCancelling = state.status == HomeStatus.cancellingCredex;
 
-    Widget transactionCard = Card(
+    final Widget transactionCard = Card(
       elevation: isSelected ? 2 : 0,
       color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
       child: InkWell(

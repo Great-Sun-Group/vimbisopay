@@ -17,7 +17,6 @@ import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
-import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
