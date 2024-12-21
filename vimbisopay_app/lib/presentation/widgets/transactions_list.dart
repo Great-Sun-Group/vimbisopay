@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
@@ -434,43 +435,10 @@ class _TransactionsListState extends State<TransactionsList> {
   Widget build(BuildContext context) {
     return BlocConsumer<HomeBloc, HomeState>(
       listener: (context, state) {
-        // Track cancellation state
-        if (state.status == HomeStatus.cancellingCredex) {
-          _wasCancelling = true;
-          _cancellingId = state.processingCredexIds.isNotEmpty ? state.processingCredexIds.first : null;
-        }
-        
-        // Show success message when cancellation completes
-        if (state.status == HomeStatus.success && 
-            _wasCancelling &&
-            _cancellingId != null &&
-            !state.processingCredexIds.contains(_cancellingId)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Transaction cancelled successfully'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        }
-
-        // Reset cancellation tracking
-        if (state.status == HomeStatus.success || state.status == HomeStatus.error) {
-          _wasCancelling = false;
-          _cancellingId = null;
-        }
-        
-        // Show error messages
-        if (state.status == HomeStatus.error && state.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                state.error!,
-                style: const TextStyle(color: Colors.white),
-              ),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+        Logger.data('TransactionsList state update - Status: ${state.status}');
+        Logger.data('Has pending transactions: ${state.hasPendingTransactions}');
+        Logger.data('Pending in count: ${state.pendingInTransactions.length}');
+        Logger.data('Pending out count: ${state.pendingOutTransactions.length}');
         
         // Clear selection for any transactions that are being processed
         if (state.processingCredexIds.isNotEmpty) {
@@ -484,6 +452,11 @@ class _TransactionsListState extends State<TransactionsList> {
         }
       },
       builder: (context, state) {
+        Logger.data('Building TransactionsList with:');
+        Logger.data('- Status: ${state.status}');
+        Logger.data('- Has pending: ${state.hasPendingTransactions}');
+        Logger.data('- Pending in: ${state.pendingInTransactions.length}');
+        Logger.data('- Pending out: ${state.pendingOutTransactions.length}');
         // Always show pending transactions if available, regardless of loading state
         if (state.hasPendingTransactions) {
           return Column(

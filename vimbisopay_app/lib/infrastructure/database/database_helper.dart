@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
@@ -220,9 +221,14 @@ class DatabaseHelper {
               'netPayRec': account.balanceData.unsecuredBalances.netPayRec ?? '0',
             });
             
+            Logger.data('Processing pending transactions for account ${account.accountName}');
+            Logger.data('Raw pending in count: ${account.pendingInData.data?.length ?? 0}');
+            Logger.data('Raw pending out count: ${account.pendingOutData.data?.length ?? 0}');
+            
             // Process incoming transactions
             for (var pending in account.pendingInData.data ?? []) {
               if (!processedCredexIds.contains(pending.credexID)) {
+                Logger.data('Saving incoming transaction: ${pending.credexID}');
                 await txn.insert('pending_transactions', {
                   'credexId': pending.credexID,
                   'accountId': account.accountID,
@@ -238,6 +244,7 @@ class DatabaseHelper {
             // Process outgoing transactions
             for (var pending in account.pendingOutData.data ?? []) {
               if (!processedCredexIds.contains(pending.credexID)) {
+                Logger.data('Saving outgoing transaction: ${pending.credexID}');
                 await txn.insert('pending_transactions', {
                   'credexId': pending.credexID,
                   'accountId': account.accountID,
@@ -249,6 +256,8 @@ class DatabaseHelper {
                 processedCredexIds.add(pending.credexID);
               }
             }
+
+            Logger.data('Saved ${processedCredexIds.length} unique transactions for account ${account.accountName}');
           }
         }
       });
@@ -314,8 +323,10 @@ class DatabaseHelper {
             print('Error decoding secured balances: $e');
           }
           
+          Logger.data('Retrieved ${pendingTxs.length} total pending transactions from database');
           final pendingIn = pendingTxs.where((tx) => tx['direction'] == 'in').toList();
           final pendingOut = pendingTxs.where((tx) => tx['direction'] == 'out').toList();
+          Logger.data('Split into ${pendingIn.length} incoming and ${pendingOut.length} outgoing transactions');
 
           dashboardAccounts.add(DashboardAccount(
             accountID: accountId,
@@ -449,13 +460,51 @@ class DatabaseHelper {
   }
 
   Future<void> updatePendingTransactions(credex.CredexResponse response) async {
+    Logger.data('Updating pending transactions from response');
+    Logger.data('Response has ${response.data.dashboard.accounts.length} accounts');
+    
     for (var account in response.data.dashboard.accounts) {
-      await updateAccountPendingTransactions(
-        account.accountID,
-        List<PendingOffer>.from(account.pendingInData ?? []),
-        List<PendingOffer>.from(account.pendingOutData ?? [])
-      );
+      Logger.data('Updating account ${account.accountName}:');
+      Logger.data('- Pending in: ${account.pendingInData?.length ?? 0}');
+      Logger.data('- Pending out: ${account.pendingOutData?.length ?? 0}');
+      
+      final Database db = await database;
+      // Convert credex.PendingOffer to database records directly
+      await db.transaction((txn) async {
+        // Delete existing pending transactions for this account
+        await txn.delete(
+          'pending_transactions',
+          where: 'accountId = ?',
+          whereArgs: [account.accountID],
+        );
+        
+        // Insert incoming transactions
+        for (var offer in account.pendingInData ?? []) {
+          await txn.insert('pending_transactions', {
+            'credexId': offer.credexID,
+            'accountId': account.accountID,
+            'amount': offer.formattedInitialAmount ?? '0',
+            'counterpartyName': offer.counterpartyAccountName ?? '',
+            'isSecured': offer.secured ? 1 : 0,
+            'direction': 'in',
+          });
+        }
+        
+        // Insert outgoing transactions
+        for (var offer in account.pendingOutData ?? []) {
+          await txn.insert('pending_transactions', {
+            'credexId': offer.credexID,
+            'accountId': account.accountID,
+            'amount': offer.formattedInitialAmount ?? '0',
+            'counterpartyName': offer.counterpartyAccountName ?? '',
+            'isSecured': offer.secured ? 1 : 0,
+            'direction': 'out',
+          });
+        }
+      });
+      
     }
+    Logger.data('Finished updating pending transactions');
   }
 
   Future<(List<PendingOffer>, List<PendingOffer>)> getAllPendingTransactions() async {

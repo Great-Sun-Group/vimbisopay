@@ -8,12 +8,14 @@ import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_selection_bottom_sheet.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class HomeActionButtons extends StatelessWidget {
   final List<DashboardAccount>? accounts;
   final VoidCallback? onSendTap;
   final AccountRepository accountRepository;
   final HomeBloc homeBloc;
+  final DatabaseHelper databaseHelper;
 
   const HomeActionButtons({
     super.key,
@@ -21,6 +23,7 @@ class HomeActionButtons extends StatelessWidget {
     this.onSendTap,
     required this.accountRepository,
     required this.homeBloc,
+    required this.databaseHelper,
   });
 
   void _handleSendTap(BuildContext context) {
@@ -47,6 +50,7 @@ class HomeActionButtons extends StatelessWidget {
           senderAccount: accounts!.first,
           accountRepository: accountRepository,
           homeBloc: homeBloc,
+          databaseHelper: databaseHelper,
         ),
       );
     } else {
@@ -60,6 +64,7 @@ class HomeActionButtons extends StatelessWidget {
             action: AccountSelectionAction.send,
             accountRepository: accountRepository,
             homeBloc: homeBloc,
+            databaseHelper: databaseHelper,
           ),
       );
     }
@@ -117,6 +122,7 @@ class HomeActionButtons extends StatelessWidget {
             action: AccountSelectionAction.receive,
             accountRepository: accountRepository,
             homeBloc: homeBloc,
+            databaseHelper: databaseHelper,
           ),
     );
   }

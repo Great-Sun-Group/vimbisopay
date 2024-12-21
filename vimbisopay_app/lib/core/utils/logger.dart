@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 
 class Logger {
   static const String _tag = 'VimbisoPay';
@@ -18,12 +18,10 @@ class Logger {
   static void error(String message, [dynamic error, StackTrace? stackTrace]) {
     _log('❌ ERROR', message);
     if (error != null) {
-      developer.log(
-        '❌ ERROR DETAILS: $error',
-        name: _tag,
-        error: error,
-        stackTrace: stackTrace,
-      );
+      debugPrint('[$_tag/❌ ERROR] Error details: $error');
+      if (stackTrace != null) {
+        debugPrint('[$_tag/❌ ERROR] Stack trace:\n$stackTrace');
+      }
     }
   }
 
@@ -37,9 +35,6 @@ class Logger {
 
   static void _log(String type, String message) {
     final timestamp = DateTime.now().toIso8601String();
-    developer.log(
-      '[$timestamp] $message',
-      name: '$_tag/$type',
-    );
+    debugPrint('[$_tag/$type] [$timestamp] $message');
   }
 }

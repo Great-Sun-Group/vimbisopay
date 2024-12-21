@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
-import 'package:vimbisopay_app/application/usecases/cancel_credex.dart';
-import 'package:vimbisopay_app/application/usecases/create_credex.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
@@ -74,8 +72,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Logger.lifecycle('Initializing HomeBloc');
     _homeBloc = HomeBloc(
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
-      cancelCredex: CancelCredex(_accountRepository),
-      createCredex: CreateCredex(_accountRepository),
       accountRepository: _accountRepository,
     );
     // Trigger initial data load after a short delay to ensure navigation is complete
@@ -247,6 +243,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return RefreshIndicator(
       onRefresh: () async {
         _homeBloc.add(const HomeRefreshStarted());
+        // Wait until the refresh is complete
+        while (state.isRefreshing) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       },
       color: AppColors.primary,
       child: SingleChildScrollView(
@@ -278,7 +278,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return BlocProvider(
       create: (context) => _homeBloc,
-      child: BlocBuilder<HomeBloc, HomeState>(
+      child: BlocConsumer<HomeBloc, HomeState>(
+        listenWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.message != current.message ||
+            previous.error != current.error,
+        listener: (context, state) {
+          // Clear any existing snackbars
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          // Handle success messages
+          if (state.status == HomeStatus.success) {
+            // Dismiss any loading dialogs first
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            
+            if (state.message != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message!),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 3),
+                  action: SnackBarAction(
+                    label: 'DISMISS',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    },
+                  ),
+                ),
+              );
+            }
+          }
+
+          // Handle error messages
+          if (state.hasError && state.error != null) {
+            // Dismiss any loading dialogs first
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.error!),
+                backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'DISMISS',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  },
+                ),
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           // Show loading only if we don't have dashboard data yet
           if (state.status == HomeStatus.loading && state.dashboard == null) {
@@ -300,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               accounts: state.dashboard?.accounts,
               accountRepository: _accountRepository,
               homeBloc: _homeBloc,
+              databaseHelper: _databaseHelper,
             ),
           );
         },

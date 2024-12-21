@@ -31,6 +31,15 @@ class HomeLoadMoreStarted extends HomeEvent {
   const HomeLoadMoreStarted();
 }
 
+class HomeLoadPendingTransactions extends HomeEvent {
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
+  const HomeLoadPendingTransactions({
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
+  });
+}
+
 class HomeDataLoaded extends HomeEvent {
   final Dashboard dashboard;
   final List<PendingOffer> pendingInTransactions;
@@ -46,11 +55,11 @@ class HomeDataLoaded extends HomeEvent {
 
   @override
   List<Object> get props => [
-    dashboard, 
-    pendingInTransactions, 
-    pendingOutTransactions,
-    keepLoading,
-  ];
+        dashboard,
+        pendingInTransactions,
+        pendingOutTransactions,
+        keepLoading,
+      ];
 }
 
 class HomeLedgerLoaded extends HomeEvent {
@@ -110,4 +119,13 @@ class CreateCredexEvent extends HomeEvent {
 
   @override
   List<Object> get props => [request];
+}
+
+class HomeFetchPendingTransactions extends HomeEvent {
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
+  const HomeFetchPendingTransactions({
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
+  });
 }
