@@ -353,8 +353,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     // First check what's in the database
     Logger.data('Checking database state before refresh');
-    // Trigger refresh
-    await _refreshFromDb();
     await _refreshViaLogin();
   }
 
@@ -413,43 +411,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Logger.error('Failed to fetch pending transactions', e);
       add(HomeErrorOccurred('Failed to fetch pending transactions: $e'));
     }
-
-    // // Check database state after refresh
-    // Logger.data('Checking database state after refresh');
-    // try {
-    //   final (dbPendingIn, dbPendingOut) =
-    //       await _databaseHelper.getAllPendingTransactions();
-    //   Logger.data('Database after refresh:');
-    //   Logger.data('- ${dbPendingIn.length} pending in transactions');
-    //   Logger.data('- ${dbPendingOut.length} pending out transactions');
-
-    //   // Compare with state
-    //   Logger.data('Current state:');
-    //   Logger.data(
-    //       '- ${state.pendingInTransactions.length} pending in transactions');
-    //   Logger.data(
-    //       '- ${state.pendingOutTransactions.length} pending out transactions');
-
-    //   // Log any discrepancies
-    //   if (dbPendingIn.length != state.pendingInTransactions.length ||
-    //       dbPendingOut.length != state.pendingOutTransactions.length) {
-    //     Logger.error('Mismatch between database and state:');
-    //     Logger.error(
-    //         'Database: ${dbPendingIn.length} in, ${dbPendingOut.length} out');
-    //     Logger.error(
-    //         'State: ${state.pendingInTransactions.length} in, ${state.pendingOutTransactions.length} out');
-    //   }
-
-    //   emit(state.copyWith(
-    //     status: HomeStatus.success,
-    //     pendingInTransactions: dbPendingIn,
-    //     pendingOutTransactions: dbPendingOut,
-    //     message: null,
-    //     error: null,
-    //   ));
-    // } catch (e) {
-    //   Logger.error('Failed to check database state after refresh', e);
-    // }
   }
 
   void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) {
@@ -713,54 +674,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     HomeFetchPendingTransactions event,
     Emitter<HomeState> emit,
   ) async {
-    Logger.data('Fetching all pending transactions from database');
-    try {
-      final user = await _databaseHelper.getUser();
-      Logger.data('Retrieved user from database: ${user != null}');
-      if (user == null) {
-        add(const HomeErrorOccurred('User not found'));
-        return;
-      }
+    Logger.state('Refresh started');
+    emit(state.copyWith(
+      status: HomeStatus.refreshing,
+      message: null,
+      error: null,
+    ));
 
-      Logger.data('User dashboard available: ${user.dashboard != null}');
-      if (user.dashboard == null) {
-        add(const HomeErrorOccurred('Dashboard data not available'));
-        return;
-      }
-
-      final (pendingIn, pendingOut) =
-          await _databaseHelper.getAllPendingTransactions();
-      Logger.data('Database contains:');
-      Logger.data('- ${pendingIn.length} pending in transactions');
-      Logger.data('- ${pendingOut.length} pending out transactions');
-
-      // Update state with fetched transactions
-      emit(state.copyWith(
-        status: HomeStatus.success,
-        dashboard: user.dashboard,
-        pendingInTransactions: pendingIn,
-        pendingOutTransactions: pendingOut,
-      ));
-
-      // Log each transaction for debugging
-      if (pendingIn.isNotEmpty) {
-        Logger.data('Pending In Transactions:');
-        for (var tx in pendingIn) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} from ${tx.counterpartyAccountName}');
-        }
-      }
-
-      if (pendingOut.isNotEmpty) {
-        Logger.data('Pending Out Transactions:');
-        for (var tx in pendingOut) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} to ${tx.counterpartyAccountName}');
-        }
-      }
-    } catch (e) {
-      Logger.error('Failed to fetch pending transactions', e);
-      add(HomeErrorOccurred('Failed to fetch pending transactions: $e'));
-    }
+    // First check what's in the database
+    Logger.data('Checking database state before refresh');
+    // Trigger refresh
+    await _refreshFromDb();
   }
 }

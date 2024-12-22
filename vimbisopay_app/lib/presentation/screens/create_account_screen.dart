@@ -21,6 +21,27 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _acceptedTerms = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
+  Map<String, String?> _fieldErrors = {
+    'firstName': null,
+    'lastName': null,
+    'phone': null,
+    'password': null,
+    'confirmPassword': null,
+  };
+  
+  Set<String> _touchedFields = {};
+
+  void _markFieldAsTouched(String fieldName) {
+    setState(() {
+      _touchedFields.add(fieldName);
+    });
+  }
+
+  String? _getFieldError(String fieldName) {
+    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+  }
 
   @override
   void dispose() {
@@ -33,14 +54,47 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   void _validateForm() {
+    final firstName = _firstNameController.text;
+    final lastName = _lastNameController.text;
+    final phone = _phoneController.text;
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
     setState(() {
-      _isFormValid = _firstNameController.text.isNotEmpty &&
-          _lastNameController.text.isNotEmpty &&
-          _phoneController.text.isNotEmpty && 
-          _passwordController.text.isNotEmpty &&
-          _confirmPasswordController.text.isNotEmpty &&
-          _passwordController.text == _confirmPasswordController.text &&
-          _passwordController.text.length >= 6 &&
+      // Show validation errors immediately
+      _fieldErrors['firstName'] = firstName.isEmpty ? 'Please enter your first name' : null;
+      _fieldErrors['lastName'] = lastName.isEmpty ? 'Please enter your last name' : null;
+      _fieldErrors['phone'] = _validatePhone(phone);
+
+      if (password.isEmpty) {
+        _fieldErrors['password'] = 'Please enter a password';
+      } else if (password.length < 6) {
+        _fieldErrors['password'] = 'Password must be at least 6 characters';
+      } else {
+        _fieldErrors['password'] = null;
+      }
+
+      if (confirmPassword.isEmpty) {
+        _fieldErrors['confirmPassword'] = 'Please confirm your password';
+      } else if (confirmPassword != password) {
+        _fieldErrors['confirmPassword'] = 'Passwords do not match';
+      } else {
+        _fieldErrors['confirmPassword'] = null;
+      }
+
+      // Check if all required fields have valid values
+      final hasValidFirstName = firstName.isNotEmpty;
+      final hasValidLastName = lastName.isNotEmpty;
+      final hasValidPhone = phone.isNotEmpty && _validatePhone(phone) == null;
+      final hasValidPassword = password.isNotEmpty && password.length >= 6;
+      final hasValidConfirmPassword = confirmPassword.isNotEmpty && confirmPassword == password;
+
+      // Update form validity
+      _isFormValid = hasValidFirstName &&
+          hasValidLastName &&
+          hasValidPhone &&
+          hasValidPassword &&
+          hasValidConfirmPassword &&
           _acceptedTerms;
     });
   }
@@ -87,7 +141,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   Future<void> _handleCreateAccount() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Mark all fields as touched when attempting to create account
+    setState(() {
+      _touchedFields.addAll([
+        'firstName',
+        'lastName',
+        'phone',
+        'password',
+        'confirmPassword'
+      ]);
+    });
+    
+    _validateForm();
+    _formKey.currentState!.validate();
+    if (!_isFormValid) return;
 
     setState(() {
       _isLoading = true;
@@ -239,92 +306,170 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _firstNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'First Name',
-                            prefixIcon: Icon(Icons.person_outline),
+                        Semantics(
+                          label: 'First name input field',
+                          child: TextFormField(
+                            controller: _firstNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'First Name',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                            enabled: !_isLoading,
+                            onTap: () => _markFieldAsTouched('firstName'),
+                            onChanged: (_) {
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            onEditingComplete: () {
+                              _markFieldAsTouched('firstName');
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            validator: (_) => _getFieldError('firstName'),
                           ),
-                          enabled: !_isLoading,
-                          onChanged: (_) => _validateForm(),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your first name';
-                            }
-                            return null;
-                          },
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _lastNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Last Name',
-                            prefixIcon: Icon(Icons.person_outline),
+                        Semantics(
+                          label: 'Last name input field',
+                          child: TextFormField(
+                            controller: _lastNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Last Name',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                            enabled: !_isLoading,
+                            onTap: () => _markFieldAsTouched('lastName'),
+                            onChanged: (_) {
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            onEditingComplete: () {
+                              _markFieldAsTouched('lastName');
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            validator: (_) => _getFieldError('lastName'),
                           ),
-                          enabled: !_isLoading,
-                          onChanged: (_) => _validateForm(),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your last name';
-                            }
-                            return null;
-                          },
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone Number',
-                            prefixIcon: Icon(Icons.phone),
-                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
-                            helperMaxLines: 2,
+                        Semantics(
+                          label: 'Phone number input field',
+                          child: TextFormField(
+                            controller: _phoneController,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                              prefixIcon: Icon(Icons.phone),
+                              helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                              helperMaxLines: 2,
+                            ),
+                            keyboardType: TextInputType.phone,
+                            enabled: !_isLoading,
+                            onTap: () => _markFieldAsTouched('phone'),
+                            onChanged: (_) {
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            onEditingComplete: () {
+                              _markFieldAsTouched('phone');
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            validator: (_) => _getFieldError('phone'),
                           ),
-                          keyboardType: TextInputType.phone,
-                          enabled: !_isLoading,
-                          onChanged: (_) => _validateForm(),
-                          validator: _validatePhone,
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock),
-                            helperText: 'At least 6 characters',
+                        Semantics(
+                          label: 'Password input field',
+                          child: TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: const Icon(Icons.lock),
+                              helperText: 'At least 6 characters',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showPassword ? Icons.visibility_off : Icons.visibility,
+                                  color: AppColors.primary,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showPassword = !_showPassword;
+                                  });
+                                },
+                                tooltip: _showPassword ? 'Hide password' : 'Show password',
+                              ),
+                            ),
+                            obscureText: !_showPassword,
+                            enabled: !_isLoading,
+                            onTap: () => _markFieldAsTouched('password'),
+                            onChanged: (_) {
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            onEditingComplete: () {
+                              _markFieldAsTouched('password');
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            validator: (_) => _getFieldError('password'),
                           ),
-                          obscureText: true,
-                          enabled: !_isLoading,
-                          onChanged: (_) => _validateForm(),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirm Password',
-                            prefixIcon: Icon(Icons.lock_outline),
-                            helperText: 'Re-enter your password',
+                        Semantics(
+                          label: 'Confirm password input field',
+                          child: TextFormField(
+                            controller: _confirmPasswordController,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              helperText: 'Re-enter your password',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                  color: AppColors.primary,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showConfirmPassword = !_showConfirmPassword;
+                                  });
+                                },
+                                tooltip: _showConfirmPassword ? 'Hide password' : 'Show password',
+                              ),
+                            ),
+                            obscureText: !_showConfirmPassword,
+                            enabled: !_isLoading,
+                            onTap: () => _markFieldAsTouched('confirmPassword'),
+                            onChanged: (_) {
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            onEditingComplete: () {
+                              _markFieldAsTouched('confirmPassword');
+                              setState(() {
+                                _validateForm();
+                                _formKey.currentState?.validate();
+                              });
+                            },
+                            validator: (_) => _getFieldError('confirmPassword'),
                           ),
-                          obscureText: true,
-                          enabled: !_isLoading,
-                          onChanged: (_) => _validateForm(),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please confirm your password';
-                            }
-                            if (value != _passwordController.text) {
-                              return 'Passwords do not match';
-                            }
-                            return null;
-                          },
                         ),
                         const SizedBox(height: 24),
                         Row(

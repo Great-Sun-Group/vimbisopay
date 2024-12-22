@@ -33,7 +33,8 @@ class SendCredexScreen extends StatefulWidget {
   State<SendCredexScreen> createState() => _SendCredexScreenState();
 }
 
-class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerProviderStateMixin {
+class _SendCredexScreenState extends State<SendCredexScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _recipientController = TextEditingController();
   late final TextEditingController _amountController;
@@ -55,11 +56,11 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
 
   double get _availableBalance {
     final denom = _selectedDenomination.toString().split('.').last;
-    final balanceStr = widget.senderAccount.balanceData.securedNetBalancesByDenom
-        .firstWhere(
-          (balance) => balance.contains(denom),
-          orElse: () => '0.0 $denom',
-        );
+    final balanceStr =
+        widget.senderAccount.balanceData.securedNetBalancesByDenom.firstWhere(
+      (balance) => balance.contains(denom),
+      orElse: () => '0.0 $denom',
+    );
     return double.tryParse(balanceStr.split(' ').first) ?? 0.0;
   }
 
@@ -142,7 +143,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
       return 'The recipient account was not found. Please check the handle and try again.';
     } else if (error.toLowerCase().contains('insufficient')) {
       return 'You have insufficient balance to complete this transaction.';
-    } else if (error.toLowerCase().contains('network') || error.toLowerCase().contains('timeout')) {
+    } else if (error.toLowerCase().contains('network') ||
+        error.toLowerCase().contains('timeout')) {
       return 'Unable to complete the transaction due to network issues. Please check your connection and try again.';
     } else if (error.toLowerCase().contains('invalid')) {
       return 'The transaction details are invalid. Please check the amount and recipient handle.';
@@ -185,7 +187,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
     if (result != null && mounted) {
       final parts = result.split('#');
       if (parts.length == 2) {
-        final handle = parts[0].startsWith('@') ? parts[0].substring(1) : parts[0];
+        final handle =
+            parts[0].startsWith('@') ? parts[0].substring(1) : parts[0];
         setState(() {
           _recipientController.text = handle;
           _recipientAccountId = parts[1];
@@ -206,7 +209,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
     try {
       _updateStatus('Validating recipient account...');
 
-      final accountResult = await widget.accountRepository.getAccountByHandle(_recipientController.text);
+      final accountResult = await widget.accountRepository
+          .getAccountByHandle(_recipientController.text);
 
       return accountResult.fold(
         (failure) {
@@ -451,9 +455,11 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                         style: const TextStyle(color: AppColors.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'Recipient Handle',
-                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          labelStyle:
+                              const TextStyle(color: AppColors.textSecondary),
                           hintText: 'Enter recipient handle',
-                          hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                          hintStyle: TextStyle(
+                              color: AppColors.textSecondary.withOpacity(0.5)),
                           filled: true,
                           fillColor: AppColors.surface,
                           border: OutlineInputBorder(
@@ -468,12 +474,14 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                                     padding: EdgeInsets.all(12.0),
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          AppColors.primary),
                                     ),
                                   ),
                                 )
                               : _recipientAccountId != null
-                                  ? const Icon(Icons.check_circle, color: AppColors.success)
+                                  ? const Icon(Icons.check_circle,
+                                      color: AppColors.success)
                                   : null,
                         ),
                         validator: (value) {
@@ -487,7 +495,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: _scanQRCode,
-                      icon: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
+                      icon: const Icon(Icons.qr_code_scanner,
+                          color: AppColors.primary),
                       tooltip: 'Scan QR Code',
                     ),
                   ],
@@ -501,11 +510,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                       child: TextFormField(
                         controller: _amountController,
                         focusNode: _amountFocusNode,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         style: const TextStyle(color: AppColors.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'Amount',
-                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          labelStyle:
+                              const TextStyle(color: AppColors.textSecondary),
                           filled: true,
                           fillColor: AppColors.surface,
                           border: OutlineInputBorder(
@@ -515,7 +526,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                         ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,' + _decimalPlaces.toString() + '}'),
+                            RegExp(r'^\d*\.?\d{0,' +
+                                _decimalPlaces.toString() +
+                                '}'),
                           ),
                         ],
                         validator: (value) {
@@ -544,7 +557,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                         style: const TextStyle(color: AppColors.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'Currency',
-                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          labelStyle:
+                              const TextStyle(color: AppColors.textSecondary),
                           filled: true,
                           fillColor: AppColors.surface,
                           border: OutlineInputBorder(
@@ -557,7 +571,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                             value: denomination,
                             child: Text(
                               denomination.toString().split('.').last,
-                              style: const TextStyle(color: AppColors.textPrimary),
+                              style:
+                                  const TextStyle(color: AppColors.textPrimary),
                             ),
                           );
                         }).toList(),
@@ -583,7 +598,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.textPrimary),
                           ),
                         )
                       : const Text(
@@ -639,7 +655,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
           final dashboardPendingOffer = dashboard.PendingOffer(
             credexID: response.data.action.id,
             formattedInitialAmount: response.data.action.details.amount,
-            counterpartyAccountName: response.data.action.details.receiverAccountName,
+            counterpartyAccountName:
+                response.data.action.details.receiverAccountName,
             secured: response.data.action.details.securedCredex,
           );
 
@@ -650,7 +667,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
             data: [],
             message: 'No pending incoming transactions',
           );
-          
+
           final pendingOutData = dashboard.PendingData(
             success: true,
             data: [dashboardPendingOffer],
@@ -659,7 +676,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
 
           // Update transactions in database with original response
           await widget.databaseHelper.updatePendingTransactions(response);
-          
+
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -731,14 +748,22 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                               const SizedBox(height: 12),
                               _buildTransactionDetailRow(
                                 'To',
-                                response.data.action.details.receiverAccountName,
+                                response
+                                    .data.action.details.receiverAccountName,
                               ),
                               const SizedBox(height: 12),
                               _buildTransactionDetailRow(
                                 'New Balance',
-                                response.data.dashboard.accounts.first.balanceData.securedNetBalancesByDenom.firstWhere(
-                                  (balance) => balance.contains(_selectedDenomination.toString().split('.').last),
-                                  orElse: () => '0.0 ${_selectedDenomination.toString().split('.').last}',
+                                response.data.dashboard.accounts.first
+                                    .balanceData.securedNetBalancesByDenom
+                                    .firstWhere(
+                                  (balance) => balance.contains(
+                                      _selectedDenomination
+                                          .toString()
+                                          .split('.')
+                                          .last),
+                                  orElse: () =>
+                                      '0.0 ${_selectedDenomination.toString().split('.').last}',
                                 ),
                               ),
                             ],
@@ -762,12 +787,15 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           CircularProgressIndicator(
-                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    AppColors.primary),
                                           ),
                                           SizedBox(height: 16),
                                           Text(
                                             'Refreshing...',
-                                            style: TextStyle(color: AppColors.textPrimary),
+                                            style: TextStyle(
+                                                color: AppColors.textPrimary),
                                           ),
                                         ],
                                       ),
@@ -775,19 +803,26 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                                   ),
                                 );
 
-                                Navigator.of(context).popUntil((route) => route.isFirst);
+                                Navigator.of(context)
+                                    .popUntil((route) => route.isFirst);
 
                                 _refreshSubscription?.cancel();
-                                _refreshSubscription = widget.homeBloc.stream.listen(
+                                _refreshSubscription =
+                                    widget.homeBloc.stream.listen(
                                   (state) {
-                                    if (state.status != HomeStatus.loading && mounted) {
+                                    if (state.status != HomeStatus.loading &&
+                                        mounted) {
                                       _refreshSubscription?.cancel();
-                                      if (mounted && Navigator.canPop(context)) {
+                                      if (mounted &&
+                                          Navigator.canPop(context)) {
                                         Navigator.of(context).pop();
                                       }
-                                    } else if (state.status == HomeStatus.error && mounted) {
+                                    } else if (state.status ==
+                                            HomeStatus.error &&
+                                        mounted) {
                                       _refreshSubscription?.cancel();
-                                      if (mounted && Navigator.canPop(context)) {
+                                      if (mounted &&
+                                          Navigator.canPop(context)) {
                                         Navigator.of(context).pop();
                                       }
                                     }
@@ -807,7 +842,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> with SingleTickerPr
                                   cancelOnError: true,
                                 );
 
-                                widget.homeBloc.add(const HomeRefreshStarted());
+                                widget.homeBloc
+                                    .add(const HomeFetchPendingTransactions());
                               }
                             },
                             style: ElevatedButton.styleFrom(
