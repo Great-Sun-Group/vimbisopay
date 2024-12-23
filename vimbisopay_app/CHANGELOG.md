@@ -62,3 +62,6 @@ Example entry format:
 
 ## [1.0.0+14] - 2024-12-20
 - dashboard changes
+
+## [1.0.0+15] - 2024-12-23
+- Transaction Confirmation and UI fixes
