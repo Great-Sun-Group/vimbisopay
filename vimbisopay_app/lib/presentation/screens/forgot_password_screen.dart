@@ -21,10 +21,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _isSubmitted = false;
-  Map<String, String?> _fieldErrors = {
+  final Map<String, String?> _fieldErrors = {
     'phone': null,
   };
-  Set<String> _touchedFields = {};
+  final Set<String> _touchedFields = {};
 
   void _markFieldAsTouched(String fieldName) {
     setState(() {

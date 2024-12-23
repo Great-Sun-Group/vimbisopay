@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:flutter/foundation.dart';

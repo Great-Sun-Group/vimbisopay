@@ -8,17 +8,17 @@ class PhoneNumberFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     // Remove any existing formatting
-    String digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final String digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
     
     // Apply formatting
-    String formatted = _formatInternationalNumber(digitsOnly);
+    final String formatted = _formatInternationalNumber(digitsOnly);
 
     // Calculate the new cursor position
     int selectionIndex = formatted.length;
     if (newValue.selection.start < newValue.text.length) {
       selectionIndex = newValue.selection.start;
       // Adjust cursor position based on added spaces and + prefix
-      int spacesBeforeCursor = formatted.substring(0, selectionIndex + 1).split(' ').length - 1;
+      final int spacesBeforeCursor = formatted.substring(0, selectionIndex + 1).split(' ').length - 1;
       selectionIndex += spacesBeforeCursor + 1; // +1 for the '+' prefix
     }
 
@@ -34,7 +34,7 @@ class PhoneNumberFormatter extends TextInputFormatter {
     final buffer = StringBuffer('+');
     
     // Format first 12 digits with spaces
-    int formattedLength = min(12, digits.length);
+    final int formattedLength = min(12, digits.length);
     for (int i = 0; i < formattedLength; i++) {
       if (i > 0 && i % 3 == 0) {
         buffer.write(' ');

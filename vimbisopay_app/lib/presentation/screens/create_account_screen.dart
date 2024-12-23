@@ -1,6 +1,5 @@
 import 'dart:async' show Future, StreamController, StreamSubscription, unawaited;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
@@ -43,7 +42,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
   bool _acceptedTerms = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
-  Map<String, String?> _fieldErrors = {
+  final Map<String, String?> _fieldErrors = {
     'firstName': null,
     'lastName': null,
     'phone': null,
@@ -51,7 +50,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
     'confirmPassword': null,
   };
   
-  Set<String> _touchedFields = {};
+  final Set<String> _touchedFields = {};
 
   void _markFieldAsTouched(String fieldName) {
     setState(() {

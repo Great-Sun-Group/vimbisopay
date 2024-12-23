@@ -3,7 +3,6 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
@@ -29,11 +28,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _showPassword = false;
-  Map<String, String?> _fieldErrors = {
+  final Map<String, String?> _fieldErrors = {
     'phone': null,
     'password': null,
   };
-  Set<String> _touchedFields = {};
+  final Set<String> _touchedFields = {};
 
   void _markFieldAsTouched(String fieldName) {
     setState(() {
