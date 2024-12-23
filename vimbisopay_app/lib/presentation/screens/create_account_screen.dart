@@ -6,148 +6,10 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 
-class _LoadingDialog extends StatefulWidget {
-  final AnimationController spinController;
-  final String message;
-  final Stream<String> messageStream;
-
-  const _LoadingDialog({
-    required this.spinController,
-    required this.message,
-    required this.messageStream,
-  });
-
-  @override
-  State<_LoadingDialog> createState() => _LoadingDialogState();
-}
-
-class _LoadingDialogState extends State<_LoadingDialog> with TickerProviderStateMixin {
-  late String _currentMessage;
-  late final AnimationController _fadeController;
-  late final AnimationController _scaleController;
-  StreamSubscription<String>? _messageSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    Logger.interaction('[CreateAccount] Loading dialog initialized');
-    _currentMessage = widget.message;
-    
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    )..forward();
-
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    )..forward();
-
-    _messageSubscription = widget.messageStream.listen((newMessage) {
-      Logger.interaction('[CreateAccount] Message stream received: $newMessage');
-      if (mounted && newMessage != _currentMessage) {
-        // Sequence the animations
-        _fadeController.reverse().then((_) {
-          if (mounted) {
-            setState(() {
-              Logger.interaction('[CreateAccount] Updating dialog message to: $newMessage');
-              _currentMessage = newMessage;
-            });
-            _scaleController.reverse();
-            _fadeController.forward();
-            _scaleController.forward();
-          }
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    Logger.interaction('[CreateAccount] Loading dialog disposing');
-    _messageSubscription?.cancel();
-    _fadeController.dispose();
-    _scaleController.dispose();
-    // Don't dispose the spin controller since it's managed by the parent
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        Logger.interaction('[CreateAccount] Dialog WillPopScope triggered');
-        return false;
-      },
-      child: Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          builder: (context, value, child) {
-            return Opacity(
-              opacity: value,
-              child: Transform.scale(
-                scale: 0.95 + (0.05 * value),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  width: 200,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary.withOpacity(0.1),
-                        ),
-                        child: RotationTransition(
-                          turns: widget.spinController,
-                          child: const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                            strokeWidth: 3,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ScaleTransition(
-                        scale: _scaleController,
-                        child: FadeTransition(
-                          opacity: _fadeController,
-                          child: Text(
-                            _currentMessage,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.15,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/core/utils/phone_validator.dart';
+import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -162,6 +24,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
   @override
   void initState() {
     super.initState();
+    _spinController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+      animationBehavior: AnimationBehavior.preserve,
+    );
   }
 
   final _formKey = GlobalKey<FormState>();
@@ -223,7 +90,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       // Show validation errors immediately
       _fieldErrors['firstName'] = firstName.isEmpty ? 'Please enter your first name' : null;
       _fieldErrors['lastName'] = lastName.isEmpty ? 'Please enter your last name' : null;
-      _fieldErrors['phone'] = _validatePhone(phone);
+      _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
 
       final passwordValidation = PasswordValidator.validatePassword(password);
       _fieldErrors['password'] = passwordValidation.error;
@@ -239,7 +106,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       // Check if all required fields have valid values
       final hasValidFirstName = firstName.isNotEmpty;
       final hasValidLastName = lastName.isNotEmpty;
-      final hasValidPhone = phone.isNotEmpty && _validatePhone(phone) == null;
+      final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
       final hasValidPassword = PasswordValidator.validatePassword(password).isValid;
       final hasValidConfirmPassword = confirmPassword.isNotEmpty && confirmPassword == password;
 
@@ -258,18 +125,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
     });
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your phone number';
-    }
-    if (!RegExp(r'^[0-9]{3}[0-9]+$').hasMatch(value)) {
-      return 'Start with country code (e.g. 263 or 353)';
-    }
-    if (value.length < 10) {
-      return 'Phone number is too short';
-    }
-    return null;
-  }
 
   void _showError(String message) {
     showDialog(
@@ -334,11 +189,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       _isLoading = true;
     });
 
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    )..repeat();
+    _spinController.repeat();
     
     Logger.interaction('[CreateAccount] Set loading state to true');
     
@@ -392,7 +243,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
         routeSettings: const RouteSettings(name: 'loading_dialog'),
         builder: (context) {
           Logger.interaction('[CreateAccount] Building loading dialog');
-          return _LoadingDialog(
+          return LoadingDialog(
             spinController: _spinController,
             message: 'Creating your account...',
             messageStream: messageController.stream,
@@ -501,25 +352,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-    );
-
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surface,
-      border: inputBorder,
-      enabledBorder: inputBorder,
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary),
-      ),
-      labelStyle: const TextStyle(color: AppColors.textSecondary),
-      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: const TextStyle(color: AppColors.error),
-      prefixIconColor: AppColors.primary,
-    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -635,6 +467,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                               helperMaxLines: 2,
                             ),
                             keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              PhoneNumberFormatter(),
+                            ],
                             enabled: !_isLoading,
                             onTap: () => _markFieldAsTouched('phone'),
                             onChanged: (_) {
