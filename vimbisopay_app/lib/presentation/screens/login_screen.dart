@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/infrastructure/repositories/account_repository_im
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/password_validator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,14 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _databaseHelper = DatabaseHelper();
   bool _isFormValid = false;
   bool _isLoading = false;
+  bool _showPassword = false;
 
   @override
   void initState() {
     super.initState();
-    // Set default values for testing
-    _phoneController.text = '263778177125';
-    _passwordController.text = 'password';
-    _validateForm();
     _loadSavedUser();
   }
 
@@ -55,9 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _validateForm() {
     setState(() {
+      final passwordValidation = PasswordValidator.validatePassword(_passwordController.text);
       _isFormValid = _phoneController.text.isNotEmpty && 
-                     _passwordController.text.isNotEmpty &&
-                     _passwordController.text.length >= 6;
+                     passwordValidation.isValid;
     });
   }
 
@@ -246,23 +244,14 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           (user) async {
             Logger.interaction('Login successful, saving user data');
-            // Save user with password
-            final userWithPassword = User(
-              memberId: user.memberId,
-              phone: user.phone,
-              token: user.token,
-              password: password,
-              dashboard: user.dashboard,
-            );
-            
-            await _databaseHelper.saveUser(userWithPassword);
+            await _databaseHelper.saveUser(user);
             
             if (mounted) {
               Logger.interaction('Navigating to auth screen');
               Navigator.pushReplacementNamed(
                 context,
                 '/auth',
-                arguments: userWithPassword,
+                arguments: user,
               );
             }
           },
@@ -328,22 +317,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock),
-                          helperText: 'Enter the password you created during registration',
+                          prefixIcon: const Icon(Icons.lock),
+                          helperText: PasswordValidator.getRequirementsText(),
+                          helperMaxLines: 6,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPassword ? Icons.visibility_off : Icons.visibility,
+                              color: AppColors.primary,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _showPassword = !_showPassword;
+                              });
+                            },
+                          ),
                         ),
-                        obscureText: true,
+                        obscureText: !_showPassword,
                         enabled: !_isLoading,
                         onChanged: (_) => _validateForm(),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
-                          return null;
+                          final validation = PasswordValidator.validatePassword(value ?? '');
+                          return validation.error;
                         },
                       ),
                       const SizedBox(height: 24),

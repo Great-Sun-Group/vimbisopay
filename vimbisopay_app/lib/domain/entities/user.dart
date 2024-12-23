@@ -4,14 +4,18 @@ class User {
   final String memberId;
   final String phone;
   final String token;
-  final String? password;  // Added password field as optional
+  final String? passwordHash;  // Hashed password
+  final String? passwordSalt;  // Salt used for hashing
+  final DateTime? passwordChanged;  // When the password was last changed
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
 
   const User({
     required this.memberId,
     required this.phone,
     required this.token,
-    this.password,
+    this.passwordHash,
+    this.passwordSalt,
+    this.passwordChanged,
     this.dashboard,
   });
 
@@ -27,7 +31,9 @@ class User {
       'memberId': memberId,
       'phone': phone,
       'token': token,
-      'password': password,
+      'password_hash': passwordHash,
+      'password_salt': passwordSalt,
+      'password_changed': passwordChanged?.millisecondsSinceEpoch,
       'dashboard': dashboard?.toMap(),
     };
   }
@@ -37,7 +43,11 @@ class User {
       memberId: map['memberId'] as String,
       phone: map['phone'] as String,
       token: map['token'] as String,
-      password: map['password'] as String?,
+      passwordHash: map['password_hash'] as String?,
+      passwordSalt: map['password_salt'] as String?,
+      passwordChanged: map['password_changed'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['password_changed'] as int)
+          : null,
       dashboard: map['dashboard'] != null 
           ? Dashboard.fromMap(map['dashboard'] as Map<String, dynamic>)
           : null,
@@ -48,14 +58,18 @@ class User {
     String? memberId,
     String? phone,
     String? token,
-    String? password,
+    String? passwordHash,
+    String? passwordSalt,
+    DateTime? passwordChanged,
     Dashboard? dashboard,
   }) {
     return User(
       memberId: memberId ?? this.memberId,
       phone: phone ?? this.phone,
       token: token ?? this.token,
-      password: password ?? this.password,
+      passwordHash: passwordHash ?? this.passwordHash,
+      passwordSalt: passwordSalt ?? this.passwordSalt,
+      passwordChanged: passwordChanged ?? this.passwordChanged,
       dashboard: dashboard ?? this.dashboard,
     );
   }
@@ -67,10 +81,20 @@ class User {
         other.memberId == memberId &&
         other.phone == phone &&
         other.token == token &&
-        other.password == password &&
+        other.passwordHash == passwordHash &&
+        other.passwordSalt == passwordSalt &&
+        other.passwordChanged == passwordChanged &&
         other.dashboard == dashboard;
   }
 
   @override
-  int get hashCode => Object.hash(memberId, phone, token, password, dashboard);
+  int get hashCode => Object.hash(
+        memberId,
+        phone,
+        token,
+        passwordHash,
+        passwordSalt,
+        passwordChanged,
+        dashboard,
+      );
 }

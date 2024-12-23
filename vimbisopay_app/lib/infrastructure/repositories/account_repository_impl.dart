@@ -11,6 +11,7 @@ import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 
@@ -19,6 +20,7 @@ class AccountRepositoryImpl implements AccountRepository {
   
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final SecurityService _securityService = SecurityService();
+  final PasswordService _passwordService = PasswordService();
 
   Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
@@ -45,27 +47,31 @@ class AccountRepositoryImpl implements AccountRepository {
       return result.fold(
         (failure) async {
           if (!isRetry && failure.message?.toLowerCase().contains('token expired') == true) {
-            if (user.password == null) {
-              return const Left(InfrastructureFailure('Authentication failed: No stored password'));
+            if (user.passwordHash == null || user.passwordSalt == null) {
+              return const Left(InfrastructureFailure('Authentication failed: No stored password hash'));
             }
 
+            // Re-login with stored password hash
             final loginResult = await login(
               phone: user.phone,
-              password: user.password!,
+              passwordHash: user.passwordHash!,
+              passwordSalt: user.passwordSalt!,
             );
 
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
-                final userWithPassword = User(
+                final userWithPasswordHash = User(
                   memberId: newUser.memberId,
                   phone: newUser.phone,
                   token: newUser.token,
-                  password: user.password,
+                  passwordHash: user.passwordHash,
+                  passwordSalt: user.passwordSalt,
+                  passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
                 );
                 
-                final saveResult = await saveUser(userWithPassword);
+                final saveResult = await saveUser(userWithPasswordHash);
                 
                 return saveResult.fold(
                   (saveFailure) => Left(saveFailure),
@@ -254,13 +260,17 @@ class AccountRepositoryImpl implements AccountRepository {
     required String password,
   }) async {
     try {
+      // Hash password before sending to server
+      final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
+      
       final url = '$baseUrl/onboardMember';
       final body = {
         'firstname': firstName,
         'lastname': lastName,
         'phone': phone,
         'defaultDenom': 'CXX',
-        'password': password
+        'password_hash': hashResult.hash,
+        'password_salt': hashResult.salt,
       };
 
       final response = await _loggedRequest(
@@ -287,16 +297,32 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  @override
   Future<Either<Failure, User>> login({
     required String phone,
-    required String password,
+    String? password,
+    String? passwordHash,
+    String? passwordSalt,
   }) async {
     try {
       final url = '$baseUrl/login';
       final body = {
         'phone': phone,
-        'password': password,
       };
+
+      if (passwordHash != null && passwordSalt != null) {
+        // Use existing hash for token refresh
+        body['password_hash'] = passwordHash;
+        body['password_salt'] = passwordSalt;
+      } else {
+        if (password == null) {
+          return const Left(InfrastructureFailure('Password is required'));
+        }
+        // Hash new password
+        final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
+        body['password_hash'] = hashResult.hash;
+        body['password_salt'] = hashResult.salt;
+      }
 
       final response = await _loggedRequest(
         () => http.post(
@@ -370,7 +396,9 @@ class AccountRepositoryImpl implements AccountRepository {
           memberId: memberId,
           phone: userPhone,
           token: token,
-          password: password,
+          passwordHash: body['password_hash'],
+          passwordSalt: body['password_salt'],
+          passwordChanged: DateTime.now(),
           dashboard: dashboardObj,
         );
         

@@ -8,7 +8,9 @@ import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({
     required String phone,
-    required String password,
+    String? password,
+    String? passwordHash,
+    String? passwordSalt,
   });
 
   Future<Either<Failure, bool>> onboardMember({

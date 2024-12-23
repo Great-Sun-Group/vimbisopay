@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -28,7 +29,7 @@ class DatabaseHelper {
     final String path = join(await getDatabasesPath(), 'vimbisopay.db');
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -39,6 +40,41 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 8) {
+      // Add new password columns
+      await db.execute('ALTER TABLE users ADD COLUMN password_hash TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN password_changed INTEGER');
+      
+      // Migrate existing passwords if any
+      final users = await db.query('users', columns: ['memberId', 'password']);
+      final passwordService = PasswordService();
+      
+      for (var user in users) {
+        if (user['password'] != null) {
+          final oldPassword = user['password'] as String;
+          final ({String hash, String salt}) result = await passwordService.hashPassword(oldPassword);
+          
+          await db.update(
+            'users',
+            {
+              'password_hash': result.hash,
+              'password_salt': result.salt,
+              'password_changed': DateTime.now().millisecondsSinceEpoch,
+            },
+            where: 'memberId = ?',
+            whereArgs: [user['memberId']],
+          );
+        }
+      }
+      
+      // Remove old password column
+      await db.execute('CREATE TABLE users_new(memberId TEXT PRIMARY KEY, phone TEXT NOT NULL, token TEXT NOT NULL, password_hash TEXT, password_salt TEXT, password_changed INTEGER)');
+      await db.execute('INSERT INTO users_new(memberId, phone, token, password_hash, password_salt, password_changed) SELECT memberId, phone, token, password_hash, password_salt, password_changed FROM users');
+      await db.execute('DROP TABLE users');
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+    }
+    
     if (oldVersion < 7) {
       await db.execute('ALTER TABLE member_tiers ADD COLUMN firstname TEXT');
       await db.execute('ALTER TABLE member_tiers ADD COLUMN lastname TEXT');
@@ -104,7 +140,9 @@ class DatabaseHelper {
         memberId TEXT PRIMARY KEY,
         phone TEXT NOT NULL,
         token TEXT NOT NULL,
-        password TEXT
+        password_hash TEXT,
+        password_salt TEXT,
+        password_changed INTEGER
       )
     ''');
     
@@ -184,7 +222,9 @@ class DatabaseHelper {
           'memberId': user.memberId,
           'phone': user.phone,
           'token': user.token,
-          'password': user.password,
+          'password_hash': user.passwordHash,
+          'password_salt': user.passwordSalt,
+          'password_changed': user.passwordChanged?.millisecondsSinceEpoch,
         });
 
         if (user.dashboard != null) {
@@ -394,7 +434,11 @@ class DatabaseHelper {
         memberId: memberId,
         phone: userData['phone'] as String,
         token: userData['token'] as String,
-        password: userData['password'] as String?,
+        passwordHash: userData['password_hash'] as String?,
+        passwordSalt: userData['password_salt'] as String?,
+        passwordChanged: userData['password_changed'] != null 
+            ? DateTime.fromMillisecondsSinceEpoch(userData['password_changed'] as int)
+            : null,
         dashboard: dashboard,
       );
     } catch (e) {

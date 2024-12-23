@@ -260,7 +260,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     try {
       final user = await _databaseHelper.getUser();
-      if (user == null || user.password == null) {
+      if (user == null || user.passwordHash == null || user.passwordSalt == null) {
         Logger.error('Cannot refresh: No stored user credentials');
         add(const HomeErrorOccurred(
             'Unable to refresh data: No stored credentials'));
@@ -269,7 +269,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
       final loginResult = await accountRepository.login(
         phone: user.phone,
-        password: user.password!,
+        passwordHash: user.passwordHash,
+        passwordSalt: user.passwordSalt,
       );
 
       loginResult.fold(
