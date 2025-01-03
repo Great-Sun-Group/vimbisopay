@@ -434,6 +434,11 @@ class _TransactionsListState extends State<TransactionsList> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<HomeBloc, HomeState>(
+      listenWhen: (previous, current) =>
+          previous.status != current.status ||
+          previous.pendingInTransactions != current.pendingInTransactions ||
+          previous.pendingOutTransactions != current.pendingOutTransactions ||
+          previous.processingCredexIds != current.processingCredexIds,
       listener: (context, state) {
         Logger.data('TransactionsList state update - Status: ${state.status}');
         Logger.data('Has pending transactions: ${state.hasPendingTransactions}');
@@ -444,10 +449,23 @@ class _TransactionsListState extends State<TransactionsList> {
         if (state.processingCredexIds.isNotEmpty) {
           setState(() {
             _selectedTransactions.removeWhere((uniqueId) {
-              final offer = state.pendingInTransactions
-                  .firstWhere((o) => o.uniqueIdentifier == uniqueId);
-              return state.isProcessingTransaction(offer.credexID);
+              try {
+                final offer = state.pendingInTransactions
+                    .firstWhere((o) => o.uniqueIdentifier == uniqueId);
+                return state.isProcessingTransaction(offer.credexID);
+              } catch (e) {
+                // If transaction not found, it was probably removed
+                return true;
+              }
             });
+          });
+        }
+
+        // Clear selection mode when no pending transactions
+        if (!state.hasPendingTransactions && _selectionMode) {
+          setState(() {
+            _selectionMode = false;
+            _selectedTransactions.clear();
           });
         }
       },

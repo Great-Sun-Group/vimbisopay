@@ -7,7 +7,29 @@ A Flutter application for managing Vimbisopay transactions.
 1. Install Flutter by following the [official installation guide](https://docs.flutter.dev/get-started/install)
 2. Clone this repository
 3. Run `flutter pub get` to install dependencies
-4. Run `flutter run` to start the app in debug mode
+4. Set up Firebase configuration (see below)
+5. Run `flutter run` to start the app in debug mode
+
+## Firebase Configuration
+
+The app requires Firebase configuration files which are not checked into version control for security reasons:
+- Android: `android/app/google-services.json`
+- iOS: `ios/GoogleService-Info.plist`
+
+To set up Firebase:
+
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Register your app:
+   - For Android: Add an Android app in Firebase Console
+     - Use package name from `android/app/build.gradle`
+     - Download `google-services.json`
+     - Place it in `android/app/google-services.json`
+   - For iOS: Add an iOS app in Firebase Console
+     - Use bundle ID from Xcode project
+     - Download `GoogleService-Info.plist`
+     - Place it in `ios/GoogleService-Info.plist`
+
+Note: Different Firebase projects/configurations may be needed for development, staging, and production environments. Contact your team lead for the appropriate configuration files.
 
 ## Release Process
 

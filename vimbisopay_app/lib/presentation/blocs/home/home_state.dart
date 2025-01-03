@@ -41,7 +41,7 @@ class HomeState extends Equatable {
   });
 
   bool get isInitialLoading => status == HomeStatus.loading && dashboard == null;
-  bool get isRefreshing => status == HomeStatus.refreshing;
+  bool get isRefreshing => status == HomeStatus.refreshing || status == HomeStatus.loading;
   bool get isLoadingMore => status == HomeStatus.loadingMore;
   bool get isAcceptingCredex => status == HomeStatus.acceptingCredex;
   bool get isCancellingCredex => status == HomeStatus.cancellingCredex;

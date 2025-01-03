@@ -582,4 +582,34 @@ class AccountRepositoryImpl implements AccountRepository {
       },
     );
   }
+
+  @override
+  Future<Either<Failure, bool>> registerNotificationToken(String token) async {
+    return _executeAuthenticatedRequest(
+      request: (authToken) async {
+        final url = '$baseUrl/api/notifications/register-token';
+        final headers = _authHeaders(authToken);
+        final body = {'token': token};
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to register notification token';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
 }

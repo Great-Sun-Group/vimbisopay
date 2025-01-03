@@ -129,3 +129,12 @@ class HomeFetchPendingTransactions extends HomeEvent {
     this.pendingOutTransactions = const [],
   });
 }
+
+class HomeRegisterNotificationToken extends HomeEvent {
+  final String token;
+
+  const HomeRegisterNotificationToken(this.token);
+
+  @override
+  List<Object> get props => [token];
+}

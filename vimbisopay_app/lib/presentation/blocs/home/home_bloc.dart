@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' show Dashboard, DashboardAccount, PendingData, PendingOffer;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
@@ -33,6 +33,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeCancelCredexStarted>(_onCancelCredexStarted);
     on<HomeCancelCredexCompleted>(_onCancelCredexCompleted);
     on<HomeFetchPendingTransactions>(_onFetchPendingTransactions);
+    on<HomeRegisterNotificationToken>(_onRegisterNotificationToken);
   }
 
   List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
@@ -84,12 +85,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           'Raw pending out data: ${user.dashboard!.accounts.map((a) => a.pendingOutData.data.length ?? 0).reduce((a, b) => a + b)}');
 
       final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingInData.data ?? []))
-          .map((offer) => PendingOffer.fromMap(offer.toMap()))
+          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
           .toList();
       final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingOutData.data ?? []))
-          .map((offer) => PendingOffer.fromMap(offer.toMap()))
+          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
           .toList();
 
       Logger.data(
@@ -121,7 +120,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         'Initial data load took ${stopwatch.elapsedMilliseconds}ms');
   }
 
-  Future<void> _loadLedgerData(dashboard) async {
+  Future<void> _loadLedgerData(Dashboard dashboard) async {
     Logger.data('Loading ledger data for accounts');
 
     add(const HomeLoadStarted());
@@ -254,6 +253,78 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
   }
 
+  Future<void> _refreshFromDb() async {
+    try {
+      final user = await _databaseHelper.getUser();
+      Logger.data('Retrieved user from database: ${user != null}');
+      if (user == null) {
+        add(const HomeErrorOccurred('User not found'));
+        return;
+      }
+
+      Logger.data('User dashboard available: ${user.dashboard != null}');
+      if (user.dashboard == null) {
+        add(const HomeErrorOccurred('Dashboard data not available'));
+        return;
+      }
+
+      // Compare with state
+      Logger.data('Current state:');
+      Logger.data(
+          '- ${state.pendingInTransactions.length} pending in transactions');
+      Logger.data(
+          '- ${state.pendingOutTransactions.length} pending out transactions');
+
+      final pendingInTransactions = user.dashboard!.accounts
+          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+          .toList();
+      final pendingOutTransactions = user.dashboard!.accounts
+          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+          .toList();
+
+      Logger.data('Database contains:');
+      Logger.data('- ${pendingInTransactions.length} pending in transactions');
+      Logger.data('- ${pendingOutTransactions.length} pending out transactions');
+
+      // First update with refreshing state to ensure UI shows loading
+      emit(state.copyWith(
+        status: HomeStatus.refreshing,
+        message: null,
+        error: null,
+      ));
+
+      // Then update with new data and success state
+      emit(state.copyWith(
+        status: HomeStatus.success,
+        dashboard: user.dashboard,
+        pendingInTransactions: pendingInTransactions,
+        pendingOutTransactions: pendingOutTransactions,
+        message: null,
+        error: null,
+      ));
+
+      // Log each transaction for debugging
+      if (pendingInTransactions.isNotEmpty) {
+        Logger.data('Pending In Transactions:');
+        for (var tx in pendingInTransactions) {
+          Logger.data(
+              '- ${tx.credexID}: ${tx.formattedInitialAmount} from ${tx.counterpartyAccountName}');
+        }
+      }
+
+      if (pendingOutTransactions.isNotEmpty) {
+        Logger.data('Pending Out Transactions:');
+        for (var tx in pendingOutTransactions) {
+          Logger.data(
+              '- ${tx.credexID}: ${tx.formattedInitialAmount} to ${tx.counterpartyAccountName}');
+        }
+      }
+    } catch (e) {
+      Logger.error('Failed to fetch pending transactions', e);
+      add(HomeErrorOccurred('Failed to fetch pending transactions: $e'));
+    }
+  }
+
   Future<void> _refreshViaLogin() async {
     Logger.data('Starting refresh via login');
     final stopwatch = Stopwatch()..start();
@@ -273,38 +344,43 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         passwordSalt: user.passwordSalt,
       );
 
-      loginResult.fold(
+      await loginResult.fold(
         (failure) async {
           Logger.error('Login refresh failed', failure);
           add(HomeErrorOccurred(failure.message ?? 'Failed to refresh data'));
         },
         (newUser) async {
-          Logger.data('Login refresh successful, updating dashboard');
+          Logger.data('Login refresh successful, processing new data');
 
+          // Extract pending transactions from the new dashboard
           final pendingInTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingInData.data ?? []))
-              .map((offer) => PendingOffer.fromMap(offer.toMap()))
-              .toList();
+              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+          .toList();
           final pendingOutTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingOutData.data ?? []))
-              .map((offer) => PendingOffer.fromMap(offer.toMap()))
-              .toList();
+              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+          .toList();
 
           Logger.data(
-              'Refresh found ${pendingInTransactions.length} pending in and ${pendingOutTransactions.length} pending out transactions');
+              'Found ${pendingInTransactions.length} pending in and ${pendingOutTransactions.length} pending out transactions in new data');
 
-          // Update local storage with new data
+          // Update database
           await _databaseHelper.saveUser(newUser);
+          Logger.data('Updated user data in database');
 
-          add(HomeDataLoaded(
-            dashboard: newUser.dashboard!,
-            pendingInTransactions: pendingInTransactions,
-            pendingOutTransactions: pendingOutTransactions,
-            keepLoading: true,
-          ));
-
+          // Clear processed IDs before updating state
           _processedCredexIds.clear();
 
+          // Update UI state immediately with new data
+          emit(state.copyWith(
+            status: HomeStatus.success,
+            dashboard: newUser.dashboard,
+            pendingInTransactions: pendingInTransactions,
+            pendingOutTransactions: pendingOutTransactions,
+            message: null,
+            error: null,
+          ));
+
+          // Then load ledger data if needed
           if (newUser.dashboard!.accounts.isNotEmpty) {
             await _loadLedgerData(newUser.dashboard!);
           } else {
@@ -357,63 +433,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     await _refreshViaLogin();
   }
 
-  Future<void> _refreshFromDb() async {
-    try {
-      final user = await _databaseHelper.getUser();
-      Logger.data('Retrieved user from database: ${user != null}');
-      if (user == null) {
-        add(const HomeErrorOccurred('User not found'));
-        return;
-      }
-
-      Logger.data('User dashboard available: ${user.dashboard != null}');
-      if (user.dashboard == null) {
-        add(const HomeErrorOccurred('Dashboard data not available'));
-        return;
-      }
-
-      // Compare with state
-      Logger.data('Current state:');
-      Logger.data(
-          '- ${state.pendingInTransactions.length} pending in transactions');
-      Logger.data(
-          '- ${state.pendingOutTransactions.length} pending out transactions');
-
-      final (pendingIn, pendingOut) =
-          await _databaseHelper.getAllPendingTransactions();
-      Logger.data('Database contains:');
-      Logger.data('- ${pendingIn.length} pending in transactions');
-      Logger.data('- ${pendingOut.length} pending out transactions');
-
-      // Update state with fetched transactions
-      emit(state.copyWith(
-        status: HomeStatus.success,
-        pendingInTransactions: pendingIn,
-        pendingOutTransactions: pendingOut,
-      ));
-
-      // Log each transaction for debugging
-      if (pendingIn.isNotEmpty) {
-        Logger.data('Pending In Transactions:');
-        for (var tx in pendingIn) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} from ${tx.counterpartyAccountName}');
-        }
-      }
-
-      if (pendingOut.isNotEmpty) {
-        Logger.data('Pending Out Transactions:');
-        for (var tx in pendingOut) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} to ${tx.counterpartyAccountName}');
-        }
-      }
-    } catch (e) {
-      Logger.error('Failed to fetch pending transactions', e);
-      add(HomeErrorOccurred('Failed to fetch pending transactions: $e'));
-    }
-  }
-
   void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) {
     if (!state.hasMoreEntries) {
       Logger.state('Load more ignored - no more entries available');
@@ -439,8 +458,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Pending Out: ${event.pendingOutTransactions.length}
     ''');
 
+    // Update data and set success state
     emit(state.copyWith(
-      status: event.keepLoading ? HomeStatus.loading : HomeStatus.success,
+      status: HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
@@ -526,6 +546,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final user = await _databaseHelper.getUser();
           if (user?.dashboard != null) {
             final updatedAccounts = user!.dashboard!.accounts.map((account) {
+              final updatedPendingInData = (account.pendingInData.data ?? [])
+                  .where((tx) => !event.credexIds.contains(tx.credexID))
+                  .map((tx) => tx as PendingOffer)
+                  .toList();
+
               return DashboardAccount(
                 accountID: account.accountID,
                 accountName: account.accountName,
@@ -535,10 +560,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                 balanceData: account.balanceData,
                 pendingInData: PendingData(
                   success: true,
-                  data: (account.pendingInData.data ?? [])
-                      .where((tx) => !event.credexIds.contains(tx.credexID))
-                      .map((offer) => PendingOffer.fromMap(offer.toMap()))
-                      .toList(),
+                  data: updatedPendingInData,
                   message: 'Pending offers retrieved',
                 ),
                 pendingOutData: account.pendingOutData,
@@ -619,6 +641,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           final user = await _databaseHelper.getUser();
           if (user?.dashboard != null) {
             final updatedAccounts = user!.dashboard!.accounts.map((account) {
+              final updatedPendingOutData = (account.pendingOutData.data ?? [])
+                  .where((tx) => tx.credexID != event.credexId)
+                  .map((tx) => tx as PendingOffer)
+                  .toList();
+
               return DashboardAccount(
                 accountID: account.accountID,
                 accountName: account.accountName,
@@ -629,10 +656,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                 pendingInData: account.pendingInData,
                 pendingOutData: PendingData(
                   success: true,
-                  data: (account.pendingOutData.data ?? [])
-                      .where((tx) => tx.credexID != event.credexId)
-                      .map((offer) => PendingOffer.fromMap(offer.toMap()))
-                      .toList(),
+                  data: updatedPendingOutData,
                   message: 'Pending outgoing offers retrieved',
                 ),
                 sendOffersTo: account.sendOffersTo,
@@ -686,5 +710,24 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Logger.data('Checking database state before refresh');
     // Trigger refresh
     await _refreshFromDb();
+  }
+
+  Future<void> _onRegisterNotificationToken(
+    HomeRegisterNotificationToken event,
+    Emitter<HomeState> emit,
+  ) async {
+    Logger.data('Registering notification token');
+    
+    final result = await accountRepository.registerNotificationToken(event.token);
+    
+    result.fold(
+      (failure) {
+        Logger.error('Failed to register notification token', failure);
+        add(HomeErrorOccurred(failure.message ?? 'Failed to register notification token'));
+      },
+      (_) {
+        Logger.data('Successfully registered notification token');
+      },
+    );
   }
 }

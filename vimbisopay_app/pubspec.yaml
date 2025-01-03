@@ -31,6 +31,8 @@ dependencies:
   lottie: ^2.6.0
   screen_brightness: ^0.2.2
   audioplayers: ^5.2.1
+  firebase_messaging: ^14.7.4
+  firebase_core: ^2.22.0
 
   path: any
 dev_dependencies:

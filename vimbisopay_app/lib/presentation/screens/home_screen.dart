@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -34,6 +38,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isDisposed = false;
   bool _isInitializing = true;
 
+  final NotificationService _notificationService = NotificationService();
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +48,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _setupScrollListener();
     WidgetsBinding.instance.addObserver(this);
     _checkUserAndInitialize();
+    _registerNotificationToken();
+  }
+
+  Future<void> _registerNotificationToken() async {
+    try {
+      final user = await _databaseHelper.getUser();
+      if (user != null) {
+        final messaging = FirebaseMessaging.instance;
+        
+        // Request permission for iOS
+        if (Platform.isIOS) {
+          await messaging.requestPermission();
+        }
+        
+        final token = await messaging.getToken();
+        if (token != null) {
+          Logger.data('Got FCM token: $token');
+          final success = await _notificationService.registerToken(token, user.token);
+          
+          if (success) {
+            Logger.data('Successfully registered notification token');
+          } else {
+            Logger.error('Failed to register notification token');
+          }
+        }
+
+        // Listen for token refresh
+        messaging.onTokenRefresh.listen((newToken) {
+          Logger.data('FCM token refreshed: $newToken');
+          if (user.token != null) {
+            _notificationService.registerToken(newToken, user.token);
+          }
+        });
+      }
+    } catch (e) {
+      Logger.error('Error registering notification token', e);
+    }
   }
 
   Future<void> _checkUserAndInitialize() async {
@@ -241,10 +284,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildScrollableContent(HomeState state) {
     return RefreshIndicator(
       onRefresh: () async {
+        final completer = Completer<void>();
+        
+        // Create a subscription to listen for state changes
+        late StreamSubscription<HomeState> subscription;
+        subscription = _homeBloc.stream.listen(
+          (state) {
+            if (state.status == HomeStatus.success && !completer.isCompleted) {
+              completer.complete();
+              subscription.cancel();
+            } else if (state.hasError && !completer.isCompleted) {
+              completer.completeError(state.error!);
+              subscription.cancel();
+            }
+          },
+          onError: (error) {
+            if (!completer.isCompleted) {
+              completer.completeError(error);
+              subscription.cancel();
+            }
+          },
+          cancelOnError: false,
+        );
+
+        // Trigger the refresh
         _homeBloc.add(const HomeRefreshStarted());
-        // Wait until the refresh is complete
-        while (state.isRefreshing) {
-          await Future.delayed(const Duration(milliseconds: 100));
+
+        try {
+          // Wait for completion
+          await completer.future;
+        } finally {
+          // Ensure subscription is cancelled even if an error occurs
+          subscription.cancel();
         }
       },
       color: AppColors.primary,
