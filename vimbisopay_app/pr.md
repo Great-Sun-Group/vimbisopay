@@ -1,13 +1,12 @@
 # Pull Request Overview
 
 ## Description
-This PR implements search functionality along with UI improvements to enhance the user experience. The changes include:
+This PR implements search functionality and optimizes the logout process with comprehensive cleanup operations. The changes include:
 
 - Added search feature for transactions and accounts
-- Implemented search results display with filtering capabilities
-- Enhanced UI components for better search interaction
-- Added loading states and animations for search operations
-- Improved overall user interface responsiveness
+- Implemented systematic database cleanup during logout
+- Enhanced notification service cleanup
+- Improved security service orchestration
 
 ## Changes Made
 1. **Search Feature Implementation**
@@ -17,26 +16,33 @@ This PR implements search functionality along with UI improvements to enhance th
    - Enhanced database queries for efficient search
    - Added search history tracking
 
-2. **UI/UX Improvements**
-   - Added search input field with auto-suggestions
-   - Implemented dynamic search results list
-   - Enhanced loading states for search operations
-   - Improved error handling for search failures
-   - Added animations for smooth transitions
+2. **Database Cleanup Optimizations**
+   - Implemented transaction-based table clearing
+   - Added dynamic table discovery and systematic cleanup
+   - Enhanced logging for cleanup operations
+   - Added proper error handling for cleanup processes
+   - Preserved system tables during cleanup
 
-3. **Infrastructure**
-   - Enhanced database helper to support search operations
-   - Updated notification service for search-related alerts
-   - Improved security service implementation
-   - Enhanced network logging for better debugging
+3. **Service Cleanup Integration**
+   - Added notification service cleanup:
+     * Canceling message subscriptions
+     * Releasing audio player resources
+     * Deleting FCM token
+   - Enhanced security service orchestration:
+     * Coordinated cleanup across services
+     * Proper error handling and logging
+     * Systematic resource disposal
 
 ## Testing Notes
 - Tested search functionality with various inputs
 - Verified search results accuracy
-- Confirmed search filtering works as expected
-- Tested error scenarios and validation
-- Verified loading states and animations
-- Tested performance with large datasets
+- Confirmed complete cleanup on logout:
+  * Verified transaction-based table clearing
+  * Confirmed proper table discovery and cleanup
+  * Tested error scenarios during cleanup
+  * Verified system tables preservation
+- Tested notification cleanup
+- Verified security service orchestration
 
 ## Impact Analysis
 ### Areas Affected
@@ -44,21 +50,27 @@ This PR implements search functionality along with UI improvements to enhance th
 - Database operations
 - User interface components
 - Search performance
+- Logout process
+- Resource management
+- Security
 
 ### Performance Considerations
 - Optimized search queries for better performance
-- Implemented efficient filtering mechanisms
-- Enhanced caching for frequently searched items
-- Improved loading states to maintain responsive UI
+- Transaction-based cleanup for data consistency
+- Enhanced resource management
+- Improved memory usage through proper cleanup
+- Better handling of background services
 
 ## Dependencies
 - No new dependencies added
-- Updated existing components for search functionality
+- Updated existing components for search and cleanup functionality
 
 ## Security Considerations
-- Maintained secure search operations
-- Enhanced input validation
+- Enhanced logout security with comprehensive cleanup
+- Transaction-based data clearing
+- Systematic resource disposal
 - Updated security service implementation
+- Better handling of sensitive data
 
 ## Migration Notes
 No database migrations required.
@@ -72,12 +84,13 @@ Closes [Issue #] (Add issue number)
 - [x] All tests are passing
 - [x] Security validation completed
 - [x] Performance impact assessed
-- [x] UI/UX changes reviewed
+- [x] Cleanup processes verified
+- [x] Resource management validated
 
 ## Files Changed
-- lib/infrastructure/database/database_helper.dart
-- lib/infrastructure/services/notification_service.dart
-- lib/infrastructure/services/security_service.dart
+- lib/infrastructure/database/database_helper.dart (Added transaction-based cleanup)
+- lib/infrastructure/services/notification_service.dart (Added cleanup functionality)
+- lib/infrastructure/services/security_service.dart (Added orchestrated cleanup)
 - lib/presentation/blocs/home/home_event.dart
 - lib/presentation/blocs/home/home_state.dart
 - lib/presentation/screens/home_screen.dart
