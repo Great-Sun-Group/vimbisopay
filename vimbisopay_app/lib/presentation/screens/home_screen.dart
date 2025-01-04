@@ -274,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const SizedBox(height: HomeConstants.defaultPadding),
         ConstrainedBox(
           constraints: HomeConstants.getAccountCardConstraints(context),
-          child: BlocListener<HomeBloc, HomeState>(
+          child: BlocConsumer<HomeBloc, HomeState>(
             listenWhen: (previous, current) => previous.currentPage != current.currentPage,
             listener: (context, state) {
               if (_pageController.page?.round() != state.currentPage) {
@@ -285,17 +285,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 );
               }
             },
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                Logger.interaction('Account page changed to $index');
-                _homeBloc.add(HomePageChanged(index));
-              },
-              itemCount: state.dashboard!.accounts.length,
-              itemBuilder: (context, index) => AccountCard(
-                account: state.dashboard!.accounts[index],
-              ),
-            ),
+            buildWhen: (previous, current) {
+              // Check if any account balances have changed
+              final previousBalances = previous.dashboard?.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+              final currentBalances = current.dashboard?.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+                  
+              return previous.dashboard != current.dashboard || 
+                     previous.currentPage != current.currentPage ||
+                     previousBalances != currentBalances;
+            },
+            builder: (context, state) {
+              // Create a key that changes when any account's balance changes
+              final balancesKey = state.dashboard!.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+                  
+              return PageView.builder(
+                key: ValueKey('accounts_pageview_$balancesKey'),
+                controller: _pageController,
+                onPageChanged: (index) {
+                  Logger.interaction('Account page changed to $index');
+                  _homeBloc.add(HomePageChanged(index));
+                },
+                itemCount: state.dashboard!.accounts.length,
+                itemBuilder: (context, index) => AccountCard(
+                  key: ValueKey('account_card_${state.dashboard!.accounts[index].accountID}_${state.dashboard!.accounts[index].balanceData.netCredexAssetsInDefaultDenom}'),
+                  account: state.dashboard!.accounts[index],
+                ),
+              );
+            },
           ),
         ),
         if (state.dashboard!.accounts.length > 1)

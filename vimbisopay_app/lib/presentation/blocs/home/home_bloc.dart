@@ -364,7 +364,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           // Clear processed IDs before updating state
           _processedCredexIds.clear();
 
-          // Update UI state immediately with new data
+          // Force state update with loading first
+          emit(state.copyWith(
+            status: HomeStatus.refreshing,
+            message: 'Updating balances...',
+          ));
+
+          // Then update with new data
           emit(state.copyWith(
             status: HomeStatus.success,
             dashboard: newUser.dashboard,
@@ -376,6 +382,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             message: null,
             error: null,
           ));
+
+          Logger.data('Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
 
           // Then load ledger data if needed
           if (newUser.dashboard!.accounts.isNotEmpty) {
@@ -608,67 +616,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       (_) async {
         Logger.data(
             'Successfully processed ${event.credexIds.length} credex transactions');
-
-        final updatedPendingIn = state.pendingInTransactions
-            .where((tx) => !event.credexIds.contains(tx.credexID))
-            .toList();
-        final updatedPendingOut = state.pendingOutTransactions
-            .where((tx) => !event.credexIds.contains(tx.credexID))
-            .toList();
-
-        // Update UI state immediately
+            
+        // Set loading state
         emit(state.copyWith(
-          status: HomeStatus.success,
-          pendingInTransactions: updatedPendingIn,
-          pendingOutTransactions: updatedPendingOut,
-          // Also update filtered lists if no search is active
-          filteredPendingInTransactions: state.searchQuery.isEmpty ? updatedPendingIn : null,
-          filteredPendingOutTransactions: state.searchQuery.isEmpty ? updatedPendingOut : null,
-          message: 'Credex transactions accepted successfully',
+          status: HomeStatus.refreshing,
+          message: 'Refreshing balances...',
           error: null,
         ));
-
-        // Update database in background
-        try {
-          final user = await _databaseHelper.getUser();
-          if (user?.dashboard != null) {
-            final updatedAccounts = user!.dashboard!.accounts.map((account) {
-              final updatedPendingInData = (account.pendingInData.data ?? [])
-                  .where((tx) => !event.credexIds.contains(tx.credexID))
-                  .map((tx) => tx as PendingOffer)
-                  .toList();
-
-              return DashboardAccount(
-                accountID: account.accountID,
-                accountName: account.accountName,
-                accountHandle: account.accountHandle,
-                defaultDenom: account.defaultDenom,
-                isOwnedAccount: account.isOwnedAccount,
-                balanceData: account.balanceData,
-                pendingInData: PendingData(
-                  success: true,
-                  data: updatedPendingInData,
-                  message: 'Pending offers retrieved',
-                ),
-                pendingOutData: account.pendingOutData,
-                sendOffersTo: account.sendOffersTo,
-              );
-            }).toList();
-
-            final updatedDashboard = Dashboard(
-              id: user.dashboard!.id,
-              member: user.dashboard!.member,
-              accounts: updatedAccounts,
-            );
-            await _databaseHelper
-                .saveUser(user.copyWith(dashboard: updatedDashboard));
-            Logger.data('Pending transactions updated in database');
-          }
-        } catch (e) {
-          Logger.error('Failed to update database', e);
-          // Don't emit error state since UI is already updated
-        }
-
+        
+        // Add a small delay to ensure backend has processed the transaction
+        await Future.delayed(const Duration(seconds: 2));
+        
+        // Refresh data to get updated balances and transactions
+        await _refreshViaLogin();
+        
         add(const HomeAcceptCredexBulkCompleted());
       },
     );
@@ -679,12 +640,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) {
     Logger.state('Bulk credex acceptance completed');
-    emit(state.copyWith(
-      status: HomeStatus.success,
-      processingCredexIds: const [],
-      message: 'Credex transactions accepted successfully',
-      error: null,
-    ));
+    // No need to refresh here as it's already done in _onAcceptCredexBulkStarted
   }
 
   void _onCancelCredexStarted(
@@ -709,64 +665,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (_) async {
         Logger.data('Successfully cancelled credex transaction');
-
-        // Update UI state immediately
-        final updatedPendingOut = state.pendingOutTransactions
-            .where((tx) => tx.credexID != event.credexId)
-            .toList();
-
+            
+        // Set loading state and trigger refresh immediately
         emit(state.copyWith(
-          status: HomeStatus.success,
-          pendingInTransactions: state.pendingInTransactions,
-          pendingOutTransactions: updatedPendingOut,
-          // Also update filtered lists if no search is active
-          filteredPendingInTransactions: state.searchQuery.isEmpty ? state.pendingInTransactions : null,
-          filteredPendingOutTransactions: state.searchQuery.isEmpty ? updatedPendingOut : null,
-          message: 'Credex cancelled successfully',
+          status: HomeStatus.refreshing,
+          message: 'Refreshing balances...',
           error: null,
         ));
-
-        // Update database in background
-        try {
-          final user = await _databaseHelper.getUser();
-          if (user?.dashboard != null) {
-            final updatedAccounts = user!.dashboard!.accounts.map((account) {
-              final updatedPendingOutData = (account.pendingOutData.data ?? [])
-                  .where((tx) => tx.credexID != event.credexId)
-                  .map((tx) => tx as PendingOffer)
-                  .toList();
-
-              return DashboardAccount(
-                accountID: account.accountID,
-                accountName: account.accountName,
-                accountHandle: account.accountHandle,
-                defaultDenom: account.defaultDenom,
-                isOwnedAccount: account.isOwnedAccount,
-                balanceData: account.balanceData,
-                pendingInData: account.pendingInData,
-                pendingOutData: PendingData(
-                  success: true,
-                  data: updatedPendingOutData,
-                  message: 'Pending outgoing offers retrieved',
-                ),
-                sendOffersTo: account.sendOffersTo,
-              );
-            }).toList();
-
-            final updatedDashboard = Dashboard(
-              id: user.dashboard!.id,
-              member: user.dashboard!.member,
-              accounts: updatedAccounts,
-            );
-            await _databaseHelper
-                .saveUser(user.copyWith(dashboard: updatedDashboard));
-            Logger.data('Pending transactions updated in database');
-          }
-        } catch (e) {
-          Logger.error('Failed to update database', e);
-          // Don't emit error state since UI is already updated
-        }
-
+        
+        // Refresh data to get updated balances and transactions
+        await _refreshViaLogin();
+        
         add(const HomeCancelCredexCompleted());
       },
     );
