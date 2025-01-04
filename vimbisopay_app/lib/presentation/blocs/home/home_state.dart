@@ -46,9 +46,9 @@ class HomeState extends Equatable {
     List<LedgerEntry>? filteredLedgerEntries,
     List<PendingOffer>? filteredPendingInTransactions,
     List<PendingOffer>? filteredPendingOutTransactions,
-  }) : this.filteredLedgerEntries = filteredLedgerEntries ?? combinedLedgerEntries,
-       this.filteredPendingInTransactions = filteredPendingInTransactions ?? pendingInTransactions,
-       this.filteredPendingOutTransactions = filteredPendingOutTransactions ?? pendingOutTransactions;
+  }) : filteredLedgerEntries = filteredLedgerEntries ?? combinedLedgerEntries,
+       filteredPendingInTransactions = filteredPendingInTransactions ?? pendingInTransactions,
+       filteredPendingOutTransactions = filteredPendingOutTransactions ?? pendingOutTransactions;
 
   bool get isInitialLoading => status == HomeStatus.loading && dashboard == null;
   bool get isRefreshing => status == HomeStatus.refreshing;

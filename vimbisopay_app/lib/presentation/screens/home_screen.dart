@@ -77,10 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // Listen for token refresh
         messaging.onTokenRefresh.listen((newToken) {
           Logger.data('FCM token refreshed: $newToken');
-          if (user.token != null) {
-            _notificationService.registerToken(newToken, user.token);
-          }
-        });
+          _notificationService.registerToken(newToken, user.token);
+                });
       }
     } catch (e) {
       Logger.error('Error registering notification token', e);
@@ -179,7 +177,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
               prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-              suffixIcon: state.searchQuery.isNotEmpty
+              suffixIcon: (state.searchQuery.isNotEmpty ||
+                      state.filteredLedgerEntries != state.combinedLedgerEntries ||
+                      state.filteredPendingInTransactions != state.pendingInTransactions ||
+                      state.filteredPendingOutTransactions != state.pendingOutTransactions)
                   ? IconButton(
                       icon: const Icon(Icons.clear, color: AppColors.primary),
                       onPressed: () {

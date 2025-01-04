@@ -73,10 +73,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       if (user?.dashboard != null) {
         Logger.data('Using cached dashboard data');
         final pendingInTransactions = user!.dashboard!.accounts
-            .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+            .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
             .toList();
         final pendingOutTransactions = user.dashboard!.accounts
-            .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+            .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
             .toList();
 
         // Emit cached data immediately
@@ -267,10 +267,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           '- ${state.pendingOutTransactions.length} pending out transactions');
 
       final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
           .toList();
       final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
           .toList();
 
       Logger.data('Database contains:');
@@ -348,10 +348,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
           // Extract pending transactions from the new dashboard
           final pendingInTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
           .toList();
           final pendingOutTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
           .toList();
 
           Logger.data(
