@@ -242,9 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       children: [
         const SizedBox(height: HomeConstants.defaultPadding),
         ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
-          ),
+          constraints: HomeConstants.getAccountCardConstraints(context),
           child: BlocListener<HomeBloc, HomeState>(
             listenWhen: (previous, current) => previous.currentPage != current.currentPage,
             listener: (context, state) {

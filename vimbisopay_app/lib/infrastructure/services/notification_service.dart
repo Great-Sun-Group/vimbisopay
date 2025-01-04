@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,8 @@ import 'package:audioplayers/audioplayers.dart';
 class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
+  StreamSubscription<String>? _tokenRefreshSubscription;
   
   Future<void> initialize() async {
     try {
@@ -28,12 +31,12 @@ class NotificationService {
       }
 
       // Handle token refresh
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      _tokenRefreshSubscription = _firebaseMessaging.onTokenRefresh.listen((newToken) {
         Logger.data('FCM token refreshed');
       });
 
       // Handle messages when app is in foreground
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _foregroundMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         Logger.data('Received foreground message: ${message.messageId}');
         _playNotificationSound();
       });
@@ -43,6 +46,25 @@ Failed to initialize Firebase Messaging:
 - Error: $e
 - Stack trace: $stackTrace
 ''');
+    }
+  }
+
+  Future<void> cleanup() async {
+    Logger.data('Cleaning up notification service');
+    try {
+      // Cancel message subscriptions
+      await _foregroundMessageSubscription?.cancel();
+      await _tokenRefreshSubscription?.cancel();
+      
+      // Release audio player resources
+      await _audioPlayer.dispose();
+      
+      // Delete the FCM token
+      await _firebaseMessaging.deleteToken();
+      
+      Logger.state('Notification service cleanup completed');
+    } catch (e, stackTrace) {
+      Logger.error('Error during notification service cleanup', e, stackTrace);
     }
   }
 
