@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -108,15 +108,59 @@ class SettingsScreen extends StatelessWidget {
 
                 if (confirmed == true) {
                   Logger.interaction('User confirmed logout');
-                  const storage = FlutterSecureStorage();
-                  await storage.deleteAll();
-                  Logger.state('Secure storage cleared for logout');
+                  
+                  // Show loading dialog
                   if (context.mounted) {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => WillPopScope(
+                        onWillPop: () async => false,
+                        child: const AlertDialog(
+                          backgroundColor: AppColors.surface,
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Logging out...',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     );
+                  }
+
+                  try {
+                    final securityService = SecurityService();
+                    await securityService.clearAllData();
+                    Logger.state('All user data cleared for logout');
+                    
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/login',
+                        (route) => false,
+                      );
+                    }
+                  } catch (e) {
+                    Logger.error('Error during logout', e);
+                    if (context.mounted) {
+                      Navigator.pop(context); // Dismiss loading dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to logout. Please try again.'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
                   }
                 }
               },

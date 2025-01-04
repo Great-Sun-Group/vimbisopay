@@ -456,16 +456,32 @@ class DatabaseHelper {
     return result.isNotEmpty;
   }
 
-  Future<void> deleteUser() async {
+  Future<void> clearAllTables() async {
+    Logger.data('Clearing all database tables');
     final Database db = await database;
     await db.transaction((txn) async {
-      await txn.delete('pending_transactions');
-      await txn.delete('balance_data');
-      await txn.delete('accounts');
-      await txn.delete('remaining_available');
-      await txn.delete('member_tiers');
-      await txn.delete('users');
+      // Get all table names
+      final tables = await txn.query(
+        'sqlite_master',
+        where: 'type = ?',
+        whereArgs: ['table'],
+        columns: ['name'],
+      );
+      
+      // Drop each table except sqlite_sequence (system table)
+      for (var table in tables) {
+        final tableName = table['name'] as String;
+        if (tableName != 'sqlite_sequence') {
+          Logger.data('Clearing table: $tableName');
+          await txn.delete(tableName);
+        }
+      }
     });
+    Logger.state('All database tables cleared successfully');
+  }
+
+  Future<void> deleteUser() async {
+    await clearAllTables();
   }
 
   Future<void> updateAccountPendingTransactions(String accountId, List<PendingOffer> pendingIn, List<PendingOffer> pendingOut) async {

@@ -431,6 +431,42 @@ class _TransactionsListState extends State<TransactionsList> {
     );
   }
 
+  Widget _buildNoSearchResults() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 64,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No Results Found',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Try adjusting your search terms or clear the search to see all transactions.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 16,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<HomeBloc, HomeState>(
@@ -475,7 +511,44 @@ class _TransactionsListState extends State<TransactionsList> {
         Logger.data('- Has pending: ${state.hasPendingTransactions}');
         Logger.data('- Pending in: ${state.pendingInTransactions.length}');
         Logger.data('- Pending out: ${state.pendingOutTransactions.length}');
-        // Always show pending transactions if available, regardless of loading state
+        // Handle search state
+        if (state.searchQuery.isNotEmpty) {
+          final hasFilteredResults = state.filteredLedgerEntries.isNotEmpty ||
+                                   state.filteredPendingInTransactions.isNotEmpty ||
+                                   state.filteredPendingOutTransactions.isNotEmpty;
+          
+          if (!hasFilteredResults) {
+            return _buildNoSearchResults();
+          }
+
+          return Column(
+            children: [
+              if (state.filteredPendingInTransactions.isNotEmpty || 
+                  state.filteredPendingOutTransactions.isNotEmpty)
+                _buildPendingTransactionsSection(
+                  state.filteredPendingInTransactions,
+                  state.filteredPendingOutTransactions,
+                  state,
+                ),
+              if (state.filteredLedgerEntries.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Text(
+                    'Transaction History',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                _buildLedgerTransactions(state.filteredLedgerEntries),
+              ],
+            ],
+          );
+        }
+
+        // Show normal view when not searching
         if (state.hasPendingTransactions) {
           return Column(
             children: [

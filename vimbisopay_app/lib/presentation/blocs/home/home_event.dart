@@ -138,3 +138,12 @@ class HomeRegisterNotificationToken extends HomeEvent {
   @override
   List<Object> get props => [token];
 }
+
+class HomeSearchStarted extends HomeEvent {
+  final String query;
+
+  const HomeSearchStarted(this.query);
+
+  @override
+  List<Object> get props => [query];
+}
