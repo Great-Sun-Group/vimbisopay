@@ -513,38 +513,50 @@ class _TransactionsListState extends State<TransactionsList> {
         Logger.data('- Pending out: ${state.pendingOutTransactions.length}');
         // Handle search state
         if (state.searchQuery.isNotEmpty) {
+          // Check if we have any results at all
           final hasFilteredResults = state.filteredLedgerEntries.isNotEmpty ||
                                    state.filteredPendingInTransactions.isNotEmpty ||
                                    state.filteredPendingOutTransactions.isNotEmpty;
           
+          Logger.data('Search query: ${state.searchQuery}');
+          Logger.data('Has filtered results: $hasFilteredResults');
+          Logger.data('Filtered ledger entries: ${state.filteredLedgerEntries.length}');
+          Logger.data('Filtered pending in: ${state.filteredPendingInTransactions.length}');
+          Logger.data('Filtered pending out: ${state.filteredPendingOutTransactions.length}');
+          
+          // Show no results view if we have no matches
           if (!hasFilteredResults) {
             return _buildNoSearchResults();
           }
 
-          return Column(
-            children: [
-              if (state.filteredPendingInTransactions.isNotEmpty || 
-                  state.filteredPendingOutTransactions.isNotEmpty)
-                _buildPendingTransactionsSection(
-                  state.filteredPendingInTransactions,
-                  state.filteredPendingOutTransactions,
-                  state,
-                ),
-              if (state.filteredLedgerEntries.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Text(
-                    'Transaction History',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+          // Show filtered results
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (state.filteredPendingInTransactions.isNotEmpty || 
+                    state.filteredPendingOutTransactions.isNotEmpty)
+                  _buildPendingTransactionsSection(
+                    state.filteredPendingInTransactions,
+                    state.filteredPendingOutTransactions,
+                    state,
+                  ),
+                if (state.filteredLedgerEntries.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Text(
+                      'Transaction History',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                ),
-                _buildLedgerTransactions(state.filteredLedgerEntries),
+                  _buildLedgerTransactions(state.filteredLedgerEntries),
+                ],
               ],
-            ],
+            ),
           );
         }
 

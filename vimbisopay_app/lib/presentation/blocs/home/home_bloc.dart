@@ -455,18 +455,50 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Pending Out: ${event.pendingOutTransactions.length}
     ''');
 
-    // Update data and set success state
-    emit(state.copyWith(
+    // Always update the main data lists
+    final newState = state.copyWith(
       status: HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
-      // Also update filtered lists if no search is active
-      filteredPendingInTransactions: state.searchQuery.isEmpty ? event.pendingInTransactions : null,
-      filteredPendingOutTransactions: state.searchQuery.isEmpty ? event.pendingOutTransactions : null,
       message: null,
       error: null,
-    ));
+    );
+
+    // If there's an active search, apply filtering
+    if (state.searchQuery.isNotEmpty) {
+      final query = state.searchQuery.toLowerCase();
+      
+      final filteredPendingIn = event.pendingInTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      final filteredPendingOut = event.pendingOutTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      // Also filter ledger entries if they exist
+      final filteredLedger = state.combinedLedgerEntries.where((entry) {
+        return entry.description.toLowerCase().contains(query) ||
+               entry.formattedAmount.toLowerCase().contains(query) ||
+               entry.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      emit(newState.copyWith(
+        filteredPendingInTransactions: filteredPendingIn,
+        filteredPendingOutTransactions: filteredPendingOut,
+        filteredLedgerEntries: filteredLedger,
+      ));
+    } else {
+      // If no search query, filtered lists should match main lists
+      emit(newState.copyWith(
+        filteredPendingInTransactions: event.pendingInTransactions,
+        filteredPendingOutTransactions: event.pendingOutTransactions,
+        filteredLedgerEntries: state.combinedLedgerEntries,
+      ));
+    }
   }
 
   void _onLedgerLoaded(HomeLedgerLoaded event, Emitter<HomeState> emit) {
@@ -476,16 +508,50 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Accounts with Data: ${event.accountLedgers.keys.length}
     ''');
 
-    emit(state.copyWith(
+    // Always update the main ledger data
+    final newState = state.copyWith(
       status: HomeStatus.success,
       accountLedgers: event.accountLedgers,
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
-      // Also update filtered ledger entries if no search is active
-      filteredLedgerEntries: state.searchQuery.isEmpty ? event.combinedEntries : null,
       message: null,
       error: null,
-    ));
+    );
+
+    // If there's an active search, apply filtering
+    if (state.searchQuery.isNotEmpty) {
+      final query = state.searchQuery.toLowerCase();
+      
+      final filteredEntries = event.combinedEntries.where((entry) {
+        return entry.description.toLowerCase().contains(query) ||
+               entry.formattedAmount.toLowerCase().contains(query) ||
+               entry.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      // Also filter pending transactions to maintain consistency
+      final filteredPendingIn = state.pendingInTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      final filteredPendingOut = state.pendingOutTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      emit(newState.copyWith(
+        filteredLedgerEntries: filteredEntries,
+        filteredPendingInTransactions: filteredPendingIn,
+        filteredPendingOutTransactions: filteredPendingOut,
+      ));
+    } else {
+      // If no search query, filtered lists should match main lists
+      emit(newState.copyWith(
+        filteredLedgerEntries: event.combinedEntries,
+        filteredPendingInTransactions: state.pendingInTransactions,
+        filteredPendingOutTransactions: state.pendingOutTransactions,
+      ));
+    }
   }
 
   void _onErrorOccurred(HomeErrorOccurred event, Emitter<HomeState> emit) {
@@ -739,9 +805,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   void _onSearchStarted(HomeSearchStarted event, Emitter<HomeState> emit) {
     Logger.interaction('Search started with query: ${event.query}');
     
+    // Always update search query first
+    emit(state.copyWith(searchQuery: event.query));
+    
     if (event.query.isEmpty) {
+      Logger.data('Empty search query - showing all transactions');
       emit(state.copyWith(
-        searchQuery: '',
         filteredLedgerEntries: state.combinedLedgerEntries,
         filteredPendingInTransactions: state.pendingInTransactions,
         filteredPendingOutTransactions: state.pendingOutTransactions,
@@ -750,28 +819,46 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
 
     final query = event.query.toLowerCase();
+    Logger.data('Filtering transactions with query: $query');
     
     // Filter ledger entries
     final filteredEntries = state.combinedLedgerEntries.where((entry) {
-      return entry.description.toLowerCase().contains(query) ||
+      final matches = entry.description.toLowerCase().contains(query) ||
              entry.formattedAmount.toLowerCase().contains(query) ||
              entry.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched ledger entry: ${entry.description}');
+      }
+      return matches;
     }).toList();
 
     // Filter pending in transactions
     final filteredPendingIn = state.pendingInTransactions.where((tx) {
-      return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
              tx.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched pending in: ${tx.counterpartyAccountName}');
+      }
+      return matches;
     }).toList();
 
     // Filter pending out transactions
     final filteredPendingOut = state.pendingOutTransactions.where((tx) {
-      return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
              tx.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched pending out: ${tx.counterpartyAccountName}');
+      }
+      return matches;
     }).toList();
 
+    Logger.data('''Search results:
+      Ledger entries: ${filteredEntries.length}
+      Pending in: ${filteredPendingIn.length}
+      Pending out: ${filteredPendingOut.length}
+    ''');
+
     emit(state.copyWith(
-      searchQuery: event.query,
       filteredLedgerEntries: filteredEntries,
       filteredPendingInTransactions: filteredPendingIn,
       filteredPendingOutTransactions: filteredPendingOut,
