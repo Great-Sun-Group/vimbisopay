@@ -1,17 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/home_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/login_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Initialize notifications
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  
   runApp(const MyApp());
 }
 
@@ -43,23 +58,89 @@ class MyApp extends StatelessWidget {
           titleSmall: TextStyle(color: AppColors.textSecondary),
         ),
       ),
-      routes: {
-        '/home': (context) => const HomeScreen(),
-      },
       onGenerateRoute: (settings) {
+        // Protected routes that require authentication
+        if (settings.name == '/home') {
+          return MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/settings') {
+          return MaterialPageRoute(
+            builder: (context) => const SettingsScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/send-credex') {
+          final args = settings.arguments as SendCredexArguments?;
+          if (args == null) {
+            Logger.error('No arguments provided for send-credex route');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+          return MaterialPageRoute(
+            builder: (context) => SendCredexScreen(
+              senderAccount: args.senderAccount,
+              accountRepository: args.accountRepository,
+              homeBloc: args.homeBloc,
+              databaseHelper: args.databaseHelper,
+            ),
+            settings: settings,
+          );
+        }
+
+        // Auth routes
         if (settings.name == '/auth') {
           final user = settings.arguments as User?;
           if (user == null) {
-            // If no user data is provided, redirect to login
+            Logger.state('No user provided for auth, redirecting to login');
             return MaterialPageRoute(
               builder: (context) => const LoginScreen(),
             );
           }
           return MaterialPageRoute(
             builder: (context) => AuthScreen(user: user),
+            settings: settings,
           );
         }
-        return null;
+
+        if (settings.name == '/security-setup') {
+          final user = settings.arguments as User?;
+          if (user == null) {
+            Logger.state('No user provided for security setup, redirecting to login');
+            return MaterialPageRoute(
+              builder: (context) => const LoginScreen(),
+            );
+          }
+          return MaterialPageRoute(
+            builder: (context) => SecuritySetupScreen(user: user),
+            settings: settings,
+          );
+        }
+
+        // Public routes
+        if (settings.name == '/login') {
+          return MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/create-account') {
+          return MaterialPageRoute(
+            builder: (context) => const CreateAccountScreen(),
+            settings: settings,
+          );
+        }
+
+        // Default to intro wrapper for unknown routes
+        return MaterialPageRoute(
+          builder: (context) => const IntroWrapper(),
+        );
       },
       home: const IntroWrapper(),
     );
@@ -87,25 +168,51 @@ class _IntroWrapperState extends State<IntroWrapper> {
   }
 
   Future<void> _checkInitialState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasShownIntro = prefs.getBool('hasShownIntro') ?? false;
-    final user = await _databaseHelper.getUser();
-    final isSecuritySetup = await _securityService.isSecuritySetup();
-    
-    if (mounted) {
-      setState(() {
-        _showIntro = !hasShownIntro;
-        _hasExistingUser = user != null;
-        _loading = false;
-      });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasShownIntro = prefs.getBool('hasShownIntro') ?? false;
+      
+      // First check if we have a user in the database
+      final hasUser = await _databaseHelper.hasUser();
+      
+      User? user;
+      if (hasUser) {
+        // Only try to get user data if we know a user exists
+        try {
+          user = await _databaseHelper.getUser();
+        } catch (e) {
+          // If there's an error getting user data, delete corrupted data
+          Logger.error('Error getting user data', e);
+          await _databaseHelper.deleteUser();
+        }
+      }
+      
+      final isSecuritySetup = await _securityService.isSecuritySetup();
+      
+      if (mounted) {
+        setState(() {
+          _showIntro = !hasShownIntro;
+          _hasExistingUser = user != null;
+          _loading = false;
+        });
 
-      // If we have a user and security is set up, go to auth screen with user data
-      if (user != null && isSecuritySetup && mounted) {
-        Navigator.pushReplacementNamed(
-          context, 
-          '/auth',
-          arguments: user,
-        );
+        // If we have a valid user and security is set up, go to auth screen
+        if (user != null && isSecuritySetup && mounted) {
+          Logger.state('Valid user found, navigating to auth');
+          Navigator.pushReplacementNamed(
+            context, 
+            '/auth',
+            arguments: user,
+          );
+        }
+      }
+    } catch (e) {
+      Logger.error('Error in initial state check', e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _hasExistingUser = false;
+        });
       }
     }
   }
@@ -125,8 +232,11 @@ class _IntroWrapperState extends State<IntroWrapper> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
+        backgroundColor: AppColors.background,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
         ),
       );
     }
@@ -186,12 +296,7 @@ class LoginSignupScreen extends StatelessWidget {
                 const SizedBox(height: 48),
                 FilledButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/login');
                   },
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -206,12 +311,7 @@ class LoginSignupScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreateAccountScreen(),
-                      ),
-                    );
+                    Navigator.pushNamed(context, '/create-account');
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -229,7 +329,8 @@ class LoginSignupScreen extends StatelessWidget {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.remove('hasShownIntro');
                     if (context.mounted) {
-                      Navigator.of(context).pushReplacement(
+                      Navigator.pushReplacement(
+                        context,
                         MaterialPageRoute(builder: (_) => const IntroWrapper()),
                       );
                     }

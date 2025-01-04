@@ -1,57 +1,95 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_selection_bottom_sheet.dart';
-import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class HomeActionButtons extends StatelessWidget {
   final List<DashboardAccount>? accounts;
   final VoidCallback? onSendTap;
   final AccountRepository accountRepository;
+  final HomeBloc homeBloc;
+  final DatabaseHelper databaseHelper;
 
   const HomeActionButtons({
     super.key,
     this.accounts,
     this.onSendTap,
     required this.accountRepository,
+    required this.homeBloc,
+    required this.databaseHelper,
   });
 
   void _handleSendTap(BuildContext context) {
-    if (accounts == null || accounts!.isEmpty) return;
+    if (accounts == null || accounts!.isEmpty) {
+      Logger.interaction('Send tapped but no accounts available');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No accounts available to send from',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     if (accounts!.length == 1) {
-      Navigator.push(
+      Logger.interaction('Navigating to send credex with single account');
+      Navigator.pushNamed(
         context,
-        MaterialPageRoute(
-          builder: (context) => SendCredexScreen(
-            senderAccount: accounts!.first,
-            accountRepository: accountRepository,
-          ),
+        '/send-credex',
+        arguments: SendCredexArguments(
+          senderAccount: accounts!.first,
+          accountRepository: accountRepository,
+          homeBloc: homeBloc,
+          databaseHelper: databaseHelper,
         ),
       );
     } else {
+      Logger.interaction('Showing account selection for send');
       showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (context) => AccountSelectionBottomSheet(
-          accounts: accounts!,
-          action: AccountSelectionAction.send,
-          accountRepository: accountRepository,
-        ),
+          builder: (context) => AccountSelectionBottomSheet(
+            accounts: accounts!,
+            action: AccountSelectionAction.send,
+            accountRepository: accountRepository,
+            homeBloc: homeBloc,
+            databaseHelper: databaseHelper,
+          ),
       );
     }
   }
 
   void _handleReceiveTap(BuildContext context) {
-    if (accounts == null || accounts!.isEmpty) return;
+    if (accounts == null || accounts!.isEmpty) {
+      Logger.interaction('Receive tapped but no accounts available');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No accounts available to receive to',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     if (accounts!.length == 1) {
+      Logger.interaction('Showing QR for single account');
       _showQRDialog(context, accounts!.first);
     } else {
+      Logger.interaction('Showing account selection for receive');
       _showAccountSelection(context);
     }
   }
@@ -79,11 +117,13 @@ class HomeActionButtons extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => AccountSelectionBottomSheet(
-        accounts: accounts!,
-        action: AccountSelectionAction.receive,
-        accountRepository: accountRepository,
-      ),
+          builder: (context) => AccountSelectionBottomSheet(
+            accounts: accounts!,
+            action: AccountSelectionAction.receive,
+            accountRepository: accountRepository,
+            homeBloc: homeBloc,
+            databaseHelper: databaseHelper,
+          ),
     );
   }
 

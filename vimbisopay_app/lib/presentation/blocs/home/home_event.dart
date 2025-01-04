@@ -1,8 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/domain/entities/credex_response.dart';
+import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 
 abstract class HomeEvent extends Equatable {
   const HomeEvent();
@@ -32,26 +31,35 @@ class HomeLoadMoreStarted extends HomeEvent {
   const HomeLoadMoreStarted();
 }
 
-class HomeDataLoaded extends HomeEvent {
-  final Dashboard dashboard;
-  final User user;
+class HomeLoadPendingTransactions extends HomeEvent {
   final List<PendingOffer> pendingInTransactions;
   final List<PendingOffer> pendingOutTransactions;
+  const HomeLoadPendingTransactions({
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
+  });
+}
+
+class HomeDataLoaded extends HomeEvent {
+  final Dashboard dashboard;
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
+  final bool keepLoading;
 
   const HomeDataLoaded({
     required this.dashboard,
-    required this.user,
     this.pendingInTransactions = const [],
     this.pendingOutTransactions = const [],
+    this.keepLoading = false,
   });
 
   @override
   List<Object> get props => [
-    dashboard, 
-    user, 
-    pendingInTransactions, 
-    pendingOutTransactions
-  ];
+        dashboard,
+        pendingInTransactions,
+        pendingOutTransactions,
+        keepLoading,
+      ];
 }
 
 class HomeLedgerLoaded extends HomeEvent {
@@ -89,4 +97,44 @@ class HomeAcceptCredexBulkStarted extends HomeEvent {
 
 class HomeAcceptCredexBulkCompleted extends HomeEvent {
   const HomeAcceptCredexBulkCompleted();
+}
+
+class HomeCancelCredexStarted extends HomeEvent {
+  final String credexId;
+
+  const HomeCancelCredexStarted(this.credexId);
+
+  @override
+  List<Object> get props => [credexId];
+}
+
+class HomeCancelCredexCompleted extends HomeEvent {
+  const HomeCancelCredexCompleted();
+}
+
+class CreateCredexEvent extends HomeEvent {
+  final CredexRequest request;
+
+  const CreateCredexEvent(this.request);
+
+  @override
+  List<Object> get props => [request];
+}
+
+class HomeFetchPendingTransactions extends HomeEvent {
+  final List<PendingOffer> pendingInTransactions;
+  final List<PendingOffer> pendingOutTransactions;
+  const HomeFetchPendingTransactions({
+    this.pendingInTransactions = const [],
+    this.pendingOutTransactions = const [],
+  });
+}
+
+class HomeRegisterNotificationToken extends HomeEvent {
+  final String token;
+
+  const HomeRegisterNotificationToken(this.token);
+
+  @override
+  List<Object> get props => [token];
 }

@@ -281,6 +281,12 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 if (_pin.isEmpty) {
                   _pin = value;
                   _pinController.clear();
+                  // Auto-focus for confirmation PIN
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && !_isDisposed) {
+                      _pinFocusNode.requestFocus();
+                    }
+                  });
                 } else {
                   _confirmPin = value;
                   _setupPin();

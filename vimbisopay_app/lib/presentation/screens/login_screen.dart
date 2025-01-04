@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/password_validator.dart';
+import 'package:vimbisopay_app/core/utils/phone_validator.dart';
+import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'dart:async' show unawaited;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,7 +18,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _spinController;
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -20,10 +27,31 @@ class _LoginScreenState extends State<LoginScreen> {
   final _databaseHelper = DatabaseHelper();
   bool _isFormValid = false;
   bool _isLoading = false;
+  bool _showPassword = false;
+  final Map<String, String?> _fieldErrors = {
+    'phone': null,
+    'password': null,
+  };
+  final Set<String> _touchedFields = {};
+
+  void _markFieldAsTouched(String fieldName) {
+    setState(() {
+      _touchedFields.add(fieldName);
+    });
+  }
+
+  String? _getFieldError(String fieldName) {
+    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+  }
 
   @override
   void initState() {
     super.initState();
+    _spinController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+      animationBehavior: AnimationBehavior.preserve,
+    );
     _loadSavedUser();
   }
 
@@ -43,30 +71,38 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    if (!_isLoading) {
+      _spinController.dispose();
+    }
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _validateForm() {
-    setState(() {
-      _isFormValid = _phoneController.text.isNotEmpty && 
-                     _passwordController.text.isNotEmpty &&
-                     _passwordController.text.length >= 6;
-    });
-  }
+    final phone = _phoneController.text;
+    final password = _passwordController.text;
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your phone number';
-    }
-    if (!RegExp(r'^[0-9]{3}[0-9]+$').hasMatch(value)) {
-      return 'Start with country code (e.g. 263 or 353)';
-    }
-    if (value.length < 10) {
-      return 'Phone number is too short';
-    }
-    return null;
+    Logger.data('[Login] Validating form fields');
+    
+    setState(() {
+      _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
+
+      final passwordValidation = PasswordValidator.validatePassword(password);
+      _fieldErrors['password'] = passwordValidation.error;
+
+      // Check if all required fields have valid values
+      final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
+      final hasValidPassword = PasswordValidator.validatePassword(password).isValid;
+
+      // Update form validity
+      _isFormValid = hasValidPhone && hasValidPassword;
+          
+      Logger.data('[Login] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
+      if (!_isFormValid) {
+        Logger.data('[Login] Invalid fields: ${_fieldErrors.entries.where((e) => e.value != null).map((e) => e.key).join(', ')}');
+      }
+    });
   }
 
   Widget _buildWelcomeBanner() {
@@ -215,64 +251,99 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+    Logger.interaction('[Login] Login button pressed');
+    
+    // Validate form first
+    setState(() {
+      _touchedFields.addAll(['phone', 'password']);
+    });
+    
+    _validateForm();
+    _formKey.currentState!.validate();
+    
+    if (!_isFormValid) {
+      Logger.data('[Login] Form validation failed, aborting login');
+      return;
+    }
+    
+    // Dismiss keyboard before showing dialog
+    FocusScope.of(context).unfocus();
+    
+    setState(() {
+      _isLoading = true;
+    });
 
-      final phoneNumber = '+${_phoneController.text}';
-      
-      final result = await _repository.login(
-        phone: phoneNumber,
-        password: _passwordController.text,
-      );
+    _spinController.repeat();
 
+    // Show loading dialog
+    unawaited(showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black26,
+      useSafeArea: false,
+      routeSettings: const RouteSettings(name: 'loading_dialog'),
+      builder: (context) {
+        Logger.interaction('[Login] Building loading dialog');
+        return LoadingDialog(
+          spinController: _spinController,
+          message: 'Logging you in...',
+        );
+      },
+    ));
+
+    final phoneNumber = '+${_phoneController.text}';
+    final password = _passwordController.text;
+    
+    Logger.interaction('[Login] Calling login API');
+    Logger.performance('[Login] API call start: login');
+    
+    final result = await _repository.login(
+      phone: phoneNumber,
+      password: password,
+    );
+
+    if (!mounted) return;
+    
+    Logger.performance('[Login] API call complete: login');
+    
+    // Helper function to safely pop dialog and update state
+    void cleanup() {
       if (mounted) {
+        Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
+          _spinController.stop();
         });
-
-        result.fold(
-          (failure) {
-            _showErrorDialog(
-              'We couldn\'t log you in. Please check your phone number and password, then try again.',
-            );
-          },
-          (user) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AuthScreen(user: user),
-              ),
-            );
-          },
-        );
       }
     }
+
+    result.fold(
+      (failure) async {
+        Logger.error('[Login] Login failed', failure);
+        cleanup();
+        _showErrorDialog(
+          'We couldn\'t log you in. Please check your phone number and password, then try again.',
+        );
+      },
+      (user) async {
+        Logger.interaction('[Login] Login successful');
+        Logger.interaction('[Login] Saving user data');
+        await _databaseHelper.saveUser(user);
+        
+        if (mounted) {
+          Logger.interaction('[Login] Navigating to auth screen');
+          Navigator.pushReplacementNamed(
+            context,
+            '/auth',
+            arguments: user,
+          );
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-    );
-
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surface,
-      border: inputBorder,
-      enabledBorder: inputBorder,
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary),
-      ),
-      labelStyle: const TextStyle(color: AppColors.textSecondary),
-      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: const TextStyle(color: AppColors.error),
-      prefixIconColor: AppColors.primary,
-    );
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -290,41 +361,80 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Form(
                   key: _formKey,
-                  onChanged: _validateForm,
                   child: Column(
                     children: [
-                      TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone Number',
-                          prefixIcon: Icon(Icons.phone),
-                          hintText: '263712345678 or 353871234567',
-                          helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
-                          helperMaxLines: 2,
+                      Semantics(
+                        label: 'Phone number input field',
+                        child: TextFormField(
+                          controller: _phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone Number',
+                            prefixIcon: Icon(Icons.phone),
+                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                            helperMaxLines: 2,
+                          ),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            PhoneNumberFormatter(),
+                          ],
+                          enabled: !_isLoading,
+                          onTap: () => _markFieldAsTouched('phone'),
+                          onChanged: (_) {
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          onEditingComplete: () {
+                            _markFieldAsTouched('phone');
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          validator: (_) => _getFieldError('phone'),
                         ),
-                        keyboardType: TextInputType.phone,
-                        enabled: !_isLoading,
-                        validator: _validatePhone,
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock),
-                          helperText: 'Enter the password you created during registration',
+                      Semantics(
+                        label: 'Password input field',
+                        child: TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock),
+                            helperText: PasswordValidator.getRequirementsText(),
+                            helperMaxLines: 6,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _showPassword ? Icons.visibility_off : Icons.visibility,
+                                color: AppColors.primary,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _showPassword = !_showPassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: !_showPassword,
+                          enabled: !_isLoading,
+                          onTap: () => _markFieldAsTouched('password'),
+                          onChanged: (_) {
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          onEditingComplete: () {
+                            _markFieldAsTouched('password');
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          validator: (_) => _getFieldError('password'),
                         ),
-                        obscureText: true,
-                        enabled: !_isLoading,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 24),
                       FilledButton(

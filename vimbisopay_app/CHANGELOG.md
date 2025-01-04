@@ -36,3 +36,32 @@ Example entry format:
 - trying to upload package
 
 ## [1.0.0+4] - 2024-12-18
+- fixed agrressive pagination
+
+## [1.0.0.+5] - 2024-12-18
+- fixed agressive pagination
+
+## [1.0.0+6] - 2024-12-18
+- We are now using the updated dashboard structure 
+
+## [1.0.0+7] - 2024-12-20
+- new dashboard changes
+
+## [1.0.0+8] - 2024-12-20
+- Dashboad updates
+
+## [1.0.0+9] - 2024-12-20
+
+## [1.0.0+10] - 2024-12-20
+- New Dashboard updates
+
+## [] - 2024-12-20
+
+## [1.0.0+13] - 2024-12-20
+- Dashboard update
+
+## [1.0.0+14] - 2024-12-20
+- dashboard changes
+
+## [1.0.0+15] - 2024-12-23
+- Transaction Confirmation and UI fixes

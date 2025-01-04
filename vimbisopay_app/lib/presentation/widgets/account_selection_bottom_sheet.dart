@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
-import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 enum AccountSelectionAction {
   send,
@@ -14,13 +17,50 @@ class AccountSelectionBottomSheet extends StatelessWidget {
   final List<DashboardAccount> accounts;
   final AccountSelectionAction action;
   final AccountRepository accountRepository;
+  final HomeBloc homeBloc;
+  final DatabaseHelper databaseHelper;
 
   const AccountSelectionBottomSheet({
     Key? key,
     required this.accounts,
     required this.action,
     required this.accountRepository,
+    required this.homeBloc,
+    required this.databaseHelper,
   }) : super(key: key);
+
+  void _handleAccountSelection(BuildContext context, DashboardAccount account) {
+    Navigator.pop(context); // Close bottom sheet
+
+    if (action == AccountSelectionAction.receive) {
+      Logger.interaction('Showing QR for selected account');
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: AccountQRDialog(account: account),
+        ),
+      );
+    } else if (action == AccountSelectionAction.send) {
+      Logger.interaction('Navigating to send credex with selected account');
+      Navigator.pushNamed(
+        context,
+        '/send-credex',
+        arguments: SendCredexArguments(
+          senderAccount: account,
+          accountRepository: accountRepository,
+          homeBloc: homeBloc,
+          databaseHelper: databaseHelper,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +77,11 @@ class AccountSelectionBottomSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Select Account',
-                style: TextStyle(
+              Text(
+                action == AccountSelectionAction.send 
+                    ? 'Select Account to Send From'
+                    : 'Select Account to Receive To',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -90,34 +132,7 @@ class AccountSelectionBottomSheet extends StatelessWidget {
                   size: 16,
                   color: AppColors.textSecondary,
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (action == AccountSelectionAction.receive) {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => Container(
-                        height: MediaQuery.of(context).size.height * 0.9,
-                        decoration: const BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                        ),
-                        child: AccountQRDialog(account: account),
-                      ),
-                    );
-                  } else if (action == AccountSelectionAction.send) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SendCredexScreen(
-                          senderAccount: account,
-                          accountRepository: accountRepository,
-                        ),
-                      ),
-                    );
-                  }
-                },
+                onTap: () => _handleAccountSelection(context, account),
               );
             },
           ),

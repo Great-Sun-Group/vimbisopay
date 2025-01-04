@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/phone_validator.dart';
+import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'dart:async' show unawaited;
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -8,36 +14,68 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _spinController;
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _isSubmitted = false;
+  final Map<String, String?> _fieldErrors = {
+    'phone': null,
+  };
+  final Set<String> _touchedFields = {};
+
+  void _markFieldAsTouched(String fieldName) {
+    setState(() {
+      _touchedFields.add(fieldName);
+    });
+  }
+
+  String? _getFieldError(String fieldName) {
+    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+      animationBehavior: AnimationBehavior.preserve,
+    );
+    Logger.lifecycle('ForgotPasswordScreen initialized');
+  }
 
   @override
   void dispose() {
+    Logger.lifecycle('ForgotPasswordScreen disposing');
+    if (!_isLoading) {
+      _spinController.dispose();
+    }
     _phoneController.dispose();
     super.dispose();
   }
 
   void _validateForm() {
-    setState(() {
-      _isFormValid = _phoneController.text.isNotEmpty;
-    });
-  }
+    final phone = _phoneController.text;
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your phone number';
-    }
-    if (!RegExp(r'^[0-9]{3}[0-9]+$').hasMatch(value)) {
-      return 'Start with country code (e.g. 263 or 353)';
-    }
-    if (value.length < 10) {
-      return 'Phone number is too short';
-    }
-    return null;
+    Logger.data('[ForgotPassword] Validating form fields');
+    
+    setState(() {
+      _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
+
+      // Check if all required fields have valid values
+      final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
+
+      // Update form validity
+      _isFormValid = hasValidPhone;
+          
+      Logger.data('[ForgotPassword] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
+      if (!_isFormValid) {
+        Logger.data('[ForgotPassword] Invalid fields: ${_fieldErrors.entries.where((e) => e.value != null).map((e) => e.key).join(', ')}');
+      }
+    });
   }
 
   Widget _buildHeaderBanner() {
@@ -139,7 +177,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              Logger.interaction('Returning to login from forgot password success');
+              Navigator.of(context).pop();
+            },
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
               backgroundColor: AppColors.primary,
@@ -158,46 +199,113 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Future<void> _handleSubmit() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Error',
+            style: TextStyle(color: AppColors.error),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-      // Simulate API call
+  Future<void> _handleSubmit() async {
+    Logger.interaction('[ForgotPassword] Submit button pressed');
+    
+    // Validate form first
+    setState(() {
+      _touchedFields.add('phone');
+    });
+    
+    _validateForm();
+    _formKey.currentState!.validate();
+    
+    if (!_isFormValid) {
+      Logger.data('[ForgotPassword] Form validation failed, aborting submission');
+      return;
+    }
+
+    // Dismiss keyboard before showing dialog
+    FocusScope.of(context).unfocus();
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    _spinController.repeat();
+
+    // Show loading dialog
+    unawaited(showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black26,
+      useSafeArea: false,
+      routeSettings: const RouteSettings(name: 'loading_dialog'),
+      builder: (context) {
+        Logger.interaction('[ForgotPassword] Building loading dialog');
+        return LoadingDialog(
+          spinController: _spinController,
+          message: 'Sending instructions...',
+        );
+      },
+    ));
+
+    try {
+      // TODO: Implement actual password reset API call
       await Future.delayed(const Duration(seconds: 2));
 
+      if (!mounted) return;
+
+      Logger.interaction('[ForgotPassword] Instructions sent successfully');
+      
+      // Helper function to safely pop dialog and update state
+      void cleanup() {
+        if (mounted) {
+          Navigator.of(context).pop(); // Pop loading dialog
+          setState(() {
+            _isLoading = false;
+            _spinController.stop();
+          });
+        }
+      }
+
+      cleanup();
+      setState(() {
+        _isSubmitted = true;
+      });
+    } catch (e) {
+      Logger.error('[ForgotPassword] Error sending reset instructions', e);
       if (mounted) {
+        Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
-          _isSubmitted = true;
+          _spinController.stop();
         });
+        _showError('Failed to send reset instructions. Please try again.');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-    );
-
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surface,
-      border: inputBorder,
-      enabledBorder: inputBorder,
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary),
-      ),
-      labelStyle: const TextStyle(color: AppColors.textSecondary),
-      helperStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.7)),
-      errorStyle: const TextStyle(color: AppColors.error),
-      prefixIconColor: AppColors.primary,
-    );
-
     if (_isSubmitted) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -217,7 +325,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            Logger.interaction('Returning to login from forgot password');
+            Navigator.of(context).pop();
+          },
         ),
       ),
       body: SafeArea(
@@ -233,21 +344,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 child: Form(
                   key: _formKey,
-                  onChanged: _validateForm,
                   child: Column(
                     children: [
-                      TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone Number',
-                          prefixIcon: Icon(Icons.phone),
-                          hintText: '263712345678 or 353871234567',
-                          helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
-                          helperMaxLines: 2,
+                      Semantics(
+                        label: 'Phone number input field',
+                        child: TextFormField(
+                          controller: _phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone Number',
+                            prefixIcon: Icon(Icons.phone),
+                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                            helperMaxLines: 2,
+                          ),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            PhoneNumberFormatter(),
+                          ],
+                          enabled: !_isLoading,
+                          onTap: () => _markFieldAsTouched('phone'),
+                          onChanged: (_) {
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          onEditingComplete: () {
+                            _markFieldAsTouched('phone');
+                            setState(() {
+                              _validateForm();
+                              _formKey.currentState?.validate();
+                            });
+                          },
+                          validator: (_) => _getFieldError('phone'),
                         ),
-                        keyboardType: TextInputType.phone,
-                        enabled: !_isLoading,
-                        validator: _validatePhone,
                       ),
                       const SizedBox(height: 24),
                       FilledButton(

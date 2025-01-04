@@ -51,40 +51,56 @@ class CredexActionDetails {
 }
 
 class CredexDashboard {
-  final bool success;
-  final CredexDashboardData data;
-  final String message;
+  final DashboardMember member;
+  final List<DashboardAccount> accounts;
 
   CredexDashboard({
-    required this.success,
-    required this.data,
-    required this.message,
+    required this.member,
+    required this.accounts,
   });
 }
 
-class CredexDashboardData {
+class DashboardMember {
+  final String memberID;
+  final int memberTier;
+  final String firstname;
+  final String lastname;
+  final String? memberHandle;
+  final String defaultDenom;
+
+  DashboardMember({
+    required this.memberID,
+    required this.memberTier,
+    required this.firstname,
+    required this.lastname,
+    this.memberHandle,
+    required this.defaultDenom,
+  });
+}
+
+class DashboardAccount {
   final String accountID;
   final String accountName;
   final String accountHandle;
+  final String accountType;
   final String defaultDenom;
   final bool isOwnedAccount;
-  final List<AuthUser> authFor;
-  final BalanceData balanceData;
-  final PendingData pendingInData;
-  final PendingData pendingOutData;
   final SendOffersTo sendOffersTo;
+  final BalanceData balanceData;
+  final List<PendingOffer> pendingInData;
+  final List<PendingOffer> pendingOutData;
 
-  CredexDashboardData({
+  DashboardAccount({
     required this.accountID,
     required this.accountName,
     required this.accountHandle,
+    required this.accountType,
     required this.defaultDenom,
     required this.isOwnedAccount,
-    required this.authFor,
+    required this.sendOffersTo,
     required this.balanceData,
     required this.pendingInData,
     required this.pendingOutData,
-    required this.sendOffersTo,
   });
 }
 
@@ -98,30 +114,57 @@ class AuthUser {
     required this.firstname,
     required this.memberID,
   });
+
+  Map<String, dynamic> toMap() => {
+    'lastname': lastname,
+    'firstname': firstname,
+    'memberID': memberID,
+  };
+
+  factory AuthUser.fromMap(Map<String, dynamic> map) => AuthUser(
+    lastname: map['lastname'] as String,
+    firstname: map['firstname'] as String,
+    memberID: map['memberID'] as String,
+  );
 }
 
 class BalanceData {
-  final bool success;
-  final BalanceDataDetails data;
-  final String message;
-
-  BalanceData({
-    required this.success,
-    required this.data,
-    required this.message,
-  });
-}
-
-class BalanceDataDetails {
   final List<String> securedNetBalancesByDenom;
   final UnsecuredBalances unsecuredBalancesInDefaultDenom;
   final String netCredexAssetsInDefaultDenom;
 
-  BalanceDataDetails({
+  BalanceData({
     required this.securedNetBalancesByDenom,
     required this.unsecuredBalancesInDefaultDenom,
     required this.netCredexAssetsInDefaultDenom,
   });
+
+  Map<String, dynamic> toMap() => {
+    'securedNetBalancesByDenom': securedNetBalancesByDenom,
+    'unsecuredBalancesInDefaultDenom': unsecuredBalancesInDefaultDenom.toMap(),
+    'netCredexAssetsInDefaultDenom': netCredexAssetsInDefaultDenom,
+  };
+
+  factory BalanceData.fromMap(Map<String, dynamic> map) {
+    final balanceData = map['balanceData'] ?? map;
+    return BalanceData(
+      securedNetBalancesByDenom: List<String>.from(balanceData['securedNetBalancesByDenom']),
+      unsecuredBalancesInDefaultDenom: UnsecuredBalances.fromMap(balanceData['unsecuredBalancesInDefaultDenom']),
+      netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'] as String,
+    );
+  }
+
+  BalanceData copyWith({
+    List<String>? securedNetBalancesByDenom,
+    UnsecuredBalances? unsecuredBalancesInDefaultDenom,
+    String? netCredexAssetsInDefaultDenom,
+  }) {
+    return BalanceData(
+      securedNetBalancesByDenom: securedNetBalancesByDenom ?? this.securedNetBalancesByDenom,
+      unsecuredBalancesInDefaultDenom: unsecuredBalancesInDefaultDenom ?? this.unsecuredBalancesInDefaultDenom,
+      netCredexAssetsInDefaultDenom: netCredexAssetsInDefaultDenom ?? this.netCredexAssetsInDefaultDenom,
+    );
+  }
 }
 
 class UnsecuredBalances {
@@ -134,6 +177,18 @@ class UnsecuredBalances {
     required this.totalReceivables,
     required this.netPayRec,
   });
+
+  Map<String, dynamic> toMap() => {
+    'totalPayables': totalPayables,
+    'totalReceivables': totalReceivables,
+    'netPayRec': netPayRec,
+  };
+
+  factory UnsecuredBalances.fromMap(Map<String, dynamic> map) => UnsecuredBalances(
+    totalPayables: map['totalPayables'] as String,
+    totalReceivables: map['totalReceivables'] as String,
+    netPayRec: map['netPayRec'] as String,
+  );
 }
 
 class PendingData {
@@ -146,6 +201,20 @@ class PendingData {
     required this.data,
     required this.message,
   });
+
+  Map<String, dynamic> toMap() => {
+    'success': success,
+    'data': data.map((x) => x.toMap()).toList(),
+    'message': message,
+  };
+
+  factory PendingData.fromMap(Map<String, dynamic> map) => PendingData(
+    success: map['success'] as bool,
+    data: List<PendingOffer>.from(
+      (map['data'] as List).map((x) => PendingOffer.fromMap(x)),
+    ),
+    message: map['message'] as String,
+  );
 }
 
 class PendingOffer {
@@ -154,12 +223,70 @@ class PendingOffer {
   final String counterpartyAccountName;
   final bool secured;
 
+  // Computed unique identifier that combines multiple fields
+  String get uniqueIdentifier {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final amount = double.tryParse(formattedInitialAmount.replaceAll(RegExp(r'[^\d.-]'), '')) ?? 0.0;
+    final type = secured ? 'secured' : 'unsecured';
+    return '${counterpartyAccountName.replaceAll(' ', '')}_${timestamp}_${amount}_$type';
+  }
+
   PendingOffer({
     required this.credexID,
     required this.formattedInitialAmount,
     required this.counterpartyAccountName,
     required this.secured,
   });
+
+  Map<String, dynamic> toMap() => {
+    'credexID': credexID,
+    'formattedInitialAmount': formattedInitialAmount,
+    'counterpartyAccountName': counterpartyAccountName,
+    'secured': secured,
+  };
+
+  factory PendingOffer.fromMap(Map<String, dynamic> map) {
+    // Parse and format the amount
+    String formattedAmount;
+    try {
+      if (map.containsKey('initialAmount') && map['initialAmount'] != null) {
+        double amount;
+        if (map['initialAmount'] is String) {
+          amount = double.parse(map['initialAmount']);
+        } else if (map['initialAmount'] is num) {
+          amount = (map['initialAmount'] as num).toDouble();
+        } else {
+          throw const FormatException('Invalid amount format');
+        }
+        
+        // If formattedInitialAmount is missing or invalid, format the amount ourselves
+        if (!map.containsKey('formattedInitialAmount') || 
+            map['formattedInitialAmount'] == null || 
+            map['formattedInitialAmount'].toString().isEmpty) {
+          final sign = amount >= 0 ? '+' : '';
+          final denomination = map['denomination'] ?? 'CXX'; // Fallback to CXX if denomination is missing
+          formattedAmount = '$sign${amount.toStringAsFixed(2)} $denomination';
+        } else {
+          formattedAmount = map['formattedInitialAmount'].toString();
+        }
+      } else if (map.containsKey('formattedInitialAmount') && 
+                 map['formattedInitialAmount'] != null && 
+                 map['formattedInitialAmount'].toString().isNotEmpty) {
+        formattedAmount = map['formattedInitialAmount'].toString();
+      } else {
+        formattedAmount = '0.00 CXX'; // Fallback if no amount information is available
+      }
+    } catch (e) {
+      formattedAmount = '0.00 CXX'; // Fallback in case of any parsing errors
+    }
+
+    return PendingOffer(
+      credexID: map['credexID'] as String,
+      formattedInitialAmount: formattedAmount,
+      counterpartyAccountName: map['counterpartyAccountName'] as String,
+      secured: map['secured'] as bool,
+    );
+  }
 }
 
 class SendOffersTo {
@@ -172,4 +299,16 @@ class SendOffersTo {
     required this.firstname,
     required this.lastname,
   });
+
+  Map<String, dynamic> toMap() => {
+    'memberID': memberID,
+    'firstname': firstname,
+    'lastname': lastname,
+  };
+
+  factory SendOffersTo.fromMap(Map<String, dynamic> map) => SendOffersTo(
+    memberID: map['memberID'] as String,
+    firstname: map['firstname'] as String,
+    lastname: map['lastname'] as String,
+  );
 }

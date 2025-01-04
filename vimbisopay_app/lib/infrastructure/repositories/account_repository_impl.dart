@@ -11,13 +11,16 @@ import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
   
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final SecurityService _securityService = SecurityService();
+  final PasswordService _passwordService = PasswordService();
 
   Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
@@ -44,15 +47,31 @@ class AccountRepositoryImpl implements AccountRepository {
       return result.fold(
         (failure) async {
           if (!isRetry && failure.message?.toLowerCase().contains('token expired') == true) {
+            if (user.passwordHash == null || user.passwordSalt == null) {
+              return const Left(InfrastructureFailure('Authentication failed: No stored password hash'));
+            }
+
+            // Re-login with stored password hash
             final loginResult = await login(
               phone: user.phone,
-              password: 'password', // TODO using dummy password as specified
+              passwordHash: user.passwordHash!,
+              passwordSalt: user.passwordSalt!,
             );
 
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
-                final saveResult = await saveUser(newUser);
+                final userWithPasswordHash = User(
+                  memberId: newUser.memberId,
+                  phone: newUser.phone,
+                  token: newUser.token,
+                  passwordHash: user.passwordHash,
+                  passwordSalt: user.passwordSalt,
+                  passwordChanged: user.passwordChanged,
+                  dashboard: newUser.dashboard,
+                );
+                
+                final saveResult = await saveUser(userWithPasswordHash);
                 
                 return saveResult.fold(
                   (saveFailure) => Left(saveFailure),
@@ -104,6 +123,45 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+    required String accountId,
+    int? startRow,
+    int? numRows,
+  }) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/getLedger';
+        final headers = _authHeaders(token);
+        final body = {
+          'accountID': accountId,
+          if (startRow != null) 'startRow': startRow,
+          if (numRows != null) 'numRows': numRows,
+        };
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          final jsonResponse = json.decode(response.body);
+          return Right(jsonResponse);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
   Future<Either<Failure, User?>> getCurrentUser() async {
     try {
       final user = await _databaseHelper.getUser();
@@ -149,45 +207,6 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> getLedger({
-    required String accountId,
-    int? startRow,
-    int? numRows,
-  }) async {
-    return _executeAuthenticatedRequest(
-      request: (token) async {
-        final url = '$baseUrl/getLedger';
-        final headers = _authHeaders(token);
-        final body = {
-          'accountID': accountId,
-          if (startRow != null) 'startRow': startRow,
-          if (numRows != null) 'numRows': numRows,
-        };
-
-        final response = await _loggedRequest(
-          () => http.post(
-            Uri.parse(url),
-            headers: headers,
-            body: json.encode(body),
-          ),
-          url,
-          'POST',
-          headers: headers,
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          return Right(data as Map<String, dynamic>);
-        } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
-          return Left(InfrastructureFailure(errorMessage));
-        }
-      },
-    );
-  }
-
-  @override
   Future<Either<Failure, Account>> getAccountByHandle(String handle) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
@@ -223,124 +242,10 @@ class AccountRepositoryImpl implements AccountRepository {
             handle: details['accountHandle'],
             name: details['accountName'],
             defaultDenom: details['defaultDenom'],
-            balances: {}, // Balances not included in this response
+            balances: {},
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
-          return Left(InfrastructureFailure(errorMessage));
-        }
-      },
-    );
-  }
-
-  @override
-  Future<Either<Failure, dashboard.Dashboard>> getMemberDashboardByPhone(String phone) async {
-    return _executeAuthenticatedRequest(
-      request: (token) async {
-        final url = '$baseUrl/getMemberDashboardByPhone';
-        final headers = _authHeaders(token);
-        final body = {'phone': phone};
-
-        final response = await _loggedRequest(
-          () => http.post(
-            Uri.parse(url),
-            headers: headers,
-            body: json.encode(body),
-          ),
-          url,
-          'POST',
-          headers: headers,
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          
-          if (!data.containsKey('data') || 
-              !data['data'].containsKey('action') ||
-              !data['data'].containsKey('dashboard')) {
-            return const Left(InfrastructureFailure('Invalid response format'));
-          }
-
-          final actionDetails = data['data']['action']['details'];
-          final dashboardData = data['data']['dashboard'];
-          
-          // Create a Set to track unique account handles
-          final seenHandles = <String>{};
-          
-          final accountsList = (dashboardData['accounts'] as List)
-              .where((account) => account['success'] == true)
-              .map((account) {
-                final accountData = account['data'];
-                final balanceData = accountData['balanceData']['data'];
-                final pendingInData = accountData['pendingInData'];
-                final pendingOutData = accountData['pendingOutData'];
-                
-                return dashboard.DashboardAccount(
-                  accountID: accountData['accountID'],
-                  accountName: accountData['accountName'],
-                  accountHandle: accountData['accountHandle'],
-                  defaultDenom: accountData['defaultDenom'],
-                  isOwnedAccount: accountData['isOwnedAccount'],
-                  authFor: (accountData['authFor'] as List)
-                      .map((auth) => dashboard.AuthUser(
-                            firstname: auth['firstname'],
-                            lastname: auth['lastname'],
-                            memberID: auth['memberID'],
-                          ))
-                      .toList(),
-                  balanceData: dashboard.BalanceData(
-                    securedNetBalancesByDenom: 
-                        (balanceData['securedNetBalancesByDenom'] as List)
-                            .map((balance) => balance.toString())
-                            .toList(),
-                    unsecuredBalances: dashboard.UnsecuredBalances(
-                      totalPayables: balanceData['unsecuredBalancesInDefaultDenom']['totalPayables'],
-                      totalReceivables: balanceData['unsecuredBalancesInDefaultDenom']['totalReceivables'],
-                      netPayRec: balanceData['unsecuredBalancesInDefaultDenom']['netPayRec'],
-                    ),
-                    netCredexAssetsInDefaultDenom: balanceData['netCredexAssetsInDefaultDenom'],
-                  ),
-                  pendingInData: credex.PendingData(
-                    success: pendingInData['success'],
-                    data: (pendingInData['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: pendingInData['message'],
-                  ),
-                  pendingOutData: credex.PendingData(
-                    success: pendingOutData['success'],
-                    data: (pendingOutData['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: pendingOutData['message'],
-                  ),
-                );
-              })
-              .where((account) => seenHandles.add(account.accountHandle)) // Only keep accounts with unique handles
-              .toList();
-
-          return Right(dashboard.Dashboard(
-            id: actionDetails['memberID'],
-            memberHandle: actionDetails['memberHandle'],
-            firstname: actionDetails['firstname'],
-            lastname: actionDetails['lastname'],
-            defaultDenom: actionDetails['defaultDenom'],
-            memberTier: dashboard.MemberTier(
-              low: actionDetails['memberTier']['low'],
-              high: actionDetails['memberTier']['high'],
-            ),
-            remainingAvailableUSD: actionDetails['remainingAvailableUSD'],
-            accounts: accountsList,
-          ));
-        } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get dashboard';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -355,13 +260,17 @@ class AccountRepositoryImpl implements AccountRepository {
     required String password,
   }) async {
     try {
+      // Hash password before sending to server
+      final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
+      
       final url = '$baseUrl/onboardMember';
       final body = {
         'firstname': firstName,
         'lastname': lastName,
         'phone': phone,
         'defaultDenom': 'CXX',
-        'password': password
+        'password_hash': hashResult.hash,
+        'password_salt': hashResult.salt,
       };
 
       final response = await _loggedRequest(
@@ -388,16 +297,32 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  @override
   Future<Either<Failure, User>> login({
     required String phone,
-    required String password,
+    String? password,
+    String? passwordHash,
+    String? passwordSalt,
   }) async {
     try {
       final url = '$baseUrl/login';
       final body = {
         'phone': phone,
-        'password': password,
       };
+
+      if (passwordHash != null && passwordSalt != null) {
+        // Use existing hash for token refresh
+        body['password_hash'] = passwordHash;
+        body['password_salt'] = passwordSalt;
+      } else {
+        if (password == null) {
+          return const Left(InfrastructureFailure('Password is required'));
+        }
+        // Hash new password
+        final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
+        body['password_hash'] = hashResult.hash;
+        body['password_salt'] = hashResult.salt;
+      }
 
       final response = await _loggedRequest(
         () => http.post(
@@ -416,16 +341,65 @@ class AccountRepositoryImpl implements AccountRepository {
         
         if (!jsonResponse.containsKey('data') || 
             !jsonResponse['data'].containsKey('action') ||
-            !jsonResponse['data']['action'].containsKey('details')) {
+            !jsonResponse['data']['action'].containsKey('details') ||
+            !jsonResponse['data'].containsKey('dashboard')) {
           return const Left(InfrastructureFailure('Invalid response format'));
         }
 
         final actionDetails = jsonResponse['data']['action']['details'];
         
+        final memberId = actionDetails['memberID']?.toString();
+        final userPhone = actionDetails['phone']?.toString();
+        final token = actionDetails['token']?.toString();
+        
+        if (memberId == null || userPhone == null || token == null) {
+          return const Left(InfrastructureFailure('Missing required user fields in response'));
+        }
+
+        final dashboardData = jsonResponse['data']['dashboard'];
+        
+          final dashboardObj = dashboard.Dashboard.fromMap({
+            'member': {
+              'memberID': actionDetails['memberID'],
+              'memberTier': dashboardData['member']['memberTier'],
+              'firstname': dashboardData['member']['firstname'],
+              'lastname': dashboardData['member']['lastname'],
+              'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
+              'defaultDenom': dashboardData['member']['defaultDenom'],
+            },
+            'accounts': dashboardData['accounts'].map((accountData) => {
+              'accountID': accountData['accountID'],
+              'accountName': accountData['accountName'],
+              'accountHandle': accountData['accountHandle'],
+              'defaultDenom': accountData['defaultDenom'],
+              'isOwnedAccount': accountData['isOwnedAccount'],
+              'balanceData': {
+                'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
+                'unsecuredBalancesInDefaultDenom': accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
+                'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
+              },
+              'pendingInData': {
+                'success': true,
+                'data': accountData['pendingInData'] ?? [],
+                'message': 'Pending offers retrieved',
+              },
+              'pendingOutData': {
+                'success': true,
+                'data': accountData['pendingOutData'] ?? [],
+                'message': 'Pending outgoing offers retrieved',
+              },
+              'sendOffersTo': accountData['sendOffersTo'],
+            }).toList(),
+          });
+        
         final user = User(
-          memberId: actionDetails['memberID'],
-          phone: actionDetails['phone'],
-          token: actionDetails['token'],
+          memberId: memberId,
+          phone: userPhone,
+          token: token,
+          passwordHash: body['password_hash'],
+          passwordSalt: body['password_salt'],
+          passwordChanged: DateTime.now(),
+          dashboard: dashboardObj,
         );
         
         return Right(user);
@@ -440,13 +414,17 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<Either<Failure, credex.CredexResponse>> createCredex(CredexRequest request) async {
+    Logger.data('Creating Credex request: ${request.toJson()}');
+    
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = '$baseUrl/createCredex';
-        final headers = _authHeaders(token);
-        final body = request.toJson();
+        try {
+          final url = '$baseUrl/createCredex';
+          final headers = _authHeaders(token);
+          final body = request.toJson();
 
-        final response = await _loggedRequest(
+          Logger.data('Sending Credex request to $url');
+          final response = await _loggedRequest(
           () => http.post(
             Uri.parse(url),
             headers: headers,
@@ -459,13 +437,29 @@ class AccountRepositoryImpl implements AccountRepository {
         );
 
         if (response.statusCode == 200) {
+          Logger.data('Credex request successful');
           final jsonResponse = json.decode(response.body);
+          
+          // Validate response structure
+          if (!jsonResponse.containsKey('data')) {
+            Logger.error('Invalid Credex response: Missing data field');
+            return const Left(InfrastructureFailure('Invalid response format: Missing data field'));
+          }
+          
           final data = jsonResponse['data'];
+          if (!data.containsKey('action') || !data.containsKey('dashboard')) {
+            Logger.error('Invalid Credex response: Missing required fields in data');
+            return const Left(InfrastructureFailure('Invalid response format: Missing required fields'));
+          }
+          
           final action = data['action'];
           final dashboard = data['dashboard'];
-          final dashboardData = dashboard['data'];
-          final balanceData = dashboardData['balanceData'];
-
+          
+          if (dashboard == null) {
+            Logger.error('Invalid Credex response: Missing dashboard');
+            return const Left(InfrastructureFailure('Invalid response format: Missing dashboard'));
+          }
+          Logger.data('Creating CredexResponse from data');
           return Right(credex.CredexResponse(
             message: jsonResponse['message'],
             data: credex.CredexData(
@@ -483,68 +477,48 @@ class AccountRepositoryImpl implements AccountRepository {
                 ),
               ),
               dashboard: credex.CredexDashboard(
-                success: dashboard['success'],
-                data: credex.CredexDashboardData(
-                  accountID: dashboardData['accountID'],
-                  accountName: dashboardData['accountName'],
-                  accountHandle: dashboardData['accountHandle'],
-                  defaultDenom: dashboardData['defaultDenom'],
-                  isOwnedAccount: dashboardData['isOwnedAccount'],
-                  authFor: (dashboardData['authFor'] as List).map((auth) => credex.AuthUser(
-                    lastname: auth['lastname'],
-                    firstname: auth['firstname'],
-                    memberID: auth['memberID'],
-                  )).toList(),
-                  balanceData: credex.BalanceData(
-                    success: balanceData['success'],
-                    data: credex.BalanceDataDetails(
-                      securedNetBalancesByDenom: 
-                          (balanceData['data']['securedNetBalancesByDenom'] as List)
-                              .map((balance) => balance.toString())
-                              .toList(),
-                      unsecuredBalancesInDefaultDenom: credex.UnsecuredBalances(
-                        totalPayables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalPayables'],
-                        totalReceivables: balanceData['data']['unsecuredBalancesInDefaultDenom']['totalReceivables'],
-                        netPayRec: balanceData['data']['unsecuredBalancesInDefaultDenom']['netPayRec'],
-                      ),
-                      netCredexAssetsInDefaultDenom: balanceData['data']['netCredexAssetsInDefaultDenom'],
-                    ),
-                    message: balanceData['message'],
-                  ),
-                  pendingInData: credex.PendingData(
-                    success: dashboardData['pendingInData']['success'],
-                    data: (dashboardData['pendingInData']['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: dashboardData['pendingInData']['message'],
-                  ),
-                  pendingOutData: credex.PendingData(
-                    success: dashboardData['pendingOutData']['success'],
-                    data: (dashboardData['pendingOutData']['data'] as List).map((offer) => credex.PendingOffer(
-                      credexID: offer['credexID'],
-                      formattedInitialAmount: offer['formattedInitialAmount'],
-                      counterpartyAccountName: offer['counterpartyAccountName'],
-                      secured: offer['secured'],
-                    )).toList(),
-                    message: dashboardData['pendingOutData']['message'],
-                  ),
-                  sendOffersTo: credex.SendOffersTo(
-                    memberID: dashboardData['sendOffersTo']['memberID'],
-                    firstname: dashboardData['sendOffersTo']['firstname'],
-                    lastname: dashboardData['sendOffersTo']['lastname'],
-                  ),
+                member: credex.DashboardMember(
+                  memberID: dashboard['member']['memberID'],
+                  memberTier: dashboard['member']['memberTier'],
+                  firstname: dashboard['member']['firstname'],
+                  lastname: dashboard['member']['lastname'],
+                  memberHandle: dashboard['member']['memberHandle'],
+                  defaultDenom: dashboard['member']['defaultDenom'],
                 ),
-                message: dashboard['message'],
+                accounts: List<credex.DashboardAccount>.from(
+                  (dashboard['accounts'] as List).map((account) => credex.DashboardAccount(
+                    accountID: account['accountID'],
+                    accountName: account['accountName'],
+                    accountHandle: account['accountHandle'],
+                    accountType: account['accountType'],
+                    defaultDenom: account['defaultDenom'],
+                    isOwnedAccount: account['isOwnedAccount'],
+                    sendOffersTo: credex.SendOffersTo(
+                      memberID: account['sendOffersTo']['memberID'],
+                      firstname: account['sendOffersTo']['firstname'],
+                      lastname: account['sendOffersTo']['lastname'],
+                    ),
+                    balanceData: credex.BalanceData.fromMap(account),
+                    pendingInData: List<credex.PendingOffer>.from(
+                      (account['pendingInData'] as List? ?? []).map((offer) => credex.PendingOffer.fromMap(offer)),
+                    ),
+                    pendingOutData: List<credex.PendingOffer>.from(
+                      (account['pendingOutData'] as List? ?? []).map((offer) => credex.PendingOffer.fromMap(offer)),
+                    ),
+                  )),
+                ),
               ),
             ),
           ));
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to create Credex';
+          Logger.error('Failed to create Credex', 'Status ${response.statusCode}: $errorMessage');
           return Left(InfrastructureFailure(errorMessage));
         }
+      } catch (e, stackTrace) {
+        Logger.error('Error creating Credex', e, stackTrace);
+        return Left(InfrastructureFailure('Unexpected error while creating Credex: ${e.toString()}'));
+      }
       },
     );
   }
@@ -573,6 +547,66 @@ class AccountRepositoryImpl implements AccountRepository {
           return const Right(true);
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transactions';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, bool>> cancelCredex(String credexId) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/cancelCredex';
+        final headers = _authHeaders(token);
+        final body = {'credexID': credexId};
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to cancel Credex transaction';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, bool>> registerNotificationToken(String token) async {
+    return _executeAuthenticatedRequest(
+      request: (authToken) async {
+        final url = '$baseUrl/api/notifications/register-token';
+        final headers = _authHeaders(authToken);
+        final body = {'token': token};
+
+        final response = await _loggedRequest(
+          () => http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to register notification token';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
