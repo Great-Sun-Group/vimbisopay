@@ -116,9 +116,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
       accountRepository: _accountRepository,
     );
-    // Trigger initial data load after a short delay to ensure navigation is complete
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!_isDisposed) {
+    
+    // Use addPostFrameCallback to ensure widget is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isDisposed && mounted) {
         _homeBloc.loadInitialData();
       }
     });
@@ -165,6 +166,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         leadingWidth: 80,
         toolbarHeight: HomeConstants.appBarHeight,
         leading: _buildUserAvatar(state),
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search transactions...',
+              hintStyle: TextStyle(color: AppColors.textPrimary.withOpacity(0.5)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+              prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+              suffixIcon: state.searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.primary),
+                      onPressed: () {
+                        Logger.interaction('Search cleared');
+                        _homeBloc.add(const HomeSearchStarted(''));
+                      },
+                    )
+                  : null,
+            ),
+            style: const TextStyle(color: AppColors.textPrimary),
+            onChanged: (query) {
+              Logger.interaction('Search query changed: $query');
+              _homeBloc.add(HomeSearchStarted(query));
+            },
+          ),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.all(12.0),
