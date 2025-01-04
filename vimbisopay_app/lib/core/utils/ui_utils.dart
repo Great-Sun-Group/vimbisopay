@@ -17,7 +17,9 @@ class UIUtils {
   }
 
   static double getViewPagerHeight(BuildContext context) {
-    return getScreenDimensions(context).height * HomeConstants.accountCardHeight;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final constraints = HomeConstants.getAccountCardConstraints(context);
+    return constraints.maxHeight ?? (screenHeight * 0.35); // Fallback to 35% if no max constraint
   }
 
   static String getInitials(String? firstname, String? lastname) {

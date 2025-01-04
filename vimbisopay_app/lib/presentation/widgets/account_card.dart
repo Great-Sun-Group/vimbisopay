@@ -15,13 +15,11 @@ class AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
-      ),
+      constraints: HomeConstants.getAccountCardConstraints(context),
       color: AppColors.surface,
       padding: const EdgeInsets.all(HomeConstants.defaultPadding),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Column(
