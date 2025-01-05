@@ -25,6 +25,10 @@ class HomeState extends Equatable {
   final int currentPage;
   final String? error;
   final String? message;
+  final String searchQuery;
+  final List<LedgerEntry> filteredLedgerEntries;
+  final List<PendingOffer> filteredPendingInTransactions;
+  final List<PendingOffer> filteredPendingOutTransactions;
 
   const HomeState({
     this.status = HomeStatus.initial,
@@ -38,10 +42,16 @@ class HomeState extends Equatable {
     this.currentPage = 0,
     this.error,
     this.message,
-  });
+    this.searchQuery = '',
+    List<LedgerEntry>? filteredLedgerEntries,
+    List<PendingOffer>? filteredPendingInTransactions,
+    List<PendingOffer>? filteredPendingOutTransactions,
+  }) : filteredLedgerEntries = filteredLedgerEntries ?? combinedLedgerEntries,
+       filteredPendingInTransactions = filteredPendingInTransactions ?? pendingInTransactions,
+       filteredPendingOutTransactions = filteredPendingOutTransactions ?? pendingOutTransactions;
 
   bool get isInitialLoading => status == HomeStatus.loading && dashboard == null;
-  bool get isRefreshing => status == HomeStatus.refreshing || status == HomeStatus.loading;
+  bool get isRefreshing => status == HomeStatus.refreshing;
   bool get isLoadingMore => status == HomeStatus.loadingMore;
   bool get isAcceptingCredex => status == HomeStatus.acceptingCredex;
   bool get isCancellingCredex => status == HomeStatus.cancellingCredex;
@@ -65,6 +75,10 @@ class HomeState extends Equatable {
     int? currentPage,
     String? error,
     String? message,
+    String? searchQuery,
+    List<LedgerEntry>? filteredLedgerEntries,
+    List<PendingOffer>? filteredPendingInTransactions,
+    List<PendingOffer>? filteredPendingOutTransactions,
   }) {
     return HomeState(
       status: status ?? this.status,
@@ -78,6 +92,10 @@ class HomeState extends Equatable {
       currentPage: currentPage ?? this.currentPage,
       error: error,
       message: message,
+      searchQuery: searchQuery ?? this.searchQuery,
+      filteredLedgerEntries: filteredLedgerEntries ?? this.filteredLedgerEntries,
+      filteredPendingInTransactions: filteredPendingInTransactions ?? this.filteredPendingInTransactions,
+      filteredPendingOutTransactions: filteredPendingOutTransactions ?? this.filteredPendingOutTransactions,
     );
   }
 
@@ -94,5 +112,9 @@ class HomeState extends Equatable {
         currentPage,
         error,
         message,
+        searchQuery,
+        filteredLedgerEntries,
+        filteredPendingInTransactions,
+        filteredPendingOutTransactions,
       ];
 }

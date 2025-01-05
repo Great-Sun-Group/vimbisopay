@@ -3,6 +3,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
 import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 
 class SecurityService {
   final FlutterSecureStorage _storage;
@@ -221,5 +223,27 @@ class SecurityService {
     final requiresAuth = !await _isRecentlyAuthenticated();
     Logger.state('Authentication required: $requiresAuth');
     return requiresAuth;
+  }
+
+  Future<void> clearAllData() async {
+    Logger.data('Starting data cleanup');
+    
+    try {
+      Logger.data('Clearing all secure storage data');
+      await _storage.deleteAll();
+      
+      Logger.data('Clearing all database tables');
+      final dbHelper = DatabaseHelper();
+      await dbHelper.clearAllTables();
+      
+      Logger.data('Cleaning up notification service');
+      final notificationService = NotificationService();
+      await notificationService.cleanup();
+      
+      Logger.state('All user data cleared successfully');
+    } catch (e, stackTrace) {
+      Logger.error('Error during data cleanup', e, stackTrace);
+      throw Exception('Failed to clear user data: $e');
+    }
   }
 }

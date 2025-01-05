@@ -19,7 +19,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc({
     required this.acceptCredexBulk,
     required this.accountRepository,
-  }) : super(const HomeState()) {
+  }) : super(const HomeState(status: HomeStatus.initial)) {
     Logger.lifecycle('HomeBloc initialized');
     on<HomePageChanged>(_onPageChanged);
     on<HomeDataLoaded>(_onDataLoaded);
@@ -34,6 +34,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeCancelCredexCompleted>(_onCancelCredexCompleted);
     on<HomeFetchPendingTransactions>(_onFetchPendingTransactions);
     on<HomeRegisterNotificationToken>(_onRegisterNotificationToken);
+    on<HomeSearchStarted>(_onSearchStarted);
   }
 
   List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
@@ -65,54 +66,46 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _processedCredexIds.clear();
 
     try {
+      // First try to get cached data from database
       final user = await _databaseHelper.getUser();
       Logger.data('Retrieved user from database: ${user != null}');
-      if (user == null) {
-        add(const HomeErrorOccurred('User not found'));
-        return;
-      }
+      
+      if (user?.dashboard != null) {
+        Logger.data('Using cached dashboard data');
+        final pendingInTransactions = user!.dashboard!.accounts
+            .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
+            .toList();
+        final pendingOutTransactions = user.dashboard!.accounts
+            .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
+            .toList();
 
-      Logger.data('User dashboard available: ${user.dashboard != null}');
-      if (user.dashboard == null) {
-        add(const HomeErrorOccurred('Dashboard data not available'));
-        return;
-      }
-
-      Logger.data('User accounts: ${user.dashboard!.accounts.length}');
-      Logger.data(
-          'Raw pending in data: ${user.dashboard!.accounts.map((a) => a.pendingInData.data.length ?? 0).reduce((a, b) => a + b)}');
-      Logger.data(
-          'Raw pending out data: ${user.dashboard!.accounts.map((a) => a.pendingOutData.data.length ?? 0).reduce((a, b) => a + b)}');
-
-      final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
-          .toList();
-      final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
-          .toList();
-
-      Logger.data(
-          'Found ${pendingInTransactions.length} pending in and ${pendingOutTransactions.length} pending out transactions');
-
-      add(HomeDataLoaded(
-        dashboard: user.dashboard!,
-        pendingInTransactions: pendingInTransactions,
-        pendingOutTransactions: pendingOutTransactions,
-        keepLoading: user.dashboard!.accounts.isNotEmpty,
-      ));
-
-      if (user.dashboard!.accounts.isNotEmpty) {
-        await _loadLedgerData(user.dashboard!);
-      } else {
-        add(const HomeLedgerLoaded(
-          accountLedgers: {},
-          combinedEntries: [],
-          hasMore: false,
+        // Emit cached data immediately
+        emit(state.copyWith(
+          status: HomeStatus.loading,
+          dashboard: user.dashboard,
+          pendingInTransactions: pendingInTransactions,
+          pendingOutTransactions: pendingOutTransactions,
+          filteredPendingInTransactions: pendingInTransactions,
+          filteredPendingOutTransactions: pendingOutTransactions,
+          filteredLedgerEntries: const [],
         ));
+
+        // Load ledger data in background if we have accounts
+        if (user.dashboard!.accounts.isNotEmpty) {
+          await _loadLedgerData(user.dashboard!);
+        }
       }
+
+      // Then refresh data from server
+      await _refreshViaLogin();
+      
     } catch (e, stackTrace) {
       Logger.error('Failed to load initial data', e, stackTrace);
-      add(const HomeErrorOccurred('Failed to load initial data'));
+      
+      // Only show error if we don't have any data
+      if (state.dashboard == null) {
+        add(const HomeErrorOccurred('Failed to load initial data'));
+      }
     }
 
     stopwatch.stop();
@@ -122,8 +115,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   Future<void> _loadLedgerData(Dashboard dashboard) async {
     Logger.data('Loading ledger data for accounts');
-
-    add(const HomeLoadStarted());
 
     final Map<String, List<LedgerEntry>> accountLedgers = {};
     final List<LedgerEntry> allEntries = [];
@@ -276,10 +267,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           '- ${state.pendingOutTransactions.length} pending out transactions');
 
       final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
           .toList();
       final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
           .toList();
 
       Logger.data('Database contains:');
@@ -299,6 +290,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         dashboard: user.dashboard,
         pendingInTransactions: pendingInTransactions,
         pendingOutTransactions: pendingOutTransactions,
+        // Also update filtered lists if no search is active
+        filteredPendingInTransactions: state.searchQuery.isEmpty ? pendingInTransactions : null,
+        filteredPendingOutTransactions: state.searchQuery.isEmpty ? pendingOutTransactions : null,
         message: null,
         error: null,
       ));
@@ -354,10 +348,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
           // Extract pending transactions from the new dashboard
           final pendingInTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx as PendingOffer))
+              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
           .toList();
           final pendingOutTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx as PendingOffer))
+              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
           .toList();
 
           Logger.data(
@@ -370,15 +364,26 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           // Clear processed IDs before updating state
           _processedCredexIds.clear();
 
-          // Update UI state immediately with new data
+          // Force state update with loading first
+          emit(state.copyWith(
+            status: HomeStatus.refreshing,
+            message: 'Updating balances...',
+          ));
+
+          // Then update with new data
           emit(state.copyWith(
             status: HomeStatus.success,
             dashboard: newUser.dashboard,
             pendingInTransactions: pendingInTransactions,
             pendingOutTransactions: pendingOutTransactions,
+            // Also update filtered lists if no search is active
+            filteredPendingInTransactions: state.searchQuery.isEmpty ? pendingInTransactions : null,
+            filteredPendingOutTransactions: state.searchQuery.isEmpty ? pendingOutTransactions : null,
             message: null,
             error: null,
           ));
+
+          Logger.data('Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
 
           // Then load ledger data if needed
           if (newUser.dashboard!.accounts.isNotEmpty) {
@@ -458,15 +463,50 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Pending Out: ${event.pendingOutTransactions.length}
     ''');
 
-    // Update data and set success state
-    emit(state.copyWith(
+    // Always update the main data lists
+    final newState = state.copyWith(
       status: HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
       message: null,
       error: null,
-    ));
+    );
+
+    // If there's an active search, apply filtering
+    if (state.searchQuery.isNotEmpty) {
+      final query = state.searchQuery.toLowerCase();
+      
+      final filteredPendingIn = event.pendingInTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      final filteredPendingOut = event.pendingOutTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      // Also filter ledger entries if they exist
+      final filteredLedger = state.combinedLedgerEntries.where((entry) {
+        return entry.description.toLowerCase().contains(query) ||
+               entry.formattedAmount.toLowerCase().contains(query) ||
+               entry.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      emit(newState.copyWith(
+        filteredPendingInTransactions: filteredPendingIn,
+        filteredPendingOutTransactions: filteredPendingOut,
+        filteredLedgerEntries: filteredLedger,
+      ));
+    } else {
+      // If no search query, filtered lists should match main lists
+      emit(newState.copyWith(
+        filteredPendingInTransactions: event.pendingInTransactions,
+        filteredPendingOutTransactions: event.pendingOutTransactions,
+        filteredLedgerEntries: state.combinedLedgerEntries,
+      ));
+    }
   }
 
   void _onLedgerLoaded(HomeLedgerLoaded event, Emitter<HomeState> emit) {
@@ -476,14 +516,50 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       Accounts with Data: ${event.accountLedgers.keys.length}
     ''');
 
-    emit(state.copyWith(
+    // Always update the main ledger data
+    final newState = state.copyWith(
       status: HomeStatus.success,
       accountLedgers: event.accountLedgers,
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
       message: null,
       error: null,
-    ));
+    );
+
+    // If there's an active search, apply filtering
+    if (state.searchQuery.isNotEmpty) {
+      final query = state.searchQuery.toLowerCase();
+      
+      final filteredEntries = event.combinedEntries.where((entry) {
+        return entry.description.toLowerCase().contains(query) ||
+               entry.formattedAmount.toLowerCase().contains(query) ||
+               entry.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      // Also filter pending transactions to maintain consistency
+      final filteredPendingIn = state.pendingInTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      final filteredPendingOut = state.pendingOutTransactions.where((tx) {
+        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
+               tx.counterpartyAccountName.toLowerCase().contains(query);
+      }).toList();
+
+      emit(newState.copyWith(
+        filteredLedgerEntries: filteredEntries,
+        filteredPendingInTransactions: filteredPendingIn,
+        filteredPendingOutTransactions: filteredPendingOut,
+      ));
+    } else {
+      // If no search query, filtered lists should match main lists
+      emit(newState.copyWith(
+        filteredLedgerEntries: event.combinedEntries,
+        filteredPendingInTransactions: state.pendingInTransactions,
+        filteredPendingOutTransactions: state.pendingOutTransactions,
+      ));
+    }
   }
 
   void _onErrorOccurred(HomeErrorOccurred event, Emitter<HomeState> emit) {
@@ -493,6 +569,22 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       error: event.message,
       message: null,
     ));
+
+    // If error is related to authentication, clear state
+    if (event.message?.toLowerCase().contains('credentials') == true ||
+        event.message?.toLowerCase().contains('unauthorized') == true ||
+        event.message?.toLowerCase().contains('unauthenticated') == true) {
+      _processedCredexIds.clear();
+      emit(const HomeState(status: HomeStatus.initial));
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    Logger.lifecycle('HomeBloc closing');
+    _processedCredexIds.clear();
+    _isInitialized = false;
+    await super.close();
   }
 
   void _onAcceptCredexBulkStarted(
@@ -524,64 +616,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       (_) async {
         Logger.data(
             'Successfully processed ${event.credexIds.length} credex transactions');
-
-        final updatedPendingIn = state.pendingInTransactions
-            .where((tx) => !event.credexIds.contains(tx.credexID))
-            .toList();
-        final updatedPendingOut = state.pendingOutTransactions
-            .where((tx) => !event.credexIds.contains(tx.credexID))
-            .toList();
-
-        // Update UI state immediately
+            
+        // Set loading state
         emit(state.copyWith(
-          status: HomeStatus.success,
-          pendingInTransactions: updatedPendingIn,
-          pendingOutTransactions: updatedPendingOut,
-          message: 'Credex transactions accepted successfully',
+          status: HomeStatus.refreshing,
+          message: 'Refreshing balances...',
           error: null,
         ));
-
-        // Update database in background
-        try {
-          final user = await _databaseHelper.getUser();
-          if (user?.dashboard != null) {
-            final updatedAccounts = user!.dashboard!.accounts.map((account) {
-              final updatedPendingInData = (account.pendingInData.data ?? [])
-                  .where((tx) => !event.credexIds.contains(tx.credexID))
-                  .map((tx) => tx as PendingOffer)
-                  .toList();
-
-              return DashboardAccount(
-                accountID: account.accountID,
-                accountName: account.accountName,
-                accountHandle: account.accountHandle,
-                defaultDenom: account.defaultDenom,
-                isOwnedAccount: account.isOwnedAccount,
-                balanceData: account.balanceData,
-                pendingInData: PendingData(
-                  success: true,
-                  data: updatedPendingInData,
-                  message: 'Pending offers retrieved',
-                ),
-                pendingOutData: account.pendingOutData,
-                sendOffersTo: account.sendOffersTo,
-              );
-            }).toList();
-
-            final updatedDashboard = Dashboard(
-              id: user.dashboard!.id,
-              member: user.dashboard!.member,
-              accounts: updatedAccounts,
-            );
-            await _databaseHelper
-                .saveUser(user.copyWith(dashboard: updatedDashboard));
-            Logger.data('Pending transactions updated in database');
-          }
-        } catch (e) {
-          Logger.error('Failed to update database', e);
-          // Don't emit error state since UI is already updated
-        }
-
+        
+        // Add a small delay to ensure backend has processed the transaction
+        await Future.delayed(const Duration(seconds: 2));
+        
+        // Refresh data to get updated balances and transactions
+        await _refreshViaLogin();
+        
         add(const HomeAcceptCredexBulkCompleted());
       },
     );
@@ -592,12 +640,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) {
     Logger.state('Bulk credex acceptance completed');
-    emit(state.copyWith(
-      status: HomeStatus.success,
-      processingCredexIds: const [],
-      message: 'Credex transactions accepted successfully',
-      error: null,
-    ));
+    // No need to refresh here as it's already done in _onAcceptCredexBulkStarted
   }
 
   void _onCancelCredexStarted(
@@ -622,61 +665,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (_) async {
         Logger.data('Successfully cancelled credex transaction');
-
-        // Update UI state immediately
-        final updatedPendingOut = state.pendingOutTransactions
-            .where((tx) => tx.credexID != event.credexId)
-            .toList();
-
+            
+        // Set loading state and trigger refresh immediately
         emit(state.copyWith(
-          status: HomeStatus.success,
-          pendingInTransactions: state.pendingInTransactions,
-          pendingOutTransactions: updatedPendingOut,
-          message: 'Credex cancelled successfully',
+          status: HomeStatus.refreshing,
+          message: 'Refreshing balances...',
           error: null,
         ));
-
-        // Update database in background
-        try {
-          final user = await _databaseHelper.getUser();
-          if (user?.dashboard != null) {
-            final updatedAccounts = user!.dashboard!.accounts.map((account) {
-              final updatedPendingOutData = (account.pendingOutData.data ?? [])
-                  .where((tx) => tx.credexID != event.credexId)
-                  .map((tx) => tx as PendingOffer)
-                  .toList();
-
-              return DashboardAccount(
-                accountID: account.accountID,
-                accountName: account.accountName,
-                accountHandle: account.accountHandle,
-                defaultDenom: account.defaultDenom,
-                isOwnedAccount: account.isOwnedAccount,
-                balanceData: account.balanceData,
-                pendingInData: account.pendingInData,
-                pendingOutData: PendingData(
-                  success: true,
-                  data: updatedPendingOutData,
-                  message: 'Pending outgoing offers retrieved',
-                ),
-                sendOffersTo: account.sendOffersTo,
-              );
-            }).toList();
-
-            final updatedDashboard = Dashboard(
-              id: user.dashboard!.id,
-              member: user.dashboard!.member,
-              accounts: updatedAccounts,
-            );
-            await _databaseHelper
-                .saveUser(user.copyWith(dashboard: updatedDashboard));
-            Logger.data('Pending transactions updated in database');
-          }
-        } catch (e) {
-          Logger.error('Failed to update database', e);
-          // Don't emit error state since UI is already updated
-        }
-
+        
+        // Refresh data to get updated balances and transactions
+        await _refreshViaLogin();
+        
         add(const HomeCancelCredexCompleted());
       },
     );
@@ -710,6 +709,69 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Logger.data('Checking database state before refresh');
     // Trigger refresh
     await _refreshFromDb();
+  }
+
+  void _onSearchStarted(HomeSearchStarted event, Emitter<HomeState> emit) {
+    Logger.interaction('Search started with query: ${event.query}');
+    
+    // Always update search query first
+    emit(state.copyWith(searchQuery: event.query));
+    
+    if (event.query.isEmpty) {
+      Logger.data('Empty search query - showing all transactions');
+      emit(state.copyWith(
+        filteredLedgerEntries: state.combinedLedgerEntries,
+        filteredPendingInTransactions: state.pendingInTransactions,
+        filteredPendingOutTransactions: state.pendingOutTransactions,
+      ));
+      return;
+    }
+
+    final query = event.query.toLowerCase();
+    Logger.data('Filtering transactions with query: $query');
+    
+    // Filter ledger entries
+    final filteredEntries = state.combinedLedgerEntries.where((entry) {
+      final matches = entry.description.toLowerCase().contains(query) ||
+             entry.formattedAmount.toLowerCase().contains(query) ||
+             entry.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched ledger entry: ${entry.description}');
+      }
+      return matches;
+    }).toList();
+
+    // Filter pending in transactions
+    final filteredPendingIn = state.pendingInTransactions.where((tx) {
+      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
+             tx.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched pending in: ${tx.counterpartyAccountName}');
+      }
+      return matches;
+    }).toList();
+
+    // Filter pending out transactions
+    final filteredPendingOut = state.pendingOutTransactions.where((tx) {
+      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
+             tx.counterpartyAccountName.toLowerCase().contains(query);
+      if (matches) {
+        Logger.data('Matched pending out: ${tx.counterpartyAccountName}');
+      }
+      return matches;
+    }).toList();
+
+    Logger.data('''Search results:
+      Ledger entries: ${filteredEntries.length}
+      Pending in: ${filteredPendingIn.length}
+      Pending out: ${filteredPendingOut.length}
+    ''');
+
+    emit(state.copyWith(
+      filteredLedgerEntries: filteredEntries,
+      filteredPendingInTransactions: filteredPendingIn,
+      filteredPendingOutTransactions: filteredPendingOut,
+    ));
   }
 
   Future<void> _onRegisterNotificationToken(

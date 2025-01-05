@@ -77,10 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // Listen for token refresh
         messaging.onTokenRefresh.listen((newToken) {
           Logger.data('FCM token refreshed: $newToken');
-          if (user.token != null) {
-            _notificationService.registerToken(newToken, user.token);
-          }
-        });
+          _notificationService.registerToken(newToken, user.token);
+                });
       }
     } catch (e) {
       Logger.error('Error registering notification token', e);
@@ -116,9 +114,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
       accountRepository: _accountRepository,
     );
-    // Trigger initial data load after a short delay to ensure navigation is complete
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!_isDisposed) {
+    
+    // Use addPostFrameCallback to ensure widget is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isDisposed && mounted) {
         _homeBloc.loadInitialData();
       }
     });
@@ -165,6 +164,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         leadingWidth: 80,
         toolbarHeight: HomeConstants.appBarHeight,
         leading: _buildUserAvatar(state),
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search transactions...',
+              hintStyle: TextStyle(color: AppColors.textPrimary.withOpacity(0.5)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+              prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+              suffixIcon: (state.searchQuery.isNotEmpty ||
+                      state.filteredLedgerEntries != state.combinedLedgerEntries ||
+                      state.filteredPendingInTransactions != state.pendingInTransactions ||
+                      state.filteredPendingOutTransactions != state.pendingOutTransactions)
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.primary),
+                      onPressed: () {
+                        Logger.interaction('Search cleared');
+                        _homeBloc.add(const HomeSearchStarted(''));
+                      },
+                    )
+                  : null,
+            ),
+            style: const TextStyle(color: AppColors.textPrimary),
+            onChanged: (query) {
+              Logger.interaction('Search query changed: $query');
+              _homeBloc.add(HomeSearchStarted(query));
+            },
+          ),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.all(12.0),
@@ -242,10 +274,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       children: [
         const SizedBox(height: HomeConstants.defaultPadding),
         ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * HomeConstants.accountCardHeight,
-          ),
-          child: BlocListener<HomeBloc, HomeState>(
+          constraints: HomeConstants.getAccountCardConstraints(context),
+          child: BlocConsumer<HomeBloc, HomeState>(
             listenWhen: (previous, current) => previous.currentPage != current.currentPage,
             listener: (context, state) {
               if (_pageController.page?.round() != state.currentPage) {
@@ -256,17 +286,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 );
               }
             },
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                Logger.interaction('Account page changed to $index');
-                _homeBloc.add(HomePageChanged(index));
-              },
-              itemCount: state.dashboard!.accounts.length,
-              itemBuilder: (context, index) => AccountCard(
-                account: state.dashboard!.accounts[index],
-              ),
-            ),
+            buildWhen: (previous, current) {
+              // Check if any account balances have changed
+              final previousBalances = previous.dashboard?.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+              final currentBalances = current.dashboard?.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+                  
+              return previous.dashboard != current.dashboard || 
+                     previous.currentPage != current.currentPage ||
+                     previousBalances != currentBalances;
+            },
+            builder: (context, state) {
+              // Create a key that changes when any account's balance changes
+              final balancesKey = state.dashboard!.accounts
+                  .map((a) => a.balanceData.netCredexAssetsInDefaultDenom)
+                  .join('_');
+                  
+              return PageView.builder(
+                key: ValueKey('accounts_pageview_$balancesKey'),
+                controller: _pageController,
+                onPageChanged: (index) {
+                  Logger.interaction('Account page changed to $index');
+                  _homeBloc.add(HomePageChanged(index));
+                },
+                itemCount: state.dashboard!.accounts.length,
+                itemBuilder: (context, index) => AccountCard(
+                  key: ValueKey('account_card_${state.dashboard!.accounts[index].accountID}_${state.dashboard!.accounts[index].balanceData.netCredexAssetsInDefaultDenom}'),
+                  account: state.dashboard!.accounts[index],
+                ),
+              );
+            },
           ),
         ),
         if (state.dashboard!.accounts.length > 1)
