@@ -37,7 +37,21 @@ flutter build apk --release
 
 # Create version-specific APK name
 version_apk="build/app/outputs/flutter-apk/vimbisopay-${new_version}.apk"
-cp build/app/outputs/flutter-apk/app-release.apk "$version_apk"
+
+# Check if source APK exists
+if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+    echo "Error: Release APK not found at build/app/outputs/flutter-apk/app-release.apk"
+    exit 1
+fi
+
+# Create version-specific copy
+cp "build/app/outputs/flutter-apk/app-release.apk" "$version_apk"
+
+# Verify copy was successful
+if [ ! -f "$version_apk" ]; then
+    echo "Error: Failed to create version-specific APK at $version_apk"
+    exit 1
+fi
 
 # Get current branch name
 current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -126,8 +140,15 @@ if [ -z "$release_id" ]; then
     exit 1
 fi
 
+# Verify APK exists before upload
+if [ ! -f "$version_apk" ]; then
+    echo "Error: APK file not found at $version_apk"
+    exit 1
+fi
+
 # Upload APK as release asset
 echo "Uploading APK to GitHub release..."
+echo "Using APK file: $version_apk"
 upload_response=$(curl -L -v \
   -X POST \
   -H "Accept: application/vnd.github+json" \

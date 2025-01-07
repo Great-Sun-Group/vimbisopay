@@ -155,7 +155,7 @@ class AccountCard extends StatelessWidget {
   }
 
   Widget _buildPayablesSection() {
-    return Container(
+    return SizedBox(
       height: 50,
       child: IntrinsicHeight(
         child: Row(
