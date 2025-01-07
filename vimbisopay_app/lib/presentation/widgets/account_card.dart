@@ -15,45 +15,51 @@ class AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      constraints: HomeConstants.getAccountCardConstraints(context),
       color: AppColors.surface,
       padding: const EdgeInsets.all(HomeConstants.defaultPadding),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      account.accountName,
-                      style: const TextStyle(
-                        fontSize: HomeConstants.headingTextSize,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          account.accountName,
+                          style: const TextStyle(
+                            fontSize: HomeConstants.headingTextSize,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      const SizedBox(width: HomeConstants.tinyPadding),
+                      _buildTierLimitBadge(),
+                    ],
                   ),
-                  const SizedBox(width: HomeConstants.tinyPadding),
-                  _buildTierLimitBadge(),
+                  _buildAccountHandle(),
                 ],
               ),
-              const SizedBox(height: HomeConstants.tinyPadding),
-              _buildAccountHandle(),
-            ],
-          ),
-          const SizedBox(height: HomeConstants.defaultPadding),
-          _buildBalanceSection(),
-          const SizedBox(height: HomeConstants.defaultPadding),
-          _buildPayablesSection(),
-        ],
+            ),
+            Expanded(
+              flex: 2,
+              child: _buildBalanceSection(),
+            ),
+            _buildPayablesSection(),
+          ],
+        ),
       ),
     );
   }
@@ -118,76 +124,99 @@ class AccountCard extends StatelessWidget {
   }
 
   Widget _buildBalanceSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Net Balance',
-          style: TextStyle(
-            fontSize: HomeConstants.subheadingTextSize,
-            color: AppColors.textSecondary,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Net Balance',
+            style: TextStyle(
+              fontSize: HomeConstants.subheadingTextSize,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-        const SizedBox(height: HomeConstants.smallPadding),
-        Text(
-          account.balanceData.netCredexAssetsInDefaultDenom,
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              account.balanceData.netCredexAssetsInDefaultDenom,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildPayablesSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      height: 50,
+      child: IntrinsicHeight(
+        child: Row(
           children: [
-            const Text(
-              'Receivables',
-              style: TextStyle(
-                fontSize: HomeConstants.bodyTextSize,
-                color: AppColors.textSecondary,
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Receivables',
+                      style: TextStyle(
+                        fontSize: HomeConstants.bodyTextSize,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      account.balanceData.unsecuredBalances.totalReceivables,
+                      style: const TextStyle(
+                        fontSize: HomeConstants.subheadingTextSize,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: HomeConstants.tinyPadding),
-            Text(
-              account.balanceData.unsecuredBalances.totalReceivables,
-              style: const TextStyle(
-                fontSize: HomeConstants.subheadingTextSize,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Payables',
+                      style: TextStyle(
+                        fontSize: HomeConstants.bodyTextSize,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      account.balanceData.unsecuredBalances.totalPayables,
+                      style: const TextStyle(
+                        fontSize: HomeConstants.subheadingTextSize,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Text(
-              'Payables',
-              style: TextStyle(
-                fontSize: HomeConstants.bodyTextSize,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: HomeConstants.tinyPadding),
-            Text(
-              account.balanceData.unsecuredBalances.totalPayables,
-              style: const TextStyle(
-                fontSize: HomeConstants.subheadingTextSize,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }

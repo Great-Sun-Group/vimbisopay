@@ -132,10 +132,10 @@ class _SendCredexScreenState extends State<SendCredexScreen>
         Navigator.of(context).pop();
       }
     }
+    super.dispose();
     _recipientController.dispose();
     _amountController.dispose();
     _amountFocusNode.dispose();
-    super.dispose();
   }
 
   String _getFormattedErrorMessage(String error) {
@@ -384,233 +384,242 @@ class _SendCredexScreenState extends State<SendCredexScreen>
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStatusMessage(),
-                _buildErrorMessage(),
-                Card(
-                  color: AppColors.surface,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'From Account',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+        body: SafeArea(
+          bottom: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              top: 16.0,
+              left: 16.0,
+              right: 16.0,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatusMessage(),
+                  _buildErrorMessage(),
+                  Card(
+                    color: AppColors.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'From Account',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.senderAccount.accountName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.senderAccount.accountName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        Text(
-                          '@${widget.senderAccount.accountHandle}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        '@',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _recipientController,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          labelText: 'Recipient Handle',
-                          labelStyle:
-                              const TextStyle(color: AppColors.textSecondary),
-                          hintText: 'Enter recipient handle',
-                          hintStyle: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.5)),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide.none,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          suffixIcon: _isValidatingRecipient
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12.0),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppColors.primary),
-                                    ),
-                                  ),
-                                )
-                              : _recipientAccountId != null
-                                  ? const Icon(Icons.check_circle,
-                                      color: AppColors.success)
-                                  : null,
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter recipient handle';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _scanQRCode,
-                      icon: const Icon(Icons.qr_code_scanner,
-                          color: AppColors.primary),
-                      tooltip: 'Scan QR Code',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildBalanceIndicator(),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _amountController,
-                        focusNode: _amountFocusNode,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          labelText: 'Amount',
-                          labelStyle:
-                              const TextStyle(color: AppColors.textSecondary),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide.none,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,' +
-                                _decimalPlaces.toString() +
-                                '}'),
+                          Text(
+                            '@${widget.senderAccount.accountHandle}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter amount';
-                          }
-                          final amount = double.tryParse(value);
-                          if (amount == null) {
-                            return 'Please enter a valid number';
-                          }
-                          if (amount <= 0) {
-                            return 'Amount must be greater than 0';
-                          }
-                          if (amount > _availableBalance) {
-                            return 'Amount exceeds available balance';
-                          }
-                          return null;
-                        },
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: DropdownButtonFormField<Denomination>(
-                        value: _selectedDenomination,
-                        dropdownColor: AppColors.surface,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          labelText: 'Currency',
-                          labelStyle:
-                              const TextStyle(color: AppColors.textSecondary),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide.none,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        items: Denomination.values.map((denomination) {
-                          return DropdownMenuItem(
-                            value: denomination,
-                            child: Text(
-                              denomination.toString().split('.').last,
-                              style:
-                                  const TextStyle(color: AppColors.textPrimary),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _handleDenominationChange,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textPrimary),
-                          ),
-                        )
-                      : const Text(
-                          'Send',
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '@',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
                           ),
                         ),
-                ),
-              ],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _recipientController,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            labelText: 'Recipient Handle',
+                            labelStyle:
+                                const TextStyle(color: AppColors.textSecondary),
+                            hintText: 'Enter recipient handle',
+                            hintStyle: TextStyle(
+                                color: AppColors.textSecondary.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            suffixIcon: _isValidatingRecipient
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: Padding(
+                                      padding: EdgeInsets.all(12.0),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                            AppColors.primary),
+                                      ),
+                                    ),
+                                  )
+                                : _recipientAccountId != null
+                                    ? const Icon(Icons.check_circle,
+                                        color: AppColors.success)
+                                    : null,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter recipient handle';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: _scanQRCode,
+                        icon: const Icon(Icons.qr_code_scanner,
+                            color: AppColors.primary),
+                        tooltip: 'Scan QR Code',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildBalanceIndicator(),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _amountController,
+                          focusNode: _amountFocusNode,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            labelText: 'Amount',
+                            labelStyle:
+                                const TextStyle(color: AppColors.textSecondary),
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,' +
+                                  _decimalPlaces.toString() +
+                                  '}'),
+                            ),
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter amount';
+                            }
+                            final amount = double.tryParse(value);
+                            if (amount == null) {
+                              return 'Please enter a valid number';
+                            }
+                            if (amount <= 0) {
+                              return 'Amount must be greater than 0';
+                            }
+                            if (amount > _availableBalance) {
+                              return 'Amount exceeds available balance';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<Denomination>(
+                          value: _selectedDenomination,
+                          dropdownColor: AppColors.surface,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            labelText: 'Currency',
+                            labelStyle:
+                                const TextStyle(color: AppColors.textSecondary),
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          items: Denomination.values.map((denomination) {
+                            return DropdownMenuItem(
+                              value: denomination,
+                              child: Text(
+                                denomination.toString().split('.').last,
+                                style:
+                                    const TextStyle(color: AppColors.textPrimary),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: _handleDenominationChange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.textPrimary),
+                            ),
+                          )
+                        : const Text(
+                            'Send',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

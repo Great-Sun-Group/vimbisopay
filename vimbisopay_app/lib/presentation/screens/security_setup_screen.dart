@@ -43,9 +43,9 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
   @override
   void dispose() {
     _isDisposed = true;
+    super.dispose();
     _pinController.dispose();
     _pinFocusNode.dispose();
-    super.dispose();
   }
 
   Widget _buildSecurityInfoBanner() {

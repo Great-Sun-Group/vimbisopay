@@ -43,10 +43,8 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     Logger.lifecycle('AuthScreen - Disposing');
     _isDisposed = true;
-    if (mounted) {
-      _pinFocusNode.dispose();
-    }
     super.dispose();
+    _pinFocusNode.dispose();
   }
 
   Future<void> _initialize() async {
