@@ -65,3 +65,6 @@ Example entry format:
 
 ## [1.0.0+15] - 2024-12-23
 - Transaction Confirmation and UI fixes
+-e 
+## [1.0.0.0+24] - 2025-01-07
+- UI Fixes
