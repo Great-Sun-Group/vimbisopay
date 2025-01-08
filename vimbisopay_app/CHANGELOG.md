@@ -2,6 +2,13 @@
 
 All notable changes to this app will be documented in this file.
 
+## [1.0.0+26] - 2025-01-08
+- Added Git hooks for automated testing:
+  - Pre-push hook to run tests automatically
+  - Tests must pass before pushing code
+  - Added setup instructions in README.md
+  - Updated testing strategy documentation
+
 ## [1.0.0+25] - 2025-01-08
 - Enhanced test coverage and reliability:
   - Improved BLoC testing with proper state transition verification

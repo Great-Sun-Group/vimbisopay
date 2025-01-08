@@ -68,9 +68,24 @@ This document outlines the testing strategy for the VimbisoPay app, detailing ou
 - **Network Mocking**: Mock HTTP client
 
 ## Continuous Integration
-- All tests run on every pull request
-- Required passing tests before merge
+
+### 1. Git Hooks
+- Pre-push hook enforces test execution
+- All tests must pass before code can be pushed
+- Located in `scripts/git-hooks/pre-push`
+- Setup instructions in README.md
+
+### 2. Pull Request Requirements
+- All tests must pass before merge
 - Coverage reports generated automatically
+- Required passing tests before merge
+- Coverage thresholds enforced
+
+### 3. Automated Testing
+- Tests run on every push
+- Tests run on every pull request
+- Tests run before releases
+- Automated test reports generated
 
 ## Recent Improvements
 - Enhanced BLoC testing with proper state transition verification
@@ -78,3 +93,30 @@ This document outlines the testing strategy for the VimbisoPay app, detailing ou
 - Removed legacy widget tests
 - Added comprehensive testing for Credex operations
 - Implemented proper timeout handling in async tests
+- Added Git hooks for automated test execution
+- Improved documentation and setup instructions
+
+## Setting Up Local Testing
+
+### 1. Git Hooks Setup
+```bash
+mkdir -p .git/hooks
+ln -s ../../scripts/git-hooks/pre-push .git/hooks/pre-push
+```
+
+### 2. Running Tests
+```bash
+# Run all tests
+flutter test
+
+# Run specific test file
+flutter test test/path/to/test_file.dart
+
+# Run with coverage
+flutter test --coverage
+```
+
+### 3. Test Reports
+- Coverage reports generated in `coverage/` directory
+- HTML reports can be generated for better visualization
+- Test results logged in CI/CD pipeline

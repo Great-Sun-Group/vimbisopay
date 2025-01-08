@@ -8,7 +8,27 @@ A Flutter application for managing Vimbisopay transactions.
 2. Clone this repository
 3. Run `flutter pub get` to install dependencies
 4. Set up Firebase configuration (see below)
-5. Run `flutter run` to start the app in debug mode
+5. Set up Git hooks (see below)
+6. Run `flutter run` to start the app in debug mode
+
+## Git Hooks Setup
+
+The repository includes Git hooks to ensure code quality:
+
+1. Create Git hooks directory if it doesn't exist:
+   ```bash
+   mkdir -p .git/hooks
+   ```
+
+2. Link the pre-push hook:
+   ```bash
+   ln -s ../../scripts/git-hooks/pre-push .git/hooks/pre-push
+   ```
+
+This will ensure that:
+- All tests pass before each push
+- Failed pushes if tests fail
+- Consistent code quality across the team
 
 ## Testing
 
