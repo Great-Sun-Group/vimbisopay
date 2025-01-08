@@ -122,7 +122,7 @@ void main() {
   });
 
   test('initial state is correct', () {
-    expect(homeBloc.state, const HomeState(status: HomeStatus.initial));
+    expect(homeBloc.state, const HomeState(status: HomeStatus.success));  // Intentionally wrong state
   });
 
   group('HomeCancelCredexStarted', () {
@@ -149,7 +149,7 @@ void main() {
           ),
           predicate<HomeState>((state) => 
             state.status == HomeStatus.refreshing &&
-            state.message == 'Refreshing balances...Test'
+            state.message == 'Refreshing balances...'
           ),
           predicate<HomeState>((state) => 
             state.status == HomeStatus.refreshing &&
