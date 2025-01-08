@@ -12,7 +12,10 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final AcceptCredexBulk acceptCredexBulk;
   final AccountRepository accountRepository;
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  DatabaseHelper _databaseHelper = DatabaseHelper();
+  
+  // For testing
+  set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
   final Set<String> _processedCredexIds = {};
   bool _isInitialized = false;
 
@@ -35,6 +38,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeFetchPendingTransactions>(_onFetchPendingTransactions);
     on<HomeRegisterNotificationToken>(_onRegisterNotificationToken);
     on<HomeSearchStarted>(_onSearchStarted);
+    on<HomeLoadPendingTransactions>(_onLoadPendingTransactions);
+    on<CreateCredexEvent>(_onCreateCredex);
   }
 
   List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
@@ -383,7 +388,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             error: null,
           ));
 
-          Logger.data('Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
+          if (newUser.dashboard!.accounts.isNotEmpty) {
+            Logger.data('Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
+          }
 
           // Then load ledger data if needed
           if (newUser.dashboard!.accounts.isNotEmpty) {
@@ -438,7 +445,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     await _refreshViaLogin();
   }
 
-  void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) {
+  void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
     if (!state.hasMoreEntries) {
       Logger.state('Load more ignored - no more entries available');
       emit(state.copyWith(
@@ -454,6 +461,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       message: null,
       error: null,
     ));
+
+    // Add a small delay to ensure state is emitted
+    await Future.delayed(const Duration(milliseconds: 10));
   }
 
   void _onDataLoaded(HomeDataLoaded event, Emitter<HomeState> emit) {
@@ -465,7 +475,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     // Always update the main data lists
     final newState = state.copyWith(
-      status: HomeStatus.success,
+      status: event.keepLoading ? state.status : HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
@@ -789,6 +799,39 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (_) {
         Logger.data('Successfully registered notification token');
+      },
+    );
+  }
+
+  void _onLoadPendingTransactions(
+    HomeLoadPendingTransactions event,
+    Emitter<HomeState> emit,
+  ) {
+    Logger.data('Loading pending transactions');
+    emit(state.copyWith(
+      status: HomeStatus.success,
+      pendingInTransactions: event.pendingInTransactions,
+      pendingOutTransactions: event.pendingOutTransactions,
+      filteredPendingInTransactions: event.pendingInTransactions,
+      filteredPendingOutTransactions: event.pendingOutTransactions,
+    ));
+  }
+
+  Future<void> _onCreateCredex(
+    CreateCredexEvent event,
+    Emitter<HomeState> emit,
+  ) async {
+    Logger.data('Creating credex request');
+    
+    final result = await accountRepository.createCredex(event.request);
+    
+    result.fold(
+      (failure) {
+        Logger.error('Failed to create credex', failure);
+        add(HomeErrorOccurred(failure.message ?? 'Failed to create credex'));
+      },
+      (_) {
+        Logger.data('Successfully created credex');
       },
     );
   }
