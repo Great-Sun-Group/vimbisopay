@@ -10,6 +10,47 @@ A Flutter application for managing Vimbisopay transactions.
 4. Set up Firebase configuration (see below)
 5. Run `flutter run` to start the app in debug mode
 
+## Testing
+
+The app includes comprehensive test coverage across different layers:
+
+### Running Tests
+
+- Run all tests:
+  ```bash
+  flutter test
+  ```
+
+- Run specific test file:
+  ```bash
+  flutter test test/path/to/test_file.dart
+  ```
+
+- Run tests with coverage:
+  ```bash
+  flutter test --coverage
+  ```
+
+### Test Categories
+
+1. **Repository Tests** (`test/infrastructure/repositories/`)
+   - Test API interactions and data mapping
+   - Verify error handling
+   - Mock HTTP responses
+   ```bash
+   flutter test test/infrastructure/repositories/
+   ```
+
+2. **BLoC Tests** (`test/presentation/blocs/`)
+   - Test state management
+   - Verify state transitions
+   - Test error handling
+   ```bash
+   flutter test test/presentation/blocs/
+   ```
+
+For more details about testing strategy and best practices, see [Testing Strategy](docs/AD_SPACE_IMPLEMENTATION/09_TESTING_STRATEGY.md).
+
 ## Firebase Configuration
 
 The app requires Firebase configuration files which are not checked into version control for security reasons:

@@ -18,9 +18,16 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
   
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
-  final SecurityService _securityService = SecurityService();
-  final PasswordService _passwordService = PasswordService();
+  DatabaseHelper _databaseHelper = DatabaseHelper();
+  SecurityService _securityService = SecurityService();
+  PasswordService _passwordService = PasswordService();
+  http.Client _httpClient = http.Client();
+
+  // For testing
+  set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
+  set securityService(SecurityService service) => _securityService = service;
+  set passwordService(PasswordService service) => _passwordService = service;
+  set httpClient(http.Client client) => _httpClient = client;
 
   Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
@@ -139,7 +146,7 @@ class AccountRepositoryImpl implements AccountRepository {
         };
 
         final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
@@ -189,7 +196,7 @@ class AccountRepositoryImpl implements AccountRepository {
         final headers = _authHeaders(token);
 
         final response = await _loggedRequest(
-          () => http.get(Uri.parse(url), headers: headers),
+          () => _httpClient.get(Uri.parse(url), headers: headers),
           url,
           'GET',
           headers: headers,
@@ -215,7 +222,7 @@ class AccountRepositoryImpl implements AccountRepository {
         final body = {'accountHandle': handle};
 
         final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
@@ -274,7 +281,7 @@ class AccountRepositoryImpl implements AccountRepository {
       };
 
       final response = await _loggedRequest(
-        () => http.post(
+        () => _httpClient.post(
           Uri.parse(url),
           headers: _baseHeaders,
           body: json.encode(body),
@@ -296,7 +303,6 @@ class AccountRepositoryImpl implements AccountRepository {
     }
   }
 
-  @override
   @override
   Future<Either<Failure, User>> login({
     required String phone,
@@ -325,7 +331,7 @@ class AccountRepositoryImpl implements AccountRepository {
       }
 
       final response = await _loggedRequest(
-        () => http.post(
+        () => _httpClient.post(
           Uri.parse(url),
           headers: _baseHeaders,
           body: json.encode(body),
@@ -358,39 +364,39 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final dashboardData = jsonResponse['data']['dashboard'];
         
-          final dashboardObj = dashboard.Dashboard.fromMap({
-            'member': {
-              'memberID': actionDetails['memberID'],
-              'memberTier': dashboardData['member']['memberTier'],
-              'firstname': dashboardData['member']['firstname'],
-              'lastname': dashboardData['member']['lastname'],
-              'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
-              'defaultDenom': dashboardData['member']['defaultDenom'],
+        final dashboardObj = dashboard.Dashboard.fromMap({
+          'member': {
+            'memberID': actionDetails['memberID'],
+            'memberTier': dashboardData['member']['memberTier'],
+            'firstname': dashboardData['member']['firstname'],
+            'lastname': dashboardData['member']['lastname'],
+            'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
+            'defaultDenom': dashboardData['member']['defaultDenom'],
+          },
+          'accounts': dashboardData['accounts'].map((accountData) => {
+            'accountID': accountData['accountID'],
+            'accountName': accountData['accountName'],
+            'accountHandle': accountData['accountHandle'],
+            'defaultDenom': accountData['defaultDenom'],
+            'isOwnedAccount': accountData['isOwnedAccount'],
+            'balanceData': {
+              'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
+              'unsecuredBalancesInDefaultDenom': accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
+              'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
             },
-            'accounts': dashboardData['accounts'].map((accountData) => {
-              'accountID': accountData['accountID'],
-              'accountName': accountData['accountName'],
-              'accountHandle': accountData['accountHandle'],
-              'defaultDenom': accountData['defaultDenom'],
-              'isOwnedAccount': accountData['isOwnedAccount'],
-              'balanceData': {
-                'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
-                'unsecuredBalancesInDefaultDenom': accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
-                'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
-              },
-              'pendingInData': {
-                'success': true,
-                'data': accountData['pendingInData'] ?? [],
-                'message': 'Pending offers retrieved',
-              },
-              'pendingOutData': {
-                'success': true,
-                'data': accountData['pendingOutData'] ?? [],
-                'message': 'Pending outgoing offers retrieved',
-              },
-              'sendOffersTo': accountData['sendOffersTo'],
-            }).toList(),
-          });
+            'pendingInData': {
+              'success': true,
+              'data': accountData['pendingInData'] ?? [],
+              'message': 'Pending offers retrieved',
+            },
+            'pendingOutData': {
+              'success': true,
+              'data': accountData['pendingOutData'] ?? [],
+              'message': 'Pending outgoing offers retrieved',
+            },
+            'sendOffersTo': accountData['sendOffersTo'],
+          }).toList(),
+        });
         
         final user = User(
           memberId: memberId,
@@ -425,7 +431,7 @@ class AccountRepositoryImpl implements AccountRepository {
 
           Logger.data('Sending Credex request to $url');
           final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
@@ -532,7 +538,7 @@ class AccountRepositoryImpl implements AccountRepository {
         final body = {'credexIDs': credexIds};
 
         final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
@@ -562,7 +568,7 @@ class AccountRepositoryImpl implements AccountRepository {
         final body = {'credexID': credexId};
 
         final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
@@ -592,7 +598,7 @@ class AccountRepositoryImpl implements AccountRepository {
         final body = {'token': token};
 
         final response = await _loggedRequest(
-          () => http.post(
+          () => _httpClient.post(
             Uri.parse(url),
             headers: headers,
             body: json.encode(body),
