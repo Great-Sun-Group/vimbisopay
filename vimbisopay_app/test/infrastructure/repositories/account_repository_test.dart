@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'account_repository_test.mocks.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
-import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
@@ -42,11 +41,11 @@ void main() {
   });
 
   group('login', () {
-    final tPhone = '+1234567890';
-    final tPassword = 'password123';
-    final tPasswordHash = 'hashedPassword';
-    final tPasswordSalt = 'salt123';
-    final tToken = 'testToken';
+    const tPhone = '+1234567890';
+    const tPassword = 'password123';
+    const tPasswordHash = 'hashedPassword';
+    const tPasswordSalt = 'salt123';
+    const tToken = 'testToken';
 
     final tLoginResponse = {
       'success': true,
@@ -632,7 +631,7 @@ void main() {
       }),
     );
 
-    final credexId = '123';
+    const credexId = '123';
 
     test('should return true when request is successful', () async {
       // Arrange
@@ -738,7 +737,7 @@ void main() {
       }),
     );
 
-    final fcmToken = 'test-fcm-token';
+    const fcmToken = 'test-fcm-token';
 
     test('should return true when request is successful', () async {
       // Arrange
