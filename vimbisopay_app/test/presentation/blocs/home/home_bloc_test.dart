@@ -149,7 +149,7 @@ void main() {
           ),
           predicate<HomeState>((state) => 
             state.status == HomeStatus.refreshing &&
-            state.message == 'Refreshing balances...'
+            state.message == 'Refreshing balances...Test'
           ),
           predicate<HomeState>((state) => 
             state.status == HomeStatus.refreshing &&
