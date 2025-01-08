@@ -114,7 +114,7 @@ void main() {
       accountId: any(named: 'accountId'),
       startRow: any(named: 'startRow'),
       numRows: any(named: 'numRows'),
-    )).thenAnswer((_) async => Right({'data': {'dashboard': {'ledger': [], 'pagination': {'hasMore': false}}}}));
+    )).thenAnswer((_) async => const Right({'data': {'dashboard': {'ledger': [], 'pagination': {'hasMore': false}}}}));
   });
 
   tearDown(() async {
@@ -138,7 +138,7 @@ void main() {
         passwordSalt: any(named: 'passwordSalt'),
       )).thenAnswer((_) async => Right(mockUser));
 
-      homeBloc.add(HomeCancelCredexStarted(credexId));
+      homeBloc.add(const HomeCancelCredexStarted(credexId));
 
       await expectLater(
         homeBloc.stream,
@@ -172,9 +172,9 @@ void main() {
       const credexId = '123';
 
       when(() => mockRepository.cancelCredex(credexId))
-        .thenAnswer((_) async => Left(InfrastructureFailure('Failed to cancel credex')));
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to cancel credex')));
 
-      homeBloc.add(HomeCancelCredexStarted(credexId));
+      homeBloc.add(const HomeCancelCredexStarted(credexId));
 
       await expectLater(
         homeBloc.stream,
@@ -201,7 +201,7 @@ void main() {
         passwordSalt: any(named: 'passwordSalt'),
       )).thenAnswer((_) async => Right(mockUser));
 
-      homeBloc.add(HomeAcceptCredexBulkStarted(credexIds));
+      homeBloc.add(const HomeAcceptCredexBulkStarted(credexIds));
 
       await expectLater(
         homeBloc.stream,
@@ -230,9 +230,9 @@ void main() {
       const credexIds = ['123', '456'];
       
       when(() => mockAcceptCredexBulk.call(any()))
-        .thenAnswer((_) async => Left(InfrastructureFailure('Failed to accept')));
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to accept')));
 
-      homeBloc.add(HomeAcceptCredexBulkStarted(credexIds));
+      homeBloc.add(const HomeAcceptCredexBulkStarted(credexIds));
 
       await expectLater(
         homeBloc.stream,
@@ -262,7 +262,7 @@ void main() {
       const token = 'test-token';
       
       when(() => mockRepository.registerNotificationToken(token))
-        .thenAnswer((_) async => Left(InfrastructureFailure('Failed to register token')));
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to register token')));
 
       homeBloc.add(const HomeRegisterNotificationToken(token));
 
@@ -309,7 +309,7 @@ void main() {
       );
       
       when(() => mockRepository.createCredex(any()))
-        .thenAnswer((_) async => Left(InfrastructureFailure('Failed to create credex')));
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to create credex')));
 
       homeBloc.add(CreateCredexEvent(request));
 

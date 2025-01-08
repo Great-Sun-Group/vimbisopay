@@ -3,7 +3,6 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'api_responses.dart';
@@ -23,13 +22,13 @@ class MockAccountRepository implements AccountRepository {
   }) async {
     await Future.delayed(const Duration(milliseconds: 10));
     if (shouldSucceed) {
-      final data = MockApiResponses.loginSuccess;
+      const data = MockApiResponses.loginSuccess;
       if (data['data'] == null) {
-        return Left(InfrastructureFailure('Invalid data format'));
+        return const Left(InfrastructureFailure('Invalid data format'));
       }
       return Right(User.fromMap(data['data'] as Map<String, dynamic>));
     } else {
-      return Left(InfrastructureFailure('Invalid credentials'));
+      return const Left(InfrastructureFailure('Invalid credentials'));
     }
   }
 
@@ -41,9 +40,9 @@ class MockAccountRepository implements AccountRepository {
   }) async {
     await Future.delayed(const Duration(milliseconds: 10));
     if (shouldSucceed) {
-      return Right(MockApiResponses.emptyLedger);
+      return const Right(MockApiResponses.emptyLedger);
     } else {
-      return Left(InfrastructureFailure('Failed to get ledger'));
+      return const Left(InfrastructureFailure('Failed to get ledger'));
     }
   }
 
@@ -80,7 +79,7 @@ class MockAccountRepository implements AccountRepository {
         ),
       ));
     } else {
-      return Left(InfrastructureFailure('Failed to create credex'));
+      return const Left(InfrastructureFailure('Failed to create credex'));
     }
   }
 
@@ -90,7 +89,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
-      return Left(InfrastructureFailure('Failed to accept credex'));
+      return const Left(InfrastructureFailure('Failed to accept credex'));
     }
   }
 
@@ -100,7 +99,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
-      return Left(InfrastructureFailure('Failed to cancel credex'));
+      return const Left(InfrastructureFailure('Failed to cancel credex'));
     }
   }
 
@@ -110,7 +109,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
-      return Left(InfrastructureFailure('Failed to register token'));
+      return const Left(InfrastructureFailure('Failed to register token'));
     }
   }
 
@@ -118,7 +117,7 @@ class MockAccountRepository implements AccountRepository {
   Future<Either<Failure, User?>> getCurrentUser() async {
     await Future.delayed(const Duration(milliseconds: 10));
     if (shouldSucceed) {
-      final data = MockApiResponses.loginSuccess;
+      const data = MockApiResponses.loginSuccess;
       if (data['data'] == null) {
         return const Right(null);
       }
@@ -134,7 +133,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right({'CXX': 100.0});
     } else {
-      return Left(InfrastructureFailure('Failed to get balances'));
+      return const Left(InfrastructureFailure('Failed to get balances'));
     }
   }
 
@@ -149,7 +148,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
-      return Left(InfrastructureFailure('Failed to onboard member'));
+      return const Left(InfrastructureFailure('Failed to onboard member'));
     }
   }
 
@@ -159,7 +158,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return Right(MockAccount.standard());
     } else {
-      return Left(InfrastructureFailure('Failed to get account'));
+      return const Left(InfrastructureFailure('Failed to get account'));
     }
   }
 
@@ -169,7 +168,7 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
-      return Left(InfrastructureFailure('Failed to save user'));
+      return const Left(InfrastructureFailure('Failed to save user'));
     }
   }
 }
