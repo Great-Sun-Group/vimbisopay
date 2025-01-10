@@ -116,7 +116,56 @@ flutter test test/path/to/test_file.dart
 flutter test --coverage
 ```
 
-### 3. Test Reports
-- Coverage reports generated in `coverage/` directory
-- HTML reports can be generated for better visualization
-- Test results logged in CI/CD pipeline
+### 3. Code Coverage
+
+#### Coverage Reports
+- Coverage reports are generated in the `coverage/` directory
+- HTML reports provide detailed visualization of code coverage
+- Reports show line-by-line coverage analysis
+- Coverage metrics include:
+  - Line coverage percentage
+  - Uncovered lines highlighted
+  - File-by-file breakdown
+  - Overall project coverage statistics
+
+#### Generating Coverage Reports
+Using the convenience script:
+```bash
+./scripts/coverage-report.sh
+```
+This automated script will:
+- Run all tests with coverage enabled
+- Generate an HTML report using lcov
+- Open the report in your default browser
+- Install lcov if needed (via brew)
+
+Manual steps:
+```bash
+# Run tests with coverage
+flutter test --coverage
+
+# Generate HTML report (requires lcov)
+genhtml coverage/lcov.info -o coverage/html
+
+# View the report
+open coverage/html/index.html
+```
+
+#### Coverage Files
+- Coverage files are excluded from version control
+- The following files are git-ignored:
+  - `/coverage/` directory
+  - `lcov.info` files
+  - Generated HTML reports
+
+#### Best Practices
+- Review coverage reports regularly
+- Focus on critical code paths
+- Aim for high coverage in core business logic
+- Document areas intentionally left uncovered
+- Use coverage data to guide test development
+
+#### CI/CD Integration
+- Test results and coverage reports logged in CI/CD pipeline
+- Coverage thresholds can be enforced in CI
+- Historical coverage data tracked
