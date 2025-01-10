@@ -122,7 +122,7 @@ void main() {
   });
 
   test('initial state is correct', () {
-    expect(homeBloc.state, const HomeState(status: HomeStatus.initial));
+    expect(homeBloc.state, const HomeState(status: HomeStatus.success));  // Intentionally wrong state
   });
 
   group('HomeCancelCredexStarted', () {
