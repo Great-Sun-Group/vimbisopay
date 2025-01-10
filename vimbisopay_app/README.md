@@ -46,10 +46,31 @@ The app includes comprehensive test coverage across different layers:
   flutter test test/path/to/test_file.dart
   ```
 
-- Run tests with coverage:
+### Code Coverage
+
+- Generate and view HTML coverage report:
   ```bash
-  flutter test --coverage
+  ./scripts/coverage-report.sh
   ```
+  This script will:
+  - Run tests with coverage enabled
+  - Generate an HTML report
+  - Open the report in your default browser
+  - Install lcov if needed (via brew)
+
+- Manual coverage commands:
+  ```bash
+  # Run tests with coverage
+  flutter test --coverage
+  
+  # Generate HTML report (requires lcov)
+  genhtml coverage/lcov.info -o coverage/html
+  
+  # View the report
+  open coverage/html/index.html
+  ```
+
+Note: Coverage files are excluded from version control via .gitignore
 
 ### Test Categories
 
