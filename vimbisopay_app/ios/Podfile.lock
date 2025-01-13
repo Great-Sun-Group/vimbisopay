@@ -1,9 +1,6 @@
 PODS:
   - audioplayers_darwin (0.0.1):
     - Flutter
-  - Firebase/AppDistribution (10.25.0):
-    - Firebase/CoreOnly
-    - FirebaseAppDistribution (~> 10.25.0-beta)
   - Firebase/CoreOnly (10.25.0):
     - FirebaseCore (= 10.25.0)
   - Firebase/Messaging (10.25.0):
@@ -16,11 +13,6 @@ PODS:
     - Firebase/Messaging (= 10.25.0)
     - firebase_core
     - Flutter
-  - FirebaseAppDistribution (10.25.0-beta):
-    - FirebaseCore (~> 10.0)
-    - FirebaseInstallations (~> 10.0)
-    - GoogleUtilities/AppDelegateSwizzler (~> 7.8)
-    - GoogleUtilities/UserDefaults (~> 7.8)
   - FirebaseCore (10.25.0):
     - FirebaseCoreInternal (~> 10.0)
     - GoogleUtilities/Environment (~> 7.12)
@@ -139,7 +131,6 @@ PODS:
 
 DEPENDENCIES:
   - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/ios`)
-  - Firebase/AppDistribution
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
@@ -155,7 +146,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - Firebase
-    - FirebaseAppDistribution
     - FirebaseCore
     - FirebaseCoreInternal
     - FirebaseInstallations
@@ -204,7 +194,6 @@ SPEC CHECKSUMS:
   Firebase: 0312a2352584f782ea56f66d91606891d4607f06
   firebase_core: a626d00494efa398e7c54f25f1454a64c8abf197
   firebase_messaging: 1541105e2a2a6ef8bd869bcc44157d31e82f3a50
-  FirebaseAppDistribution: 6e834c729b23f394a389dc1333d384ca5e077419
   FirebaseCore: 7ec4d0484817f12c3373955bc87762d96842d483
   FirebaseCoreInternal: df84dd300b561c27d5571684f389bf60b0a5c934
   FirebaseInstallations: 913cf60d0400ebd5d6b63a28b290372ab44590dd
@@ -231,6 +220,6 @@ SPEC CHECKSUMS:
   sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
-PODFILE CHECKSUM: 69e4968337b15ef773d632f57d5c6a9c4af026da
+PODFILE CHECKSUM: 3675f39a45f84614129a7af198f185877efd2aab
 
 COCOAPODS: 1.16.2

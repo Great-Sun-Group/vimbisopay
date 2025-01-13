@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -17,19 +18,121 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    print('=== BACKGROUND MESSAGE RECEIVED ===');
+    
+    // Initialize Firebase for background handler
+    print('Initializing Firebase in background handler...');
+    await Firebase.initializeApp();
+    print('Firebase initialized in background handler');
+    
+    print('''
+Message details:
+- Message ID: ${message.messageId}
+- Title: ${message.notification?.title}
+- Body: ${message.notification?.body}
+- Data: ${message.data}
+- Category: ${message.category}
+- SenderId: ${message.senderId}
+- ThreadId: ${message.threadId}
+- From: ${message.from}
+- SentTime: ${message.sentTime}
+''');
+
+    // Initialize NotificationService to handle background message
+    print('Initializing NotificationService in background...');
+    final notificationService = NotificationService();
+    final initialized = await notificationService.initialize();
+    
+    if (initialized) {
+      print('NotificationService initialized in background');
+      
+      // Play notification sound
+      await notificationService.playNotificationSound();
+      print('Notification sound played in background');
+      
+      // Create a new message with the same data
+      final processedMessage = RemoteMessage(
+        notification: message.notification,
+        data: Map<String, String>.from(message.data),
+        messageId: message.messageId,
+        senderId: message.senderId,
+        category: message.category,
+        from: message.from,
+        sentTime: message.sentTime,
+        threadId: message.threadId,
+      );
+
+      // Send message through notification service to trigger the same flow as foreground
+      print('Sending message through notification service...');
+      notificationService.sendTestNotification(processedMessage);
+      print('Message sent through notification service');
+      
+      // Initialize database helper to refresh data
+      print('Initializing database helper...');
+      final databaseHelper = DatabaseHelper();
+      final user = await databaseHelper.getUser();
+      if (user != null) {
+        print('User found, refreshing data...');
+        // TODO: Implement background refresh
+      } else {
+        print('No user found in database');
+      }
+    } else {
+      print('Failed to initialize NotificationService in background');
+    }
+    
+    print('=== BACKGROUND MESSAGE HANDLING COMPLETE ===');
+  } catch (e, stackTrace) {
+    print('''
+ERROR in background handler:
+Error: $e
+Stack trace: $stackTrace
+''');
+  }
+}
+
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  
-  // Initialize notifications
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+  try {
+    print('=== APP STARTING ===');
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // Initialize Firebase first
+    print('Initializing Firebase...');
+    await Firebase.initializeApp();
+    print('Firebase initialized successfully');
+    
+    // Set up background message handler
+    print('Setting up background message handler...');
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    print('Background message handler set up');
+    
+    // Initialize NotificationService after Firebase is ready
+    print('Initializing NotificationService...');
+    final notificationService = NotificationService();
+    final initialized = await notificationService.initialize();
+    
+    if (!initialized) {
+      print('Failed to initialize NotificationService');
+    } else {
+      print('NotificationService initialized successfully');
+    }
+    
+    print('=== APP INITIALIZATION COMPLETE ===');
+  } catch (e, stackTrace) {
+    Logger.error('''
+[NOTIFICATION_FLOW] Error during app initialization:
+- Error: $e
+- Stack trace: $stackTrace
+''');
+  }
   
   runApp(const MyApp());
 }
 
+// Rest of the file remains unchanged
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
