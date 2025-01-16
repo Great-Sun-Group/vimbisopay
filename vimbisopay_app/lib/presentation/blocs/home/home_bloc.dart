@@ -1,5 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
@@ -19,11 +24,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final Set<String> _processedCredexIds = {};
   bool _isInitialized = false;
 
+  static final NotificationService _notificationService = NotificationService();
+  StreamSubscription<RemoteMessage>? _notificationSubscription;
+
   HomeBloc({
     required this.acceptCredexBulk,
     required this.accountRepository,
   }) : super(const HomeState(status: HomeStatus.initial)) {
     Logger.lifecycle('HomeBloc initialized');
+
     on<HomePageChanged>(_onPageChanged);
     on<HomeDataLoaded>(_onDataLoaded);
     on<HomeLedgerLoaded>(_onLedgerLoaded);
@@ -40,6 +49,131 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeSearchStarted>(_onSearchStarted);
     on<HomeLoadPendingTransactions>(_onLoadPendingTransactions);
     on<CreateCredexEvent>(_onCreateCredex);
+
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    Logger.data('=== INITIALIZING NOTIFICATIONS IN HOME BLOC ===');
+    
+    try {
+      // Initialize Firebase first
+      Logger.data('Getting initial message...');
+      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        Logger.data('Initial message received:');
+        Logger.data('Title: ${initialMessage.notification?.title}');
+        Logger.data('Body: ${initialMessage.notification?.body}');
+        Logger.data('Data: ${initialMessage.data}');
+        
+        // Process initial message
+        Logger.data('Processing initial message...');
+        _notificationService.sendTestNotification(initialMessage);
+      }
+
+      // Cancel any existing subscription first
+      await _notificationSubscription?.cancel();
+      Logger.data('Previous notification subscription cancelled');
+      
+      // Initialize notification service with retries
+      Logger.data('Initializing notification service...');
+      bool initialized = false;
+      int retries = 0;
+      while (!initialized && retries < 3) {
+        initialized = await _notificationService.initialize();
+        if (!initialized) {
+          Logger.data('Failed to initialize notification service, attempt ${retries + 1}');
+          await Future.delayed(const Duration(seconds: 2));
+          retries++;
+        }
+      }
+
+      if (!initialized) {
+        Logger.error('Failed to initialize notification service after retries');
+        return;
+      }
+
+      Logger.data('Notification service initialized successfully');
+
+      // Re-initialize notification service when app resumes
+      SystemChannels.lifecycle.setMessageHandler((msg) async {
+        if (msg == AppLifecycleState.resumed.toString()) {
+          print('App resumed, reinitializing notification service...');
+          await _notificationService.initialize();
+          
+          // Also refresh data when app resumes
+          print('App resumed, refreshing data...');
+          await _refreshViaLogin();
+        }
+        return null;
+      });
+
+      // Listen to notification events and refresh dashboard
+      await _notificationSubscription?.cancel(); // Ensure previous subscription is cancelled
+      _notificationSubscription = _notificationService.onNotification.listen(
+        (message) async {
+          print('=== NOTIFICATION RECEIVED IN HOME BLOC ===');
+          print('Title: ${message.notification?.title}');
+          print('Body: ${message.notification?.body}');
+          print('Data: ${message.data}');
+          
+          try {
+            Logger.data('=== PROCESSING NOTIFICATION IN HOME BLOC ===');
+            
+            // Extract message content first
+            final title = message.notification?.title ?? message.data['title'];
+            final body = message.notification?.body ?? message.data['body'];
+            final toastMessage = body ?? title ?? 'New transaction received';
+            
+            Logger.data('Extracted message content: $toastMessage');
+            
+            // Show toast message and start refresh simultaneously
+            Logger.data('Emitting notification received state and starting refresh...');
+            emit(state.copyWith(
+              message: toastMessage,
+              status: HomeStatus.refreshing,
+            ));
+            Logger.data('State emitted successfully');
+
+            // Keep the message visible during refresh
+            final refreshFuture = _refreshViaLogin();
+            await Future.wait([
+              refreshFuture,
+              Future.delayed(const Duration(seconds: 3)), // Ensure message stays visible
+            ]);
+            
+            await _refreshViaLogin();
+            Logger.data('Refresh completed');
+            
+            // Show success message
+            Logger.data('Emitting success state...');
+            emit(state.copyWith(
+              message: '✅ Data refreshed',
+              status: HomeStatus.success,
+            ));
+            
+            // Clear message after a moment
+            await Future.delayed(const Duration(seconds: 2));
+            emit(state.copyWith(message: null));
+            
+            Logger.data('Success state emitted');
+          } catch (e, stackTrace) {
+            Logger.error('''
+[NOTIFICATION_FLOW] Error processing notification in HomeBloc:
+- Error: $e
+- Stack trace: $stackTrace
+''');
+          }
+        },
+        onError: (error) {
+          Logger.error('Error in notification stream', error);
+        },
+      );
+      
+      Logger.data('Notification handling setup complete in HomeBloc');
+    } catch (e, stackTrace) {
+      Logger.error('Error setting up notifications', e, stackTrace);
+    }
   }
 
   List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
@@ -384,7 +518,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             // Also update filtered lists if no search is active
             filteredPendingInTransactions: state.searchQuery.isEmpty ? pendingInTransactions : null,
             filteredPendingOutTransactions: state.searchQuery.isEmpty ? pendingOutTransactions : null,
-            message: null,
+            message: '✅ Data refreshed',
             error: null,
           ));
 
@@ -401,6 +535,33 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               combinedEntries: [],
               hasMore: false,
             ));
+          }
+
+          // Get FCM token and register it
+          print('Getting FCM token...');
+          final messaging = FirebaseMessaging.instance;
+          String? token;
+          
+          if (Platform.isIOS) {
+            final apnsToken = await messaging.getAPNSToken();
+            if (apnsToken != null) {
+              token = await messaging.getToken();
+            }
+          } else {
+            token = await messaging.getToken();
+          }
+          
+          if (token != null) {
+            print('Got FCM token: $token');
+            add(HomeRegisterNotificationToken(token));
+            
+            // Set up token refresh listener
+            messaging.onTokenRefresh.listen((newToken) {
+              print('FCM token refreshed: $newToken');
+              add(HomeRegisterNotificationToken(newToken));
+            });
+          } else {
+            print('Failed to get FCM token');
           }
         },
       );
@@ -433,16 +594,35 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   void _onRefreshStarted(
       HomeRefreshStarted event, Emitter<HomeState> emit) async {
-    Logger.state('Refresh started');
+    print('=== REFRESH STARTED IN HOME BLOC ===');
     emit(state.copyWith(
       status: HomeStatus.refreshing,
-      message: null,
+      message: '🔄 Refreshing data...',
       error: null,
     ));
 
-    // First check what's in the database
-    Logger.data('Checking database state before refresh');
-    await _refreshViaLogin();
+    try {
+      print('Starting refresh via login...');
+      await _refreshViaLogin();
+      print('Refresh completed successfully');
+      
+      // Emit success state after refresh
+      emit(state.copyWith(
+        status: HomeStatus.success,
+        message: '✅ Data refreshed',
+      ));
+    } catch (e, stackTrace) {
+      Logger.error('''
+[NOTIFICATION_FLOW] Error during refresh:
+- Error: $e
+- Stack trace: $stackTrace
+''');
+      emit(state.copyWith(
+        status: HomeStatus.error,
+        message: 'Failed to refresh data',
+        error: e.toString(),
+      ));
+    }
   }
 
   void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
@@ -594,6 +774,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Logger.lifecycle('HomeBloc closing');
     _processedCredexIds.clear();
     _isInitialized = false;
+    await _notificationSubscription?.cancel();
     await super.close();
   }
 

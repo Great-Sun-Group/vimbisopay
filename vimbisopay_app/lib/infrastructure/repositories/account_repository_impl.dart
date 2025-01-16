@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
@@ -595,7 +596,10 @@ class AccountRepositoryImpl implements AccountRepository {
       request: (authToken) async {
         final url = '$baseUrl/api/notifications/register-token';
         final headers = _authHeaders(authToken);
-        final body = {'token': token};
+        final body = {
+          'token': token,
+          'platform': Platform.isIOS ? 'ios' : 'android'
+        };
 
         final response = await _loggedRequest(
           () => _httpClient.post(

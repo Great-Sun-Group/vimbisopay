@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -61,6 +63,19 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 24),
+            if (kDebugMode) ...[
+              _buildSettingsTile(
+                icon: Icons.bug_report,
+                title: 'Debug',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const DebugScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
             _buildSettingsTile(
               icon: Icons.logout,
               title: 'Logout',

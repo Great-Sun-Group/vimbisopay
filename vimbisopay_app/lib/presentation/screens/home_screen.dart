@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
-import 'dart:io';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -38,7 +35,85 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isDisposed = false;
   bool _isInitializing = true;
 
-  final NotificationService _notificationService = NotificationService();
+  Widget _buildUserAvatar(HomeState state) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 16.0,
+        top: 16.0,
+        bottom: 16.0,
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            radius: HomeConstants.avatarSize / 2,
+            backgroundColor: AppColors.primary.withOpacity(0.1),
+            child: state.dashboard != null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.person,
+                        color: AppColors.primary,
+                        size: HomeConstants.avatarSize / 2,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        UIUtils.getInitials(
+                          state.dashboard!.firstname,
+                          state.dashboard!.lastname,
+                        ),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: HomeConstants.captionTextSize,
+                        ),
+                      ),
+                    ],
+                  )
+                : const Icon(
+                    Icons.person_outline,
+                    color: AppColors.primary,
+                    size: HomeConstants.avatarSize / 2,
+                  ),
+          ),
+          if (state.dashboard?.memberTier != null)
+            Positioned(
+              right: -8,
+              bottom: -8,
+              child: MemberTierBadge(
+                tierType: state.dashboard!.memberTier.type,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent * 0.9) {
+        Logger.interaction('Scroll threshold reached, loading more entries');
+        _homeBloc.add(const HomeLoadMoreStarted());
+      }
+    });
+  }
+
+  void _initializeBloc() {
+    Logger.lifecycle('Initializing HomeBloc');
+    _homeBloc = HomeBloc(
+      acceptCredexBulk: AcceptCredexBulk(_accountRepository),
+      accountRepository: _accountRepository,
+    );
+    
+    // Use addPostFrameCallback to ensure widget is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isDisposed && mounted) {
+        _homeBloc.loadInitialData();
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -48,41 +123,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _setupScrollListener();
     WidgetsBinding.instance.addObserver(this);
     _checkUserAndInitialize();
-    _registerNotificationToken();
-  }
-
-  Future<void> _registerNotificationToken() async {
-    try {
-      final user = await _databaseHelper.getUser();
-      if (user != null) {
-        final messaging = FirebaseMessaging.instance;
-        
-        // Request permission for iOS
-        if (Platform.isIOS) {
-          await messaging.requestPermission();
-        }
-        
-        final token = await messaging.getToken();
-        if (token != null) {
-          Logger.data('Got FCM token: $token');
-          final success = await _notificationService.registerToken(token, user.token);
-          
-          if (success) {
-            Logger.data('Successfully registered notification token');
-          } else {
-            Logger.error('Failed to register notification token');
-          }
-        }
-
-        // Listen for token refresh
-        messaging.onTokenRefresh.listen((newToken) {
-          Logger.data('FCM token refreshed: $newToken');
-          _notificationService.registerToken(newToken, user.token);
-                });
-      }
-    } catch (e) {
-      Logger.error('Error registering notification token', e);
-    }
   }
 
   Future<void> _checkUserAndInitialize() async {
@@ -108,21 +148,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _initializeBloc() {
-    Logger.lifecycle('Initializing HomeBloc');
-    _homeBloc = HomeBloc(
-      acceptCredexBulk: AcceptCredexBulk(_accountRepository),
-      accountRepository: _accountRepository,
-    );
-    
-    // Use addPostFrameCallback to ensure widget is fully mounted
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isDisposed && mounted) {
-        _homeBloc.loadInitialData();
-      }
-    });
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     Logger.lifecycle('App lifecycle state changed to: $state');
@@ -132,16 +157,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _setupScrollListener() {
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.9) {
-        Logger.interaction('Scroll threshold reached, loading more entries');
-        _homeBloc.add(const HomeLoadMoreStarted());
-      }
-    });
-  }
-
   @override
   void dispose() {
     Logger.lifecycle('HomeScreen disposing');
@@ -149,9 +164,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _pageController.dispose();
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    if (!_isInitializing) {
-      _homeBloc.close();
-    }
+    // Don't close the HomeBloc here as it needs to stay alive for notifications
     super.dispose();
   }
 
@@ -209,61 +222,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               tooltip: 'Settings',
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserAvatar(HomeState state) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: 16.0,
-        top: 16.0,
-        bottom: 16.0,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          CircleAvatar(
-            radius: HomeConstants.avatarSize / 2,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            child: state.dashboard != null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.person,
-                        color: AppColors.primary,
-                        size: HomeConstants.avatarSize / 2,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        UIUtils.getInitials(
-                          state.dashboard!.firstname,
-                          state.dashboard!.lastname,
-                        ),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: HomeConstants.captionTextSize,
-                        ),
-                      ),
-                    ],
-                  )
-                : const Icon(
-                    Icons.person_outline,
-                    color: AppColors.primary,
-                    size: HomeConstants.avatarSize / 2,
-                  ),
-          ),
-          if (state.dashboard?.memberTier != null)
-            Positioned(
-              right: -8,
-              bottom: -8,
-              child: MemberTierBadge(
-                tierType: state.dashboard!.memberTier.type,
-              ),
-            ),
         ],
       ),
     );
@@ -398,8 +356,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
-    return BlocProvider(
-      create: (context) => _homeBloc,
+    return BlocProvider.value(
+      value: _homeBloc,
       child: BlocConsumer<HomeBloc, HomeState>(
         listenWhen: (previous, current) =>
             previous.status != current.status ||
@@ -409,28 +367,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // Clear any existing snackbars
           ScaffoldMessenger.of(context).clearSnackBars();
 
-          // Handle success messages
-          if (state.status == HomeStatus.success) {
-            // Dismiss any loading dialogs first
-            Navigator.of(context).popUntil((route) => route.isFirst);
+          // Show message if present, regardless of status
+          if (state.message != null) {
+            Logger.data('Showing snackbar with message: ${state.message}');
+            // Ensure any existing snackbar is removed first
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
             
-            if (state.message != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message!),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 3),
-                  action: SnackBarAction(
-                    label: 'DISMISS',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    },
-                  ),
+            // Show the new snackbar
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message!),
+                backgroundColor: state.status == HomeStatus.error 
+                    ? AppColors.error 
+                    : AppColors.success,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4), // Increased duration
+                action: SnackBarAction(
+                  label: 'DISMISS',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  },
                 ),
-              );
-            }
+              ),
+            );
           }
 
           // Handle error messages
