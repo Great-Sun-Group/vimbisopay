@@ -5,10 +5,12 @@ import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 
 class AccountCard extends StatelessWidget {
   final DashboardAccount account;
+  final MemberTier memberTier;
 
   const AccountCard({
     super.key,
     required this.account,
+    required this.memberTier,
   });
 
   @override
@@ -74,9 +76,9 @@ class AccountCard extends StatelessWidget {
         color: AppColors.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(HomeConstants.buttonBorderRadius),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Text(
+          const Text(
             'Tier Limit',
             style: TextStyle(
               fontSize: HomeConstants.captionTextSize,
@@ -84,10 +86,10 @@ class AccountCard extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          SizedBox(height: HomeConstants.tinyPadding - 2),
+          const SizedBox(height: HomeConstants.tinyPadding - 2),
           Text(
-            '\$10 USD/day',
-            style: TextStyle(
+            '\$${memberTier.dailySecuredCredexLimit} USD/day',
+            style: const TextStyle(
               color: AppColors.primary,
               fontWeight: FontWeight.bold,
             ),

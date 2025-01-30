@@ -2,8 +2,8 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 
 enum MemberTierType {
-  open(0, 10.0, false, true, false, false, false, false),    // Free tier
-  hustler(1, 100.0, false, true, false, false, false, true); // $1 tier
+  open(1, 10.0, false, true, false, false, false, false),    // Free tier
+  hustler(3, 100.0, false, true, false, false, false, true); // $1 tier
 
   final int value;
   final double dailyLimit;
@@ -77,13 +77,13 @@ class Dashboard extends Entity {
   MemberTier get memberTier => MemberTier(low: 0, high: member.memberTier);
 
   // Permission getters based on member tier
-  bool get canIssueSecuredCredex => member.memberTier >= 5;
-  double get dailySecuredCredexLimit => 100.0;
-  bool get canIssueUnsecuredCredex => member.memberTier >= 5;
-  bool get canCreateAdditionalAccounts => member.memberTier >= 5;
-  bool get canBeAddedToAccount => member.memberTier >= 5;
-  bool get canAddOthersToAccount => member.memberTier >= 5;
-  bool get canRequestRecurringPayments => member.memberTier >= 5;
+  bool get canIssueSecuredCredex => member.memberTier >= 3;
+  double get dailySecuredCredexLimit => memberTier.dailySecuredCredexLimit;
+  bool get canIssueUnsecuredCredex => member.memberTier >= 3;
+  bool get canCreateAdditionalAccounts => member.memberTier >= 3;
+  bool get canBeAddedToAccount => member.memberTier >= 3;
+  bool get canAddOthersToAccount => member.memberTier >= 3;
+  bool get canRequestRecurringPayments => member.memberTier >= 3;
 
   Map<String, dynamic> toMap() => {
     'id': id,

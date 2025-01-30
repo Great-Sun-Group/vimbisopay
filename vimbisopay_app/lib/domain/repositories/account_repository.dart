@@ -38,6 +38,8 @@ abstract class AccountRepository {
 
   Future<Either<Failure, bool>> acceptCredexBulk(List<String> credexIds);
 
+  Future<Either<Failure, bool>> acceptCredex(String credexId);
+
   Future<Either<Failure, bool>> cancelCredex(String credexId);
 
   Future<Either<Failure, bool>> registerNotificationToken(String token);

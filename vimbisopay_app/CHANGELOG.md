@@ -80,3 +80,16 @@ Example entry format:
 - Added new feature X
 - Fixed bug in Y
 - Improved Z
+-e 
+## [1.0.0+28] - 2025-01-13
+- Foreground notifications
+-e 
+## [1.0.0.30] - 2025-01-28
+-e 
+## [1.0.1.0] - 2025-01-28
+-e 
+## [1.0.0+30] - 2025-01-28
+- Demo with Lawrance
+-e 
+## [1.0.0+31] - 2025-01-28
+- Demo with lawrance
