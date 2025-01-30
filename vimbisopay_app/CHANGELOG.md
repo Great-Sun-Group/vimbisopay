@@ -99,3 +99,6 @@ Example entry format:
 -e 
 ## [1.0.0+32] - 2025-01-30
 - bug fixes and enhancements
+-e 
+## [1.0.0+33] - 2025-01-30
+- member tier update workflow 
