@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dartz/dartz.dart' hide State;
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
@@ -13,6 +15,7 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
 
 class SendCredexScreen extends StatefulWidget {
   static const String routeName = '/send-credex';
@@ -22,19 +25,19 @@ class SendCredexScreen extends StatefulWidget {
   final DatabaseHelper databaseHelper;
 
   const SendCredexScreen({
-    Key? key,
+    super.key,
     required this.senderAccount,
     required this.accountRepository,
     required this.homeBloc,
     required this.databaseHelper,
-  }) : super(key: key);
+  });
 
   @override
   State<SendCredexScreen> createState() => _SendCredexScreenState();
 }
 
 class _SendCredexScreenState extends State<SendCredexScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _recipientController = TextEditingController();
   late final TextEditingController _amountController;
@@ -58,7 +61,10 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     final denom = _selectedDenomination.toString().split('.').last;
     final balanceStr =
         widget.senderAccount.balanceData.securedNetBalancesByDenom.firstWhere(
-      (balance) => balance.contains(denom),
+      (balance) => balance.endsWith(' $denom') && 
+                   (balance.startsWith('-') || 
+                    balance.startsWith('+') || 
+                    RegExp(r'^\d').hasMatch(balance)),
       orElse: () => '0.0 $denom',
     );
     return double.tryParse(balanceStr.split(' ').first) ?? 0.0;
@@ -138,6 +144,58 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     _amountFocusNode.dispose();
   }
 
+  void _showError(String message) {
+    try {
+      // Try to parse the error response as JSON
+      final Map<String, dynamic> errorResponse = jsonDecode(message);
+      final action = errorResponse['data']?['action'];
+      
+      if (action != null && 
+          action['details']?['code'] == 'TIER_LIMIT_EXCEEDED') {
+        final userMessage = errorResponse['message'] ?? 
+                          action['details']?['reason'] ??
+                          'You have reached your daily transaction limit.';
+        
+        // Show the tier limit dialog
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showDialog(
+            context: context,
+            builder: (context) => TierLimitDialog(
+              message: userMessage,
+              accountId: widget.senderAccount.accountID,
+              homeBloc: widget.homeBloc,
+            ),
+          );
+        });
+        
+        setState(() {
+          _errorMessage = userMessage;
+          _statusMessage = null;
+        });
+      } else {
+        setState(() {
+          _errorMessage = _getFormattedErrorMessage(message);
+          _statusMessage = null;
+        });
+      }
+    } catch (e) {
+      // If JSON parsing fails, fall back to the existing error handling
+      setState(() {
+        _errorMessage = _getFormattedErrorMessage(message);
+        _statusMessage = null;
+      });
+    }
+
+    // Clear error message after delay
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _errorMessage = null;
+        });
+      }
+    });
+  }
+
   String _getFormattedErrorMessage(String error) {
     if (error.toLowerCase().contains('not found')) {
       return 'The recipient account was not found. Please check the handle and try again.';
@@ -153,20 +211,6 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     } else {
       return 'Unable to send Credex at this time. Please try again later.';
     }
-  }
-
-  void _showError(String message) {
-    setState(() {
-      _errorMessage = _getFormattedErrorMessage(message);
-      _statusMessage = null;
-    });
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _errorMessage = null;
-        });
-      }
-    });
   }
 
   void _updateStatus(String message) {
@@ -657,7 +701,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
 
       result.fold(
         (failure) {
-          _showError(failure.toString());
+          _showError(failure.message ?? failure.toString());
         },
         (response) async {
           // Map CredexResponse PendingOffer to Dashboard PendingOffer
@@ -667,20 +711,6 @@ class _SendCredexScreenState extends State<SendCredexScreen>
             counterpartyAccountName:
                 response.data.action.details.receiverAccountName,
             secured: response.data.action.details.securedCredex,
-          );
-
-          // Update pending transactions in database with mapped data
-          // Create PendingData objects with the mapped offer
-          const pendingInData = dashboard.PendingData(
-            success: true,
-            data: [],
-            message: 'No pending incoming transactions',
-          );
-
-          final pendingOutData = dashboard.PendingData(
-            success: true,
-            data: [dashboardPendingOffer],
-            message: 'Pending outgoing transactions updated',
           );
 
           // Update transactions in database with original response
@@ -766,11 +796,13 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                                 response.data.dashboard.accounts.first
                                     .balanceData.securedNetBalancesByDenom
                                     .firstWhere(
-                                  (balance) => balance.contains(
-                                      _selectedDenomination
-                                          .toString()
-                                          .split('.')
-                                          .last),
+                                  (balance) {
+                                    final denom = _selectedDenomination.toString().split('.').last;
+                                    return balance.endsWith(' $denom') && 
+                                           (balance.startsWith('-') || 
+                                            balance.startsWith('+') || 
+                                            RegExp(r'^\d').hasMatch(balance));
+                                  },
                                   orElse: () =>
                                       '0.0 ${_selectedDenomination.toString().split('.').last}',
                                 ),

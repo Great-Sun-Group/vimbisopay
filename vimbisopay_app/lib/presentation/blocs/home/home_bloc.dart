@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart'
@@ -20,6 +21,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final AcceptCredexBulk acceptCredexBulk;
   final AcceptCredex acceptCredex;
   final AccountRepository accountRepository;
+  final UpgradeMemberTier upgradeMemberTier;
   DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // For testing
@@ -39,6 +41,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this.acceptCredexBulk,
     required this.acceptCredex,
     required this.accountRepository,
+    required this.upgradeMemberTier,
   }) : super(const HomeState(status: HomeStatus.initial)) {
     Logger.lifecycle('HomeBloc initialized');
 
@@ -60,6 +63,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeSearchStarted>(_onSearchStarted);
     on<HomeLoadPendingTransactions>(_onLoadPendingTransactions);
     on<CreateCredexEvent>(_onCreateCredex);
+    on<HomeUpgradeTierStarted>(_onUpgradeTierStarted);
+    on<HomeUpgradeTierCompleted>(_onUpgradeTierCompleted);
+    on<HomeUpgradeTierFailed>(_onUpgradeTierFailed);
 
     _initializeNotifications();
   }
@@ -1187,6 +1193,63 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       pendingOutTransactions: event.pendingOutTransactions,
       filteredPendingInTransactions: event.pendingInTransactions,
       filteredPendingOutTransactions: event.pendingOutTransactions,
+    ));
+  }
+
+
+  Future<void> _onUpgradeTierStarted(
+    HomeUpgradeTierStarted event,
+    Emitter<HomeState> emit,
+  ) async {
+    Logger.data('Starting tier upgrade');
+    emit(state.copyWith(
+      status: HomeStatus.upgradingTier,
+      message: 'Upgrading to Hustler tier...',
+      error: null,
+    ));
+
+    try {
+      await upgradeMemberTier(event.sourceAccountId);
+      
+      // Set loading state
+      emit(state.copyWith(
+        status: HomeStatus.refreshing,
+        message: 'Refreshing membership status...',
+      ));
+
+      // Add a small delay to ensure backend has processed the upgrade
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Refresh data to get updated membership status
+      await _refreshViaLogin();
+
+      add(const HomeUpgradeTierCompleted());
+    } catch (e) {
+      Logger.error('Failed to upgrade tier', e);
+      add(HomeUpgradeTierFailed(e.toString()));
+    }
+  }
+
+  void _onUpgradeTierCompleted(
+    HomeUpgradeTierCompleted event,
+    Emitter<HomeState> emit,
+  ) {
+    Logger.state('Tier upgrade completed');
+    emit(state.copyWith(
+      status: HomeStatus.success,
+      message: '✅ Successfully upgraded to Hustler tier',
+    ));
+  }
+
+  void _onUpgradeTierFailed(
+    HomeUpgradeTierFailed event,
+    Emitter<HomeState> emit,
+  ) {
+    Logger.error('Tier upgrade failed: ${event.message}');
+    emit(state.copyWith(
+      status: HomeStatus.error,
+      error: event.message,
+      message: 'Failed to upgrade tier',
     ));
   }
 

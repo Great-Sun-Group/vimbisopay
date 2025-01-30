@@ -9,6 +9,8 @@ import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
+import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
@@ -18,7 +20,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
-  
+
   DatabaseHelper _databaseHelper = DatabaseHelper();
   SecurityService _securityService = SecurityService();
   PasswordService _passwordService = PasswordService();
@@ -37,26 +39,34 @@ class AccountRepositoryImpl implements AccountRepository {
     required String defaultDenom,
   }) {
     // Extract base values, defaulting to 0.00 if not present
-    double baseReceivables = double.tryParse(
-      baseBalances['totalReceivables']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
-    ) ?? 0.00;
-    
-    double basePayables = double.tryParse(
-      baseBalances['totalPayables']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
-    ) ?? 0.00;
+    double baseReceivables = double.tryParse(baseBalances['totalReceivables']
+                ?.toString()
+                .replaceAll(RegExp(r'[^\d.-]'), '') ??
+            '0.00') ??
+        0.00;
+
+    double basePayables = double.tryParse(baseBalances['totalPayables']
+                ?.toString()
+                .replaceAll(RegExp(r'[^\d.-]'), '') ??
+            '0.00') ??
+        0.00;
 
     // Calculate pending amounts
     double pendingInTotal = pendingIn.fold(0.00, (sum, tx) {
-      final amount = double.tryParse(
-        tx['formattedInitialAmount']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
-      ) ?? 0.00;
+      final amount = double.tryParse(tx['formattedInitialAmount']
+                  ?.toString()
+                  .replaceAll(RegExp(r'[^\d.-]'), '') ??
+              '0.00') ??
+          0.00;
       return sum + amount;
     });
 
     double pendingOutTotal = pendingOut.fold(0.00, (sum, tx) {
-      final amount = double.tryParse(
-        tx['formattedInitialAmount']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
-      ) ?? 0.00;
+      final amount = double.tryParse(tx['formattedInitialAmount']
+                  ?.toString()
+                  .replaceAll(RegExp(r'[^\d.-]'), '') ??
+              '0.00') ??
+          0.00;
       return sum + amount;
     });
 
@@ -67,21 +77,22 @@ class AccountRepositoryImpl implements AccountRepository {
 
     // Format values with denomination
     return {
-      'totalReceivables': '${totalReceivables.toStringAsFixed(2)} $defaultDenom',
+      'totalReceivables':
+          '${totalReceivables.toStringAsFixed(2)} $defaultDenom',
       'totalPayables': '${totalPayables.toStringAsFixed(2)} $defaultDenom',
       'netPayRec': '${netPayRec.toStringAsFixed(2)} $defaultDenom',
     };
   }
 
   Map<String, String> get _baseHeaders => {
-    'Content-Type': 'application/json',
-    'x-client-api-key': ApiConfig.apiKey,
-  };
+        'Content-Type': 'application/json',
+        'x-client-api-key': ApiConfig.apiKey,
+      };
 
   Map<String, String> _authHeaders(String token) => {
-    ..._baseHeaders,
-    'Authorization': 'Bearer $token',
-  };
+        ..._baseHeaders,
+        'Authorization': 'Bearer $token',
+      };
 
   Future<Either<Failure, T>> _executeAuthenticatedRequest<T>({
     required Future<Either<Failure, T>> Function(String token) request,
@@ -97,9 +108,12 @@ class AccountRepositoryImpl implements AccountRepository {
 
       return result.fold(
         (failure) async {
-          if (!isRetry && failure.message?.toLowerCase().contains('token expired') == true) {
+          if (!isRetry &&
+              failure.message?.toLowerCase().contains('token expired') ==
+                  true) {
             if (user.passwordHash == null || user.passwordSalt == null) {
-              return const Left(InfrastructureFailure('Authentication failed: No stored password hash'));
+              return const Left(InfrastructureFailure(
+                  'Authentication failed: No stored password hash'));
             }
 
             // Re-login with stored password hash
@@ -121,9 +135,9 @@ class AccountRepositoryImpl implements AccountRepository {
                   passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
                 );
-                
+
                 final saveResult = await saveUser(userWithPasswordHash);
-                
+
                 return saveResult.fold(
                   (saveFailure) => Left(saveFailure),
                   (_) => _executeAuthenticatedRequest<T>(
@@ -205,7 +219,8 @@ class AccountRepositoryImpl implements AccountRepository {
           final jsonResponse = json.decode(response.body);
           return Right(jsonResponse);
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
+          final errorMessage =
+              json.decode(response.body)['message'] ?? 'Failed to get ledger';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -250,7 +265,8 @@ class AccountRepositoryImpl implements AccountRepository {
           final data = json.decode(response.body);
           return Right(Map<String, double>.from(data['balances']));
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get balances';
+          final errorMessage =
+              json.decode(response.body)['message'] ?? 'Failed to get balances';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -279,15 +295,15 @@ class AccountRepositoryImpl implements AccountRepository {
 
         if (response.statusCode == 200) {
           final jsonResponse = json.decode(response.body);
-          
-          if (!jsonResponse.containsKey('data') || 
+
+          if (!jsonResponse.containsKey('data') ||
               !jsonResponse['data'].containsKey('action') ||
               !jsonResponse['data']['action'].containsKey('details')) {
             return const Left(InfrastructureFailure('Invalid response format'));
           }
 
           final details = jsonResponse['data']['action']['details'];
-          
+
           return Right(Account(
             id: details['accountID'],
             handle: details['accountHandle'],
@@ -296,7 +312,8 @@ class AccountRepositoryImpl implements AccountRepository {
             balances: {},
           ));
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get account';
+          final errorMessage =
+              json.decode(response.body)['message'] ?? 'Failed to get account';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -312,8 +329,9 @@ class AccountRepositoryImpl implements AccountRepository {
   }) async {
     try {
       // Hash password before sending to server
-      final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
-      
+      final ({String hash, String salt}) hashResult =
+          await _passwordService.hashPassword(password);
+
       final url = '$baseUrl/onboardMember';
       final body = {
         'firstname': firstName,
@@ -339,7 +357,8 @@ class AccountRepositoryImpl implements AccountRepository {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return const Right(true);
       } else {
-        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to onboard member';
+        final errorMessage =
+            json.decode(response.body)['message'] ?? 'Failed to onboard member';
         return Left(InfrastructureFailure(errorMessage));
       }
     } catch (e) {
@@ -369,7 +388,8 @@ class AccountRepositoryImpl implements AccountRepository {
           return const Left(InfrastructureFailure('Password is required'));
         }
         // Hash new password
-        final ({String hash, String salt}) hashResult = await _passwordService.hashPassword(password);
+        final ({String hash, String salt}) hashResult =
+            await _passwordService.hashPassword(password);
         body['password_hash'] = hashResult.hash;
         body['password_salt'] = hashResult.salt;
       }
@@ -388,8 +408,8 @@ class AccountRepositoryImpl implements AccountRepository {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        
-        if (!jsonResponse.containsKey('data') || 
+
+        if (!jsonResponse.containsKey('data') ||
             !jsonResponse['data'].containsKey('action') ||
             !jsonResponse['data']['action'].containsKey('details') ||
             !jsonResponse['data'].containsKey('dashboard')) {
@@ -397,56 +417,65 @@ class AccountRepositoryImpl implements AccountRepository {
         }
 
         final actionDetails = jsonResponse['data']['action']['details'];
-        
+
         final memberId = actionDetails['memberID']?.toString();
         final userPhone = actionDetails['phone']?.toString();
         final token = actionDetails['token']?.toString();
-        
+
         if (memberId == null || userPhone == null || token == null) {
-          return const Left(InfrastructureFailure('Missing required user fields in response'));
+          return const Left(InfrastructureFailure(
+              'Missing required user fields in response'));
         }
 
         final dashboardData = jsonResponse['data']['dashboard'];
-        
+
         final dashboardObj = dashboard.Dashboard.fromMap({
           'member': {
             'memberID': actionDetails['memberID'],
             'memberTier': dashboardData['member']['memberTier'],
             'firstname': dashboardData['member']['firstname'],
             'lastname': dashboardData['member']['lastname'],
-            'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
+            'memberHandle':
+                dashboardData['member']['memberHandle'] as String? ?? '',
             'defaultDenom': dashboardData['member']['defaultDenom'],
           },
-          'accounts': dashboardData['accounts'].map((accountData) => {
-            'accountID': accountData['accountID'],
-            'accountName': accountData['accountName'],
-            'accountHandle': accountData['accountHandle'],
-            'defaultDenom': accountData['defaultDenom'],
-            'isOwnedAccount': accountData['isOwnedAccount'],
-            'balanceData': {
-              'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
-              'unsecuredBalancesInDefaultDenom': _calculateUnsecuredBalances(
-                baseBalances: accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
-                pendingIn: accountData['pendingInData'] ?? [],
-                pendingOut: accountData['pendingOutData'] ?? [],
-                defaultDenom: accountData['defaultDenom'],
-              ),
-              'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
-            },
-            'pendingInData': {
-              'success': true,
-              'data': accountData['pendingInData'] ?? [],
-              'message': 'Pending offers retrieved',
-            },
-            'pendingOutData': {
-              'success': true,
-              'data': accountData['pendingOutData'] ?? [],
-              'message': 'Pending outgoing offers retrieved',
-            },
-            'sendOffersTo': accountData['sendOffersTo'],
-          }).toList(),
+          'accounts': dashboardData['accounts']
+              .map((accountData) => {
+                    'accountID': accountData['accountID'],
+                    'accountName': accountData['accountName'],
+                    'accountHandle': accountData['accountHandle'],
+                    'defaultDenom': accountData['defaultDenom'],
+                    'isOwnedAccount': accountData['isOwnedAccount'],
+                    'balanceData': {
+                      'securedNetBalancesByDenom': accountData['balanceData']
+                          ['securedNetBalancesByDenom'],
+                      'unsecuredBalancesInDefaultDenom':
+                          _calculateUnsecuredBalances(
+                        baseBalances: accountData['balanceData']
+                            ['unsecuredBalancesInDefaultDenom'],
+                        pendingIn: accountData['pendingInData'] ?? [],
+                        pendingOut: accountData['pendingOutData'] ?? [],
+                        defaultDenom: accountData['defaultDenom'],
+                      ),
+                      'netCredexAssetsInDefaultDenom':
+                          accountData['balanceData']
+                              ['netCredexAssetsInDefaultDenom'],
+                    },
+                    'pendingInData': {
+                      'success': true,
+                      'data': accountData['pendingInData'] ?? [],
+                      'message': 'Pending offers retrieved',
+                    },
+                    'pendingOutData': {
+                      'success': true,
+                      'data': accountData['pendingOutData'] ?? [],
+                      'message': 'Pending outgoing offers retrieved',
+                    },
+                    'sendOffersTo': accountData['sendOffersTo'],
+                  })
+              .toList(),
         });
-        
+
         final user = User(
           memberId: memberId,
           phone: userPhone,
@@ -456,10 +485,11 @@ class AccountRepositoryImpl implements AccountRepository {
           passwordChanged: DateTime.now(),
           dashboard: dashboardObj,
         );
-        
+
         return Right(user);
       } else {
-        final errorMessage = json.decode(response.body)['message'] ?? 'Login failed';
+        final errorMessage =
+            json.decode(response.body)['message'] ?? 'Login failed';
         return Left(InfrastructureFailure(errorMessage));
       }
     } catch (e) {
@@ -468,9 +498,10 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, credex.CredexResponse>> createCredex(CredexRequest request) async {
+  Future<Either<Failure, credex.CredexResponse>> createCredex(
+      CredexRequest request) async {
     Logger.data('Creating Credex request: ${request.toJson()}');
-    
+
     return _executeAuthenticatedRequest(
       request: (token) async {
         try {
@@ -480,100 +511,109 @@ class AccountRepositoryImpl implements AccountRepository {
 
           Logger.data('Sending Credex request to $url');
           final response = await _loggedRequest(
-          () => _httpClient.post(
-            Uri.parse(url),
-            headers: headers,
-            body: json.encode(body),
-          ),
-          url,
-          'POST',
-          headers: headers,
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          Logger.data('Credex request successful');
-          final jsonResponse = json.decode(response.body);
-          
-          // Validate response structure
-          if (!jsonResponse.containsKey('data')) {
-            Logger.error('Invalid Credex response: Missing data field');
-            return const Left(InfrastructureFailure('Invalid response format: Missing data field'));
-          }
-          
-          final data = jsonResponse['data'];
-          if (!data.containsKey('action') || !data.containsKey('dashboard')) {
-            Logger.error('Invalid Credex response: Missing required fields in data');
-            return const Left(InfrastructureFailure('Invalid response format: Missing required fields'));
-          }
-          
-          final action = data['action'];
-          final dashboard = data['dashboard'];
-          
-          if (dashboard == null) {
-            Logger.error('Invalid Credex response: Missing dashboard');
-            return const Left(InfrastructureFailure('Invalid response format: Missing dashboard'));
-          }
-          Logger.data('Creating CredexResponse from data');
-          return Right(credex.CredexResponse(
-            message: jsonResponse['message'],
-            data: credex.CredexData(
-              action: credex.CredexAction(
-                id: action['id'],
-                type: action['type'],
-                timestamp: action['timestamp'],
-                actor: action['actor'],
-                details: credex.CredexActionDetails(
-                  amount: action['details']['amount'],
-                  denomination: action['details']['denomination'],
-                  securedCredex: action['details']['securedCredex'],
-                  receiverAccountID: action['details']['receiverAccountID'],
-                  receiverAccountName: action['details']['receiverAccountName'],
-                ),
-              ),
-              dashboard: credex.CredexDashboard(
-                member: credex.DashboardMember(
-                  memberID: dashboard['member']['memberID'],
-                  memberTier: dashboard['member']['memberTier'],
-                  firstname: dashboard['member']['firstname'],
-                  lastname: dashboard['member']['lastname'],
-                  memberHandle: dashboard['member']['memberHandle'],
-                  defaultDenom: dashboard['member']['defaultDenom'],
-                ),
-                accounts: List<credex.DashboardAccount>.from(
-                  (dashboard['accounts'] as List).map((account) => credex.DashboardAccount(
-                    accountID: account['accountID'],
-                    accountName: account['accountName'],
-                    accountHandle: account['accountHandle'],
-                    accountType: account['accountType'],
-                    defaultDenom: account['defaultDenom'],
-                    isOwnedAccount: account['isOwnedAccount'],
-                    sendOffersTo: credex.SendOffersTo(
-                      memberID: account['sendOffersTo']['memberID'],
-                      firstname: account['sendOffersTo']['firstname'],
-                      lastname: account['sendOffersTo']['lastname'],
-                    ),
-                    balanceData: credex.BalanceData.fromMap(account),
-                    pendingInData: List<credex.PendingOffer>.from(
-                      (account['pendingInData'] as List? ?? []).map((offer) => credex.PendingOffer.fromMap(offer)),
-                    ),
-                    pendingOutData: List<credex.PendingOffer>.from(
-                      (account['pendingOutData'] as List? ?? []).map((offer) => credex.PendingOffer.fromMap(offer)),
-                    ),
-                  )),
-                ),
-              ),
+            () => _httpClient.post(
+              Uri.parse(url),
+              headers: headers,
+              body: json.encode(body),
             ),
-          ));
-        } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to create Credex';
-          Logger.error('Failed to create Credex', 'Status ${response.statusCode}: $errorMessage');
-          return Left(InfrastructureFailure(errorMessage));
+            url,
+            'POST',
+            headers: headers,
+            body: body,
+          );
+
+          if (response.statusCode == 200) {
+            Logger.data('Credex request successful');
+            final jsonResponse = json.decode(response.body);
+
+            // Validate response structure
+            if (!jsonResponse.containsKey('data')) {
+              Logger.error('Invalid Credex response: Missing data field');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing data field'));
+            }
+
+            final data = jsonResponse['data'];
+            if (!data.containsKey('action') || !data.containsKey('dashboard')) {
+              Logger.error(
+                  'Invalid Credex response: Missing required fields in data');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing required fields'));
+            }
+
+            final action = data['action'];
+            final dashboard = data['dashboard'];
+
+            if (dashboard == null) {
+              Logger.error('Invalid Credex response: Missing dashboard');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing dashboard'));
+            }
+            Logger.data('Creating CredexResponse from data');
+            return Right(credex.CredexResponse(
+              message: jsonResponse['message'],
+              data: credex.CredexData(
+                action: credex.CredexAction(
+                  id: action['id'],
+                  type: action['type'],
+                  timestamp: action['timestamp'],
+                  actor: action['actor'],
+                  details: credex.CredexActionDetails(
+                    amount: action['details']['amount'],
+                    denomination: action['details']['denomination'],
+                    securedCredex: action['details']['securedCredex'],
+                    receiverAccountID: action['details']['receiverAccountID'],
+                    receiverAccountName: action['details']
+                        ['receiverAccountName'],
+                  ),
+                ),
+                dashboard: credex.CredexDashboard(
+                  member: credex.DashboardMember(
+                    memberID: dashboard['member']['memberID'],
+                    memberTier: dashboard['member']['memberTier'],
+                    firstname: dashboard['member']['firstname'],
+                    lastname: dashboard['member']['lastname'],
+                    memberHandle: dashboard['member']['memberHandle'],
+                    defaultDenom: dashboard['member']['defaultDenom'],
+                  ),
+                  accounts: List<credex.DashboardAccount>.from(
+                    (dashboard['accounts'] as List).map((account) =>
+                        credex.DashboardAccount(
+                          accountID: account['accountID'],
+                          accountName: account['accountName'],
+                          accountHandle: account['accountHandle'],
+                          accountType: account['accountType'],
+                          defaultDenom: account['defaultDenom'],
+                          isOwnedAccount: account['isOwnedAccount'],
+                          sendOffersTo: credex.SendOffersTo(
+                            memberID: account['sendOffersTo']['memberID'],
+                            firstname: account['sendOffersTo']['firstname'],
+                            lastname: account['sendOffersTo']['lastname'],
+                          ),
+                          balanceData: credex.BalanceData.fromMap(account),
+                          pendingInData: List<credex.PendingOffer>.from(
+                            (account['pendingInData'] as List? ?? []).map(
+                                (offer) => credex.PendingOffer.fromMap(offer)),
+                          ),
+                          pendingOutData: List<credex.PendingOffer>.from(
+                            (account['pendingOutData'] as List? ?? []).map(
+                                (offer) => credex.PendingOffer.fromMap(offer)),
+                          ),
+                        )),
+                  ),
+                ),
+              ),
+            ));
+          } else {
+            Logger.error('Failed to create Credex',
+                'Status ${response.statusCode}: ${response.body}');
+            return Left(InfrastructureFailure(response.body));
+          }
+        } catch (e, stackTrace) {
+          Logger.error('Error creating Credex', e, stackTrace);
+          return Left(InfrastructureFailure(
+              'Unexpected error while creating Credex: ${e.toString()}'));
         }
-      } catch (e, stackTrace) {
-        Logger.error('Error creating Credex', e, stackTrace);
-        return Left(InfrastructureFailure('Unexpected error while creating Credex: ${e.toString()}'));
-      }
       },
     );
   }
@@ -601,7 +641,8 @@ class AccountRepositoryImpl implements AccountRepository {
         if (response.statusCode == 200) {
           return const Right(true);
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transactions';
+          final errorMessage = json.decode(response.body)['message'] ??
+              'Failed to accept Credex transactions';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -631,7 +672,8 @@ class AccountRepositoryImpl implements AccountRepository {
         if (response.statusCode == 200) {
           return const Right(true);
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transaction';
+          final errorMessage = json.decode(response.body)['message'] ??
+              'Failed to accept Credex transaction';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -661,7 +703,8 @@ class AccountRepositoryImpl implements AccountRepository {
         if (response.statusCode == 200) {
           return const Right(true);
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to cancel Credex transaction';
+          final errorMessage = json.decode(response.body)['message'] ??
+              'Failed to cancel Credex transaction';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
@@ -694,8 +737,157 @@ class AccountRepositoryImpl implements AccountRepository {
         if (response.statusCode == 200) {
           return const Right(true);
         } else {
-          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to register notification token';
+          final errorMessage = json.decode(response.body)['message'] ??
+              'Failed to register notification token';
           return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, RecurringResponse>> createRecurring(
+      RecurringRequest request) async {
+    Logger.data('Creating Recurring request: ${request.toJson()}');
+
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        try {
+          final url = '$baseUrl/createRecurring';
+          final headers = _authHeaders(token);
+          final body = request.toJson();
+
+          Logger.data('Sending Recurring request to $url');
+          final response = await _loggedRequest(
+            () => _httpClient.post(
+              Uri.parse(url),
+              headers: headers,
+              body: json.encode(body),
+            ),
+            url,
+            'POST',
+            headers: headers,
+            body: body,
+          );
+
+          if (response.statusCode == 201) {
+            Logger.data('Recurring request successful');
+            final jsonResponse = json.decode(response.body);
+
+            if (!jsonResponse.containsKey('data')) {
+              Logger.error('Invalid Recurring response: Missing data field');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing data field'));
+            }
+
+            final data = jsonResponse['data'];
+            if (!data.containsKey('action')) {
+              Logger.error('Invalid Recurring response: Missing action field');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing action field'));
+            }
+
+            final action = data['action'];
+            final details = action['details'];
+            final nextDateData = details['nextDate'];
+
+            final dashboardData = data['dashboard'];
+            if (!dashboardData.containsKey('member') || !dashboardData.containsKey('accounts')) {
+              Logger.error('Invalid Recurring response: Missing required dashboard fields');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing required dashboard fields'));
+            }
+
+            Logger.data('Creating Dashboard from response data');
+            final dashboardObj = dashboard.Dashboard.fromMap({
+              'member': {
+                'memberID': dashboardData['member']['memberID'],
+                'memberTier': dashboardData['member']['memberTier'],
+                'firstname': dashboardData['member']['firstname'],
+                'lastname': dashboardData['member']['lastname'],
+                'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
+                'defaultDenom': dashboardData['member']['defaultDenom'],
+              },
+              'accounts': dashboardData['accounts']
+                  .map((accountData) => {
+                        'accountID': accountData['accountID'],
+                        'accountName': accountData['accountName'],
+                        'accountHandle': accountData['accountHandle'],
+                        'defaultDenom': accountData['defaultDenom'],
+                        'isOwnedAccount': accountData['isOwnedAccount'],
+                        'balanceData': {
+                          'securedNetBalancesByDenom': accountData['balanceData']
+                              ['securedNetBalancesByDenom'],
+                          'unsecuredBalancesInDefaultDenom':
+                              _calculateUnsecuredBalances(
+                            baseBalances: accountData['balanceData']
+                                ['unsecuredBalancesInDefaultDenom'],
+                            pendingIn: accountData['pendingInData'] ?? [],
+                            pendingOut: accountData['pendingOutData'] ?? [],
+                            defaultDenom: accountData['defaultDenom'],
+                          ),
+                          'netCredexAssetsInDefaultDenom':
+                              accountData['balanceData']
+                                  ['netCredexAssetsInDefaultDenom'],
+                        },
+                        'pendingInData': {
+                          'success': true,
+                          'data': accountData['pendingInData'] ?? [],
+                          'message': 'Pending offers retrieved',
+                        },
+                        'pendingOutData': {
+                          'success': true,
+                          'data': accountData['pendingOutData'] ?? [],
+                          'message': 'Pending outgoing offers retrieved',
+                        },
+                        'sendOffersTo': accountData['sendOffersTo'],
+                      })
+                  .toList(),
+            });
+
+            Logger.data('Creating RecurringResponse with parsed dashboard');
+            return Right(RecurringResponse(
+              message: jsonResponse['message'],
+              data: RecurringData(
+                action: RecurringAction(
+                  id: action['id'],
+                  type: action['type'],
+                  timestamp: action['timestamp'],
+                  actor: action['actor'],
+                  details: RecurringActionDetails(
+                    recurringID: details['recurringID'],
+                    amount: details['amount'],
+                    denomination: details['denomination'],
+                    payFrequency: details['payFrequency'],
+                    nextDate: NextDate(
+                      year: YearValue(
+                        low: nextDateData['year']['low'],
+                        high: nextDateData['year']['high'],
+                      ),
+                      month: YearValue(
+                        low: nextDateData['month']['low'],
+                        high: nextDateData['month']['high'],
+                      ),
+                      day: YearValue(
+                        low: nextDateData['day']['low'],
+                        high: nextDateData['day']['high'],
+                      ),
+                    ),
+                    status: details['status'],
+                  ),
+                ),
+                dashboard: dashboardObj,
+              ),
+            ));
+          } else {
+            Logger.error('Failed to create Recurring',
+                'Status ${response.statusCode}: ${response.body}');
+            return Left(InfrastructureFailure(response.body));
+          }
+        } catch (e, stackTrace) {
+          Logger.error('Error creating Recurring', e, stackTrace);
+          return Left(InfrastructureFailure(
+              'Unexpected error while creating Recurring: ${e.toString()}'));
         }
       },
     );

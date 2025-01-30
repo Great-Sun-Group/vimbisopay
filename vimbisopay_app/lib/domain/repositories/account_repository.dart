@@ -3,7 +3,9 @@ import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
+import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({
@@ -43,4 +45,6 @@ abstract class AccountRepository {
   Future<Either<Failure, bool>> cancelCredex(String credexId);
 
   Future<Either<Failure, bool>> registerNotificationToken(String token);
+
+  Future<Either<Failure, RecurringResponse>> createRecurring(RecurringRequest request);
 }

@@ -2,8 +2,11 @@ import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
+import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dash;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'api_responses.dart';
 import 'mock_account.dart';
@@ -179,6 +182,76 @@ class MockAccountRepository implements AccountRepository {
       return const Right(true);
     } else {
       return const Left(InfrastructureFailure('Failed to save user'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, RecurringResponse>> createRecurring(RecurringRequest request) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      final now = DateTime.now();
+      final mockDashboard = dash.Dashboard.fromMap({
+        'member': {
+          'memberID': '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+          'memberTier': 1,
+          'firstname': 'John',
+          'lastname': 'Doe',
+          'memberHandle': '123456789',
+          'defaultDenom': 'USD',
+        },
+        'accounts': [
+          {
+            'accountID': '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'accountName': 'John Doe Personal',
+            'accountHandle': '123456789',
+            'defaultDenom': 'USD',
+            'isOwnedAccount': true,
+            'balanceData': {
+              'securedNetBalancesByDenom': ['10.00 USD'],
+              'unsecuredBalancesInDefaultDenom': {
+                'totalPayables': '0.00 USD',
+                'totalReceivables': '0.00 USD',
+                'netPayRec': '0.00 USD',
+              },
+              'netCredexAssetsInDefaultDenom': '10.00 USD',
+            },
+            'pendingInData': [],
+            'pendingOutData': [],
+            'sendOffersTo': {
+              'memberID': '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+              'firstname': 'John',
+              'lastname': 'Doe',
+            },
+          },
+        ],
+      });
+
+      return Right(RecurringResponse(
+        message: 'Recurring transaction created successfully',
+        data: RecurringData(
+          action: RecurringAction(
+            id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            type: 'RECURRING_CREATED',
+            timestamp: now.toIso8601String(),
+            actor: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            details: RecurringActionDetails(
+              recurringID: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+              amount: request.amount.toString(),
+              denomination: request.denomination,
+              payFrequency: request.payFrequency,
+              nextDate: NextDate(
+                year: YearValue(low: now.year, high: 0),
+                month: YearValue(low: now.month, high: 0),
+                day: YearValue(low: now.day, high: 0),
+              ),
+              status: 'PENDING',
+            ),
+          ),
+          dashboard: mockDashboard,
+        ),
+      ));
+    } else {
+      return const Left(InfrastructureFailure('Failed to create recurring transaction'));
     }
   }
 }

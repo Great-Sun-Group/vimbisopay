@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
+import '../../../infrastructure/mocks/mock_upgrade_member_tier.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
@@ -25,6 +27,7 @@ void main() {
   late MockDatabaseHelper mockDatabaseHelper;
   late MockAcceptCredexBulk mockAcceptCredexBulk;
   late MockAcceptCredex mockAcceptCredex;
+  late MockUpgradeMemberTier mockUpgradeMemberTier;
   late User mockUser;
   late credex.CredexResponse mockResponse;
 
@@ -85,11 +88,13 @@ void main() {
     );
     
     mockAcceptCredex = MockAcceptCredex();
+    mockUpgradeMemberTier = MockUpgradeMemberTier();
     
     homeBloc = HomeBloc(
       accountRepository: mockRepository,
       acceptCredexBulk: mockAcceptCredexBulk,
       acceptCredex: mockAcceptCredex,
+      upgradeMemberTier: mockUpgradeMemberTier,
     );
     homeBloc.databaseHelper = mockDatabaseHelper;
 
@@ -387,6 +392,135 @@ void main() {
         emits(
           predicate<HomeState>((state) => state.status == HomeStatus.error && state.error != null),
         ),
+      ).timeout(const Duration(seconds: 10));
+    });
+  });
+
+  group('HomeUpgradeTierStarted', () {
+    test('upgrades tier successfully', () async {
+      const accountId = '123';
+      
+      // Mock usecase call
+      when(() => mockUpgradeMemberTier.call(any()))
+        .thenAnswer((_) async => const Right(true));
+
+      // Mock repository calls
+      when(() => mockRepository.login(
+        phone: any(named: 'phone'),
+        passwordHash: any(named: 'passwordHash'),
+        passwordSalt: any(named: 'passwordSalt'),
+      )).thenAnswer((_) async => Right(mockUser));
+
+      homeBloc.add(const HomeUpgradeTierStarted(accountId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.upgradingTier &&
+            state.message == 'Upgrading to Hustler tier...'
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.refreshing &&
+            state.message == 'Refreshing membership status...'
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.refreshing &&
+            state.message == 'Updating balances...'
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.success &&
+            state.dashboard != null
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.success &&
+            state.message == '✅ Successfully upgraded to Hustler tier'
+          ),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+
+    test('handles upgrade tier error', () async {
+      const accountId = '123';
+      
+      when(() => mockUpgradeMemberTier.call(any()))
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to upgrade tier')));
+
+      homeBloc.add(const HomeUpgradeTierStarted(accountId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => state.status == HomeStatus.upgradingTier),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.error && 
+            state.error != null &&
+            state.message == 'Failed to upgrade tier'
+          ),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+
+    test('handles insufficient balance error gracefully', () async {
+      const accountId = '123';
+      
+      when(() => mockUpgradeMemberTier.call(any()))
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Insufficient balance for tier upgrade')));
+
+      homeBloc.add(const HomeUpgradeTierStarted(accountId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => state.status == HomeStatus.upgradingTier),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.error && 
+            state.error != null &&
+            state.message == 'Failed to upgrade tier'
+          ),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+
+    test('handles network error gracefully', () async {
+      const accountId = '123';
+      
+      when(() => mockUpgradeMemberTier.call(any()))
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Network connection error')));
+
+      homeBloc.add(const HomeUpgradeTierStarted(accountId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => state.status == HomeStatus.upgradingTier),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.error && 
+            state.error != null &&
+            state.message == 'Failed to upgrade tier'
+          ),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+
+    test('handles already upgraded error gracefully', () async {
+      const accountId = '123';
+      
+      when(() => mockUpgradeMemberTier.call(any()))
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Account already upgraded to Hustler tier')));
+
+      homeBloc.add(const HomeUpgradeTierStarted(accountId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => state.status == HomeStatus.upgradingTier),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.error && 
+            state.error != null &&
+            state.message == 'Failed to upgrade tier'
+          ),
+        ]),
       ).timeout(const Duration(seconds: 10));
     });
   });

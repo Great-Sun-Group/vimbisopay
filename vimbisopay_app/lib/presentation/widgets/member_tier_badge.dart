@@ -5,39 +5,78 @@ import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 
 class MemberTierBadge extends StatelessWidget {
   final MemberTierType tierType;
+  final VoidCallback? onUpgrade;
 
   const MemberTierBadge({
     super.key,
     required this.tierType,
+    this.onUpgrade,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: _getBadgeColor(),
-        borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
-        border: Border.all(
-          color: tierType == MemberTierType.hustler ? AppColors.success : Colors.white,
-          width: 2,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _getBadgeColor(),
+            borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
+            border: Border.all(
+              color: tierType == MemberTierType.hustler ? AppColors.success : Colors.white,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            _getTierLabel(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+        if (tierType == MemberTierType.open && onUpgrade != null) ...[
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onUpgrade,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.upgrade,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Upgrade',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      child: Text(
-        _getTierLabel(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      ],
     );
   }
 

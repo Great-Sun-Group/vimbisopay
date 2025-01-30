@@ -3,10 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
+import 'package:vimbisopay_app/presentation/widgets/upgrade_tier_bottom_sheet.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' show Dashboard, MemberTierType;
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
@@ -35,6 +38,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late HomeBloc _homeBloc;
   bool _isDisposed = false;
   bool _isInitializing = true;
+
+  void _showUpgradeBottomSheet(BuildContext context, String accountId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => UpgradeTierBottomSheet(
+        onConfirm: () {
+          Navigator.pop(context);
+          _homeBloc.add(HomeUpgradeTierStarted(accountId));
+        },
+        onCancel: () => Navigator.pop(context),
+        isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
+      ),
+    );
+  }
 
   Widget _buildUserAvatar(HomeState state) {
     return Padding(
@@ -84,6 +103,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               bottom: -8,
               child: MemberTierBadge(
                 tierType: state.dashboard!.memberTier.type,
+                onUpgrade: state.dashboard!.memberTier.type == MemberTierType.open &&
+                        state.dashboard!.accounts.isNotEmpty
+                    ? () => _showUpgradeBottomSheet(
+                        context, state.dashboard!.accounts[state.currentPage].accountID)
+                    : null,
               ),
             ),
         ],
@@ -107,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
       acceptCredex: AcceptCredex(_accountRepository),
       accountRepository: _accountRepository,
+      upgradeMemberTier: UpgradeMemberTier(_accountRepository),
     );
     
     // Use addPostFrameCallback to ensure widget is fully mounted
