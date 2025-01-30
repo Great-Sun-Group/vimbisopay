@@ -35,21 +35,47 @@ done
 echo "Building new APK..."
 flutter build apk --release
 
-# Create version-specific APK name
-version_apk="build/app/outputs/flutter-apk/vimbisopay-${new_version}.apk"
+# Add a delay to ensure the APK is fully written
+sleep 5
 
-# Check if source APK exists
-if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-    echo "Error: Release APK not found at build/app/outputs/flutter-apk/app-release.apk"
+# Locate the APK file
+apk_path="build/app/outputs/flutter-apk/app-release.apk"
+if [ ! -f "$apk_path" ]; then
+    # Try alternative path (sometimes it's in a different location)
+    apk_path=$(ls build/app/outputs/flutter-apk/app*.apk 2>/dev/null | head -n 1)
+fi
+
+if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
+    echo "Error: Release APK not found. Search paths:"
+    echo "1. build/app/outputs/flutter-apk/app-release.apk"
+    echo "2. build/app/outputs/flutter-apk/app*.apk"
     exit 1
 fi
 
+echo "Found APK at: $apk_path"
+
+# Verify file exists and is readable
+if [ ! -r "$apk_path" ]; then
+    echo "Error: APK file is not readable at $apk_path"
+    exit 1
+fi
+
+# Create version-specific APK name
+version_apk="build/app/outputs/flutter-apk/vimbisopay-${new_version}.apk"
+
 # Create version-specific copy
-cp "build/app/outputs/flutter-apk/app-release.apk" "$version_apk"
+echo "Copying APK to version-specific location..."
+cp "$apk_path" "$version_apk"
 
 # Verify copy was successful
 if [ ! -f "$version_apk" ]; then
     echo "Error: Failed to create version-specific APK at $version_apk"
+    exit 1
+fi
+
+# Verify file exists and is readable
+if [ ! -r "$version_apk" ]; then
+    echo "Error: Version-specific APK is not readable at $version_apk"
     exit 1
 fi
 
@@ -143,6 +169,12 @@ fi
 # Verify APK exists before upload
 if [ ! -f "$version_apk" ]; then
     echo "Error: APK file not found at $version_apk"
+    exit 1
+fi
+
+# Verify file exists and is readable
+if [ ! -r "$version_apk" ]; then
+    echo "Error: APK file is not readable at $version_apk"
     exit 1
 fi
 

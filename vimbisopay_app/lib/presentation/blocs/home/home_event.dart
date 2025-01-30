@@ -66,11 +66,13 @@ class HomeLedgerLoaded extends HomeEvent {
   final Map<String, List<LedgerEntry>> accountLedgers;
   final List<LedgerEntry> combinedEntries;
   final bool hasMore;
+  final bool showCompletionToast;
 
   const HomeLedgerLoaded({
     required this.accountLedgers,
     required this.combinedEntries,
     required this.hasMore,
+    this.showCompletionToast = false,
   });
 
   @override
@@ -84,6 +86,19 @@ class HomeErrorOccurred extends HomeEvent {
 
   @override
   List<Object?> get props => [message];
+}
+
+class HomeAcceptCredexStarted extends HomeEvent {
+  final String credexId;
+
+  const HomeAcceptCredexStarted(this.credexId);
+
+  @override
+  List<Object> get props => [credexId];
+}
+
+class HomeAcceptCredexCompleted extends HomeEvent {
+  const HomeAcceptCredexCompleted();
 }
 
 class HomeAcceptCredexBulkStarted extends HomeEvent {

@@ -6,9 +6,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart' show Dashboard, DashboardAccount, PendingData, PendingOffer;
+import 'package:vimbisopay_app/domain/entities/dashboard.dart'
+    show Dashboard, DashboardAccount, PendingData, PendingOffer;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
@@ -16,9 +18,10 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final AcceptCredexBulk acceptCredexBulk;
+  final AcceptCredex acceptCredex;
   final AccountRepository accountRepository;
   DatabaseHelper _databaseHelper = DatabaseHelper();
-  
+
   // For testing
   set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
   final Set<String> _processedCredexIds = {};
@@ -26,9 +29,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   static final NotificationService _notificationService = NotificationService();
   StreamSubscription<RemoteMessage>? _notificationSubscription;
+  static String? _currentFcmToken;
+  bool _isTokenSetupComplete = false;
+  final Completer<void> _tokenSetupCompleter = Completer<void>();
+  static bool _isTokenRegistrationInProgress = false;
+  static final _tokenRegistrationLock = Object();
 
   HomeBloc({
     required this.acceptCredexBulk,
+    required this.acceptCredex,
     required this.accountRepository,
   }) : super(const HomeState(status: HomeStatus.initial)) {
     Logger.lifecycle('HomeBloc initialized');
@@ -40,6 +49,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeLoadStarted>(_onLoadStarted);
     on<HomeRefreshStarted>(_onRefreshStarted);
     on<HomeLoadMoreStarted>(_onLoadMoreStarted);
+    on<HomeAcceptCredexStarted>(_onAcceptCredexStarted);
+    on<HomeAcceptCredexCompleted>(_onAcceptCredexCompleted);
     on<HomeAcceptCredexBulkStarted>(_onAcceptCredexBulkStarted);
     on<HomeAcceptCredexBulkCompleted>(_onAcceptCredexBulkCompleted);
     on<HomeCancelCredexStarted>(_onCancelCredexStarted);
@@ -53,9 +64,99 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     _initializeNotifications();
   }
 
+  Future<void> _setupFcmToken() async {
+    if (_isTokenSetupComplete) {
+      Logger.data('Token setup already completed, skipping');
+      return;
+    }
+
+    Logger.data('Setting up FCM token...');
+    final messaging = FirebaseMessaging.instance;
+    
+    try {
+      // Get initial token
+      String? token;
+      if (Platform.isIOS) {
+        final apnsToken = await messaging.getAPNSToken();
+        if (apnsToken != null) {
+          token = await messaging.getToken();
+        }
+      } else {
+        token = await messaging.getToken();
+      }
+
+      // Complete token setup first
+      _isTokenSetupComplete = true;
+      if (!_tokenSetupCompleter.isCompleted) {
+        _tokenSetupCompleter.complete();
+      }
+
+      // Then register token if needed
+      if (token != null && token != _currentFcmToken) {
+        Logger.data('New FCM token obtained: $token');
+        await _registerToken(token);
+      }
+
+      // Set up token refresh listener only once
+      messaging.onTokenRefresh.listen((String newToken) {
+        Logger.data('FCM token refreshed: $newToken');
+        // Only register if token has actually changed and no registration in progress
+        if (newToken != _currentFcmToken && !_isTokenRegistrationInProgress) {
+          // Use unawaited Future to handle token registration
+          Future(() async {
+            try {
+              await _registerToken(newToken);
+            } catch (e) {
+              Logger.error('Error registering refreshed token', e);
+            }
+          });
+        }
+      });
+    } catch (e) {
+      Logger.error('Error setting up FCM token', e);
+      if (!_tokenSetupCompleter.isCompleted) {
+        _tokenSetupCompleter.completeError(e);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _registerToken(String token) async {
+    // Atomic check and set of registration flag
+    if (_isTokenRegistrationInProgress || token == _currentFcmToken) {
+      Logger.data('Token registration skipped: ${_isTokenRegistrationInProgress ? 'in progress' : 'already registered'}');
+      return;
+    }
+
+    try {
+      _isTokenRegistrationInProgress = true;
+      Logger.data('Registering notification token');
+      
+      final result = await accountRepository.registerNotificationToken(token);
+      
+      result.fold(
+        (failure) {
+          Logger.error('Failed to register notification token', failure);
+          add(HomeErrorOccurred(
+              failure.message ?? 'Failed to register notification token'));
+          throw failure;
+        },
+        (_) {
+          Logger.data('Successfully registered notification token');
+          _currentFcmToken = token; // Only update on success
+        },
+      );
+    } catch (e) {
+      Logger.error('Error in token registration', e);
+      rethrow;
+    } finally {
+      _isTokenRegistrationInProgress = false;
+    }
+  }
+
   Future<void> _initializeNotifications() async {
     Logger.data('=== INITIALIZING NOTIFICATIONS IN HOME BLOC ===');
-    
+
     try {
       // Initialize Firebase first
       Logger.data('Getting initial message...');
@@ -65,7 +166,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         Logger.data('Title: ${initialMessage.notification?.title}');
         Logger.data('Body: ${initialMessage.notification?.body}');
         Logger.data('Data: ${initialMessage.data}');
-        
+
         // Process initial message
         Logger.data('Processing initial message...');
         _notificationService.sendTestNotification(initialMessage);
@@ -74,7 +175,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       // Cancel any existing subscription first
       await _notificationSubscription?.cancel();
       Logger.data('Previous notification subscription cancelled');
-      
+
       // Initialize notification service with retries
       Logger.data('Initializing notification service...');
       bool initialized = false;
@@ -95,12 +196,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
       Logger.data('Notification service initialized successfully');
 
+      // Setup FCM token
+      await _setupFcmToken();
+
       // Re-initialize notification service when app resumes
       SystemChannels.lifecycle.setMessageHandler((msg) async {
         if (msg == AppLifecycleState.resumed.toString()) {
           print('App resumed, reinitializing notification service...');
           await _notificationService.initialize();
-          
+
           // Also refresh data when app resumes
           print('App resumed, refreshing data...');
           await _refreshViaLogin();
@@ -109,26 +213,28 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       });
 
       // Listen to notification events and refresh dashboard
-      await _notificationSubscription?.cancel(); // Ensure previous subscription is cancelled
+      await _notificationSubscription
+          ?.cancel(); // Ensure previous subscription is cancelled
       _notificationSubscription = _notificationService.onNotification.listen(
         (message) async {
           print('=== NOTIFICATION RECEIVED IN HOME BLOC ===');
           print('Title: ${message.notification?.title}');
           print('Body: ${message.notification?.body}');
           print('Data: ${message.data}');
-          
+
           try {
             Logger.data('=== PROCESSING NOTIFICATION IN HOME BLOC ===');
-            
+
             // Extract message content first
             final title = message.notification?.title ?? message.data['title'];
             final body = message.notification?.body ?? message.data['body'];
             final toastMessage = body ?? title ?? 'New transaction received';
-            
+
             Logger.data('Extracted message content: $toastMessage');
-            
+
             // Show toast message and start refresh simultaneously
-            Logger.data('Emitting notification received state and starting refresh...');
+            Logger.data(
+                'Emitting notification received state and starting refresh...');
             emit(state.copyWith(
               message: toastMessage,
               status: HomeStatus.refreshing,
@@ -139,23 +245,24 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             final refreshFuture = _refreshViaLogin();
             await Future.wait([
               refreshFuture,
-              Future.delayed(const Duration(seconds: 3)), // Ensure message stays visible
+              Future.delayed(
+                  const Duration(seconds: 3)), // Ensure message stays visible
             ]);
-            
+
             await _refreshViaLogin();
             Logger.data('Refresh completed');
-            
+
             // Show success message
             Logger.data('Emitting success state...');
             emit(state.copyWith(
               message: '✅ Data refreshed',
               status: HomeStatus.success,
             ));
-            
+
             // Clear message after a moment
             await Future.delayed(const Duration(seconds: 2));
             emit(state.copyWith(message: null));
-            
+
             Logger.data('Success state emitted');
           } catch (e, stackTrace) {
             Logger.error('''
@@ -169,7 +276,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           Logger.error('Error in notification stream', error);
         },
       );
-      
+
       Logger.data('Notification handling setup complete in HomeBloc');
     } catch (e, stackTrace) {
       Logger.error('Error setting up notifications', e, stackTrace);
@@ -204,18 +311,22 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     add(const HomeLoadStarted());
     _processedCredexIds.clear();
 
+    // Wait for token setup to complete before proceeding
     try {
+      await _tokenSetupCompleter.future;
       // First try to get cached data from database
       final user = await _databaseHelper.getUser();
       Logger.data('Retrieved user from database: ${user != null}');
-      
+
       if (user?.dashboard != null) {
         Logger.data('Using cached dashboard data');
         final pendingInTransactions = user!.dashboard!.accounts
-            .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
+            .expand(
+                (account) => (account.pendingInData.data ?? []).map((tx) => tx))
             .toList();
         final pendingOutTransactions = user.dashboard!.accounts
-            .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
+            .expand((account) =>
+                (account.pendingOutData.data ?? []).map((tx) => tx))
             .toList();
 
         // Emit cached data immediately
@@ -237,10 +348,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
       // Then refresh data from server
       await _refreshViaLogin();
-      
     } catch (e, stackTrace) {
       Logger.error('Failed to load initial data', e, stackTrace);
-      
+
       // Only show error if we don't have any data
       if (state.dashboard == null) {
         add(const HomeErrorOccurred('Failed to load initial data'));
@@ -252,6 +362,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         'Initial data load took ${stopwatch.elapsedMilliseconds}ms');
   }
 
+  int processedAccounts = 0;
+  int totalAccounts = 0;
+
   Future<void> _loadLedgerData(Dashboard dashboard) async {
     Logger.data('Loading ledger data for accounts');
 
@@ -259,8 +372,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final List<LedgerEntry> allEntries = [];
     bool hasMoreEntries = false;
     final List<String> errors = [];
-    int processedAccounts = 0;
-    final totalAccounts = dashboard.accounts.length;
+
+    totalAccounts = dashboard.accounts.length;
 
     try {
       final accounts = dashboard.accounts;
@@ -341,6 +454,25 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                   allEntries.addAll(entries);
                 }
 
+                // if (isLastAccount) {
+                //   if (allEntries.isNotEmpty) {
+                //     final uniqueEntries =
+                //         _deduplicateAndSortEntries(allEntries);
+                //     add(HomeLedgerLoaded(
+                //       accountLedgers: accountLedgers,
+                //       combinedEntries: uniqueEntries,
+                //       hasMore: false,
+                //     ));
+                //   } else if (errors.isNotEmpty) {
+                //     add(HomeErrorOccurred(errors.join('\n')));
+                //   } else {
+                //     add(const HomeLedgerLoaded(
+                //       accountLedgers: {},
+                //       combinedEntries: [],
+                //       hasMore: false,
+                //     ));
+                //   }
+                // }
                 if (isLastAccount) {
                   if (allEntries.isNotEmpty) {
                     final uniqueEntries =
@@ -348,7 +480,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                     add(HomeLedgerLoaded(
                       accountLedgers: accountLedgers,
                       combinedEntries: uniqueEntries,
-                      hasMore: false,
+                      hasMore: hasMoreEntries,
+                      showCompletionToast: processedAccounts == totalAccounts &&
+                          errors
+                              .isEmpty, // Only show toast when all accounts are processed successfully
                     ));
                   } else if (errors.isNotEmpty) {
                     add(HomeErrorOccurred(errors.join('\n')));
@@ -357,6 +492,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
                       accountLedgers: {},
                       combinedEntries: [],
                       hasMore: false,
+                      showCompletionToast: false,
                     ));
                   }
                 }
@@ -406,15 +542,18 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           '- ${state.pendingOutTransactions.length} pending out transactions');
 
       final pendingInTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
+          .expand(
+              (account) => (account.pendingInData.data ?? []).map((tx) => tx))
           .toList();
       final pendingOutTransactions = user.dashboard!.accounts
-          .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
+          .expand(
+              (account) => (account.pendingOutData.data ?? []).map((tx) => tx))
           .toList();
 
       Logger.data('Database contains:');
       Logger.data('- ${pendingInTransactions.length} pending in transactions');
-      Logger.data('- ${pendingOutTransactions.length} pending out transactions');
+      Logger.data(
+          '- ${pendingOutTransactions.length} pending out transactions');
 
       // First update with refreshing state to ensure UI shows loading
       emit(state.copyWith(
@@ -430,8 +569,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         pendingInTransactions: pendingInTransactions,
         pendingOutTransactions: pendingOutTransactions,
         // Also update filtered lists if no search is active
-        filteredPendingInTransactions: state.searchQuery.isEmpty ? pendingInTransactions : null,
-        filteredPendingOutTransactions: state.searchQuery.isEmpty ? pendingOutTransactions : null,
+        filteredPendingInTransactions:
+            state.searchQuery.isEmpty ? pendingInTransactions : null,
+        filteredPendingOutTransactions:
+            state.searchQuery.isEmpty ? pendingOutTransactions : null,
         message: null,
         error: null,
       ));
@@ -464,7 +605,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     try {
       final user = await _databaseHelper.getUser();
-      if (user == null || user.passwordHash == null || user.passwordSalt == null) {
+      if (user == null ||
+          user.passwordHash == null ||
+          user.passwordSalt == null) {
         Logger.error('Cannot refresh: No stored user credentials');
         add(const HomeErrorOccurred(
             'Unable to refresh data: No stored credentials'));
@@ -487,11 +630,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
           // Extract pending transactions from the new dashboard
           final pendingInTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingInData.data ?? []).map((tx) => tx))
-          .toList();
+              .expand((account) =>
+                  (account.pendingInData.data ?? []).map((tx) => tx))
+              .toList();
           final pendingOutTransactions = newUser.dashboard!.accounts
-              .expand((account) => (account.pendingOutData.data ?? []).map((tx) => tx))
-          .toList();
+              .expand((account) =>
+                  (account.pendingOutData.data ?? []).map((tx) => tx))
+              .toList();
 
           Logger.data(
               'Found ${pendingInTransactions.length} pending in and ${pendingOutTransactions.length} pending out transactions in new data');
@@ -516,14 +661,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             pendingInTransactions: pendingInTransactions,
             pendingOutTransactions: pendingOutTransactions,
             // Also update filtered lists if no search is active
-            filteredPendingInTransactions: state.searchQuery.isEmpty ? pendingInTransactions : null,
-            filteredPendingOutTransactions: state.searchQuery.isEmpty ? pendingOutTransactions : null,
+            filteredPendingInTransactions:
+                state.searchQuery.isEmpty ? pendingInTransactions : null,
+            filteredPendingOutTransactions:
+                state.searchQuery.isEmpty ? pendingOutTransactions : null,
             message: '✅ Data refreshed',
             error: null,
           ));
 
           if (newUser.dashboard!.accounts.isNotEmpty) {
-            Logger.data('Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
+            Logger.data(
+                'Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
           }
 
           // Then load ledger data if needed
@@ -537,32 +685,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             ));
           }
 
-          // Get FCM token and register it
-          print('Getting FCM token...');
-          final messaging = FirebaseMessaging.instance;
-          String? token;
-          
-          if (Platform.isIOS) {
-            final apnsToken = await messaging.getAPNSToken();
-            if (apnsToken != null) {
-              token = await messaging.getToken();
-            }
-          } else {
-            token = await messaging.getToken();
-          }
-          
-          if (token != null) {
-            print('Got FCM token: $token');
-            add(HomeRegisterNotificationToken(token));
-            
-            // Set up token refresh listener
-            messaging.onTokenRefresh.listen((newToken) {
-              print('FCM token refreshed: $newToken');
-              add(HomeRegisterNotificationToken(newToken));
-            });
-          } else {
-            print('Failed to get FCM token');
-          }
         },
       );
 
@@ -605,7 +727,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       print('Starting refresh via login...');
       await _refreshViaLogin();
       print('Refresh completed successfully');
-      
+
       // Emit success state after refresh
       emit(state.copyWith(
         status: HomeStatus.success,
@@ -625,7 +747,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
   }
 
-  void _onLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
+  void _onLoadMoreStarted(
+      HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
     if (!state.hasMoreEntries) {
       Logger.state('Load more ignored - no more entries available');
       emit(state.copyWith(
@@ -666,22 +789,22 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // If there's an active search, apply filtering
     if (state.searchQuery.isNotEmpty) {
       final query = state.searchQuery.toLowerCase();
-      
+
       final filteredPendingIn = event.pendingInTransactions.where((tx) {
         return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-               tx.counterpartyAccountName.toLowerCase().contains(query);
+            tx.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       final filteredPendingOut = event.pendingOutTransactions.where((tx) {
         return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-               tx.counterpartyAccountName.toLowerCase().contains(query);
+            tx.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       // Also filter ledger entries if they exist
       final filteredLedger = state.combinedLedgerEntries.where((entry) {
         return entry.description.toLowerCase().contains(query) ||
-               entry.formattedAmount.toLowerCase().contains(query) ||
-               entry.counterpartyAccountName.toLowerCase().contains(query);
+            entry.formattedAmount.toLowerCase().contains(query) ||
+            entry.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       emit(newState.copyWith(
@@ -712,29 +835,33 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       accountLedgers: event.accountLedgers,
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
-      message: null,
+      message: (event.showCompletionToast &&
+              event.combinedEntries.isNotEmpty &&
+              processedAccounts == totalAccounts)
+          ? '✅ Transaction history loaded'
+          : null,
       error: null,
     );
 
     // If there's an active search, apply filtering
     if (state.searchQuery.isNotEmpty) {
       final query = state.searchQuery.toLowerCase();
-      
+
       final filteredEntries = event.combinedEntries.where((entry) {
         return entry.description.toLowerCase().contains(query) ||
-               entry.formattedAmount.toLowerCase().contains(query) ||
-               entry.counterpartyAccountName.toLowerCase().contains(query);
+            entry.formattedAmount.toLowerCase().contains(query) ||
+            entry.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       // Also filter pending transactions to maintain consistency
       final filteredPendingIn = state.pendingInTransactions.where((tx) {
         return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-               tx.counterpartyAccountName.toLowerCase().contains(query);
+            tx.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       final filteredPendingOut = state.pendingOutTransactions.where((tx) {
         return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-               tx.counterpartyAccountName.toLowerCase().contains(query);
+            tx.counterpartyAccountName.toLowerCase().contains(query);
       }).toList();
 
       emit(newState.copyWith(
@@ -778,12 +905,77 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     await super.close();
   }
 
+  void _onAcceptCredexStarted(
+    HomeAcceptCredexStarted event,
+    Emitter<HomeState> emit,
+  ) async {
+    Logger.state('Starting single credex acceptance for ${event.credexId}');
+
+    emit(state.copyWith(
+      status: HomeStatus.acceptingCredex,
+      processingCredexIds: [event.credexId],
+      error: null,
+    ));
+
+    final stopwatch = Stopwatch()..start();
+    final result = await acceptCredex(event.credexId);
+    stopwatch.stop();
+
+    Logger.performance(
+        'Single credex acceptance took ${stopwatch.elapsedMilliseconds}ms');
+
+    result.fold(
+      (failure) {
+        Logger.error('Single credex acceptance failed', failure);
+        add(HomeErrorOccurred(
+            failure.message ?? 'Failed to accept transaction'));
+      },
+      (_) async {
+        Logger.data('Successfully processed credex transaction');
+
+        // Set loading state
+        emit(state.copyWith(
+          status: HomeStatus.refreshing,
+          message: 'Refreshing balances...',
+          error: null,
+        ));
+
+        // Add a small delay to ensure backend has processed the transaction
+        await Future.delayed(const Duration(seconds: 2));
+
+        // Refresh data to get updated balances and transactions
+        await _refreshViaLogin();
+
+        add(const HomeAcceptCredexCompleted());
+      },
+    );
+  }
+
+  void _onAcceptCredexCompleted(
+    HomeAcceptCredexCompleted event,
+    Emitter<HomeState> emit,
+  ) {
+    Logger.state('Single credex acceptance completed');
+    emit(state.copyWith(
+      status: HomeStatus.success,
+      processingCredexIds: const [],
+      message: 'Transaction accepted successfully',
+      error: null,
+    ));
+  }
+
   void _onAcceptCredexBulkStarted(
     HomeAcceptCredexBulkStarted event,
     Emitter<HomeState> emit,
   ) async {
     Logger.state(
-        'Starting bulk credex acceptance for ${event.credexIds.length} transactions');
+        'Starting credex acceptance for ${event.credexIds.length} transactions');
+
+    // If only one credex, use single accept endpoint
+    if (event.credexIds.length == 1) {
+      add(HomeAcceptCredexStarted(event.credexIds.first));
+      return;
+    }
 
     emit(state.copyWith(
       status: HomeStatus.acceptingCredex,
@@ -807,20 +999,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       (_) async {
         Logger.data(
             'Successfully processed ${event.credexIds.length} credex transactions');
-            
+
         // Set loading state
         emit(state.copyWith(
           status: HomeStatus.refreshing,
           message: 'Refreshing balances...',
           error: null,
         ));
-        
+
         // Add a small delay to ensure backend has processed the transaction
         await Future.delayed(const Duration(seconds: 2));
-        
+
         // Refresh data to get updated balances and transactions
         await _refreshViaLogin();
-        
+
         add(const HomeAcceptCredexBulkCompleted());
       },
     );
@@ -856,17 +1048,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
       (_) async {
         Logger.data('Successfully cancelled credex transaction');
-            
+
         // Set loading state and trigger refresh immediately
         emit(state.copyWith(
           status: HomeStatus.refreshing,
           message: 'Refreshing balances...',
           error: null,
         ));
-        
+
         // Refresh data to get updated balances and transactions
         await _refreshViaLogin();
-        
+
         add(const HomeCancelCredexCompleted());
       },
     );
@@ -904,10 +1096,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   void _onSearchStarted(HomeSearchStarted event, Emitter<HomeState> emit) {
     Logger.interaction('Search started with query: ${event.query}');
-    
+
     // Always update search query first
     emit(state.copyWith(searchQuery: event.query));
-    
+
     if (event.query.isEmpty) {
       Logger.data('Empty search query - showing all transactions');
       emit(state.copyWith(
@@ -920,12 +1112,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     final query = event.query.toLowerCase();
     Logger.data('Filtering transactions with query: $query');
-    
+
     // Filter ledger entries
     final filteredEntries = state.combinedLedgerEntries.where((entry) {
       final matches = entry.description.toLowerCase().contains(query) ||
-             entry.formattedAmount.toLowerCase().contains(query) ||
-             entry.counterpartyAccountName.toLowerCase().contains(query);
+          entry.formattedAmount.toLowerCase().contains(query) ||
+          entry.counterpartyAccountName.toLowerCase().contains(query);
       if (matches) {
         Logger.data('Matched ledger entry: ${entry.description}');
       }
@@ -935,7 +1127,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // Filter pending in transactions
     final filteredPendingIn = state.pendingInTransactions.where((tx) {
       final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
-             tx.counterpartyAccountName.toLowerCase().contains(query);
+          tx.counterpartyAccountName.toLowerCase().contains(query);
       if (matches) {
         Logger.data('Matched pending in: ${tx.counterpartyAccountName}');
       }
@@ -945,7 +1137,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // Filter pending out transactions
     final filteredPendingOut = state.pendingOutTransactions.where((tx) {
       final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
-             tx.counterpartyAccountName.toLowerCase().contains(query);
+          tx.counterpartyAccountName.toLowerCase().contains(query);
       if (matches) {
         Logger.data('Matched pending out: ${tx.counterpartyAccountName}');
       }
@@ -969,19 +1161,19 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     HomeRegisterNotificationToken event,
     Emitter<HomeState> emit,
   ) async {
-    Logger.data('Registering notification token');
+    // Skip if token setup is not complete
+    if (!_isTokenSetupComplete) {
+      Logger.data('Token setup not complete, skipping registration');
+      return;
+    }
     
-    final result = await accountRepository.registerNotificationToken(event.token);
-    
-    result.fold(
-      (failure) {
-        Logger.error('Failed to register notification token', failure);
-        add(HomeErrorOccurred(failure.message ?? 'Failed to register notification token'));
-      },
-      (_) {
-        Logger.data('Successfully registered notification token');
-      },
-    );
+    // Skip if token is already registered
+    if (event.token == _currentFcmToken) {
+      Logger.data('Token already registered, skipping');
+      return;
+    }
+
+    await _registerToken(event.token);
   }
 
   void _onLoadPendingTransactions(
@@ -1003,9 +1195,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     Logger.data('Creating credex request');
-    
+
     final result = await accountRepository.createCredex(event.request);
-    
+
     result.fold(
       (failure) {
         Logger.error('Failed to create credex', failure);

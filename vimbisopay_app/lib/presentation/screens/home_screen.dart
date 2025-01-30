@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
@@ -104,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Logger.lifecycle('Initializing HomeBloc');
     _homeBloc = HomeBloc(
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
+      acceptCredex: AcceptCredex(_accountRepository),
       accountRepository: _accountRepository,
     );
     
@@ -274,6 +276,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 itemBuilder: (context, index) => AccountCard(
                   key: ValueKey('account_card_${state.dashboard!.accounts[index].accountID}_${state.dashboard!.accounts[index].balanceData.netCredexAssetsInDefaultDenom}'),
                   account: state.dashboard!.accounts[index],
+                  memberTier: state.dashboard!.memberTier,
                 ),
               );
             },

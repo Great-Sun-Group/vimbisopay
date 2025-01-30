@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
@@ -16,12 +17,14 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 class MockAccountRepository extends Mock implements AccountRepository {}
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 class MockAcceptCredexBulk extends Mock implements AcceptCredexBulk {}
+class MockAcceptCredex extends Mock implements AcceptCredex {}
 
 void main() {
   late HomeBloc homeBloc;
   late MockAccountRepository mockRepository;
   late MockDatabaseHelper mockDatabaseHelper;
   late MockAcceptCredexBulk mockAcceptCredexBulk;
+  late MockAcceptCredex mockAcceptCredex;
   late User mockUser;
   late credex.CredexResponse mockResponse;
 
@@ -81,9 +84,12 @@ void main() {
       ),
     );
     
+    mockAcceptCredex = MockAcceptCredex();
+    
     homeBloc = HomeBloc(
       accountRepository: mockRepository,
       acceptCredexBulk: mockAcceptCredexBulk,
+      acceptCredex: mockAcceptCredex,
     );
     homeBloc.databaseHelper = mockDatabaseHelper;
 
@@ -180,6 +186,69 @@ void main() {
         homeBloc.stream,
         emitsInOrder([
           predicate<HomeState>((state) => state.status == HomeStatus.cancellingCredex),
+          predicate<HomeState>((state) => state.status == HomeStatus.error && state.error != null),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+  });
+
+  group('HomeAcceptCredexStarted', () {
+    test('accepts single credex transaction successfully', () async {
+      const credexId = '123';
+      
+      // Mock usecase call
+      when(() => mockAcceptCredex.call(any()))
+        .thenAnswer((_) async => const Right(true));
+
+      // Mock repository calls
+      when(() => mockRepository.login(
+        phone: any(named: 'phone'),
+        passwordHash: any(named: 'passwordHash'),
+        passwordSalt: any(named: 'passwordSalt'),
+      )).thenAnswer((_) async => Right(mockUser));
+
+      homeBloc.add(const HomeAcceptCredexStarted(credexId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.acceptingCredex &&
+            state.processingCredexIds.contains(credexId)
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.refreshing &&
+            state.message == 'Refreshing balances...'
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.refreshing &&
+            state.message == 'Updating balances...'
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.success &&
+            state.dashboard != null
+          ),
+          predicate<HomeState>((state) => 
+            state.status == HomeStatus.success &&
+            state.message == 'Transaction accepted successfully' &&
+            state.processingCredexIds.isEmpty
+          ),
+        ]),
+      ).timeout(const Duration(seconds: 10));
+    });
+
+    test('handles single credex accept error', () async {
+      const credexId = '123';
+      
+      when(() => mockAcceptCredex.call(any()))
+        .thenAnswer((_) async => const Left(InfrastructureFailure('Failed to accept')));
+
+      homeBloc.add(const HomeAcceptCredexStarted(credexId));
+
+      await expectLater(
+        homeBloc.stream,
+        emitsInOrder([
+          predicate<HomeState>((state) => state.status == HomeStatus.acceptingCredex),
           predicate<HomeState>((state) => state.status == HomeStatus.error && state.error != null),
         ]),
       ).timeout(const Duration(seconds: 10));

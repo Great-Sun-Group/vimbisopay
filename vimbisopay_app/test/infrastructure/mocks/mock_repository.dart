@@ -89,6 +89,16 @@ class MockAccountRepository implements AccountRepository {
     if (shouldSucceed) {
       return const Right(true);
     } else {
+      return const Left(InfrastructureFailure('Failed to accept credex bulk'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> acceptCredex(String credexId) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      return const Right(true);
+    } else {
       return const Left(InfrastructureFailure('Failed to accept credex'));
     }
   }

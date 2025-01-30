@@ -30,6 +30,49 @@ class AccountRepositoryImpl implements AccountRepository {
   set passwordService(PasswordService service) => _passwordService = service;
   set httpClient(http.Client client) => _httpClient = client;
 
+  Map<String, dynamic> _calculateUnsecuredBalances({
+    required Map<String, dynamic> baseBalances,
+    required List<dynamic> pendingIn,
+    required List<dynamic> pendingOut,
+    required String defaultDenom,
+  }) {
+    // Extract base values, defaulting to 0.00 if not present
+    double baseReceivables = double.tryParse(
+      baseBalances['totalReceivables']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
+    ) ?? 0.00;
+    
+    double basePayables = double.tryParse(
+      baseBalances['totalPayables']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
+    ) ?? 0.00;
+
+    // Calculate pending amounts
+    double pendingInTotal = pendingIn.fold(0.00, (sum, tx) {
+      final amount = double.tryParse(
+        tx['formattedInitialAmount']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
+      ) ?? 0.00;
+      return sum + amount;
+    });
+
+    double pendingOutTotal = pendingOut.fold(0.00, (sum, tx) {
+      final amount = double.tryParse(
+        tx['formattedInitialAmount']?.toString().replaceAll(RegExp(r'[^\d.-]'), '') ?? '0.00'
+      ) ?? 0.00;
+      return sum + amount;
+    });
+
+    // Add pending amounts to base values
+    final totalReceivables = baseReceivables + pendingInTotal;
+    final totalPayables = basePayables + pendingOutTotal;
+    final netPayRec = totalReceivables - totalPayables;
+
+    // Format values with denomination
+    return {
+      'totalReceivables': '${totalReceivables.toStringAsFixed(2)} $defaultDenom',
+      'totalPayables': '${totalPayables.toStringAsFixed(2)} $defaultDenom',
+      'netPayRec': '${netPayRec.toStringAsFixed(2)} $defaultDenom',
+    };
+  }
+
   Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
     'x-client-api-key': ApiConfig.apiKey,
@@ -382,7 +425,12 @@ class AccountRepositoryImpl implements AccountRepository {
             'isOwnedAccount': accountData['isOwnedAccount'],
             'balanceData': {
               'securedNetBalancesByDenom': accountData['balanceData']['securedNetBalancesByDenom'],
-              'unsecuredBalancesInDefaultDenom': accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
+              'unsecuredBalancesInDefaultDenom': _calculateUnsecuredBalances(
+                baseBalances: accountData['balanceData']['unsecuredBalancesInDefaultDenom'],
+                pendingIn: accountData['pendingInData'] ?? [],
+                pendingOut: accountData['pendingOutData'] ?? [],
+                defaultDenom: accountData['defaultDenom'],
+              ),
               'netCredexAssetsInDefaultDenom': accountData['balanceData']['netCredexAssetsInDefaultDenom'],
             },
             'pendingInData': {
@@ -554,6 +602,36 @@ class AccountRepositoryImpl implements AccountRepository {
           return const Right(true);
         } else {
           final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transactions';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, bool>> acceptCredex(String credexId) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = 'https://dev.mycredex.dev/acceptCredex';
+        final headers = _authHeaders(token);
+        final body = {'credexID': credexId};
+
+        final response = await _loggedRequest(
+          () => _httpClient.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to accept Credex transaction';
           return Left(InfrastructureFailure(errorMessage));
         }
       },
