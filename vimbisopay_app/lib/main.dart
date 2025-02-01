@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -11,6 +12,7 @@ import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -129,18 +131,25 @@ void main() async {
 ''');
   }
   
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  runApp(MyApp(sharedPreferences: prefs));
 }
 
-// Rest of the file remains unchanged
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final SharedPreferences sharedPreferences;
+  
+  const MyApp({
+    required this.sharedPreferences,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VimbisoPay',
-      theme: ThemeData(
+    return Provider<SharedPreferences>.value(
+      value: sharedPreferences,
+      child: MaterialApp(
+        title: 'VimbisoPay',
+        theme: ThemeData(
         useMaterial3: true,
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primary,
@@ -160,8 +169,8 @@ class MyApp extends StatelessWidget {
           titleMedium: TextStyle(color: AppColors.textPrimary),
           titleSmall: TextStyle(color: AppColors.textSecondary),
         ),
-      ),
-      onGenerateRoute: (settings) {
+        ),
+        onGenerateRoute: (settings) {
         // Protected routes that require authentication
         if (settings.name == '/home') {
           return MaterialPageRoute(
@@ -173,6 +182,13 @@ class MyApp extends StatelessWidget {
         if (settings.name == '/settings') {
           return MaterialPageRoute(
             builder: (context) => const SettingsScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/notifications-settings') {
+          return MaterialPageRoute(
+            builder: (context) => const NotificationsSettingsScreen(),
             settings: settings,
           );
         }
@@ -244,8 +260,9 @@ class MyApp extends StatelessWidget {
         return MaterialPageRoute(
           builder: (context) => const IntroWrapper(),
         );
-      },
-      home: const IntroWrapper(),
+        },
+        home: const IntroWrapper(),
+      ),
     );
   }
 }

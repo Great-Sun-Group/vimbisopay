@@ -4,6 +4,9 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -35,7 +38,12 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.person_outline,
               title: 'Profile',
               onTap: () {
-                // TODO: Implement profile navigation
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileSettingsScreen(),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 12),
@@ -43,7 +51,12 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.security,
               title: 'Security',
               onTap: () {
-                // TODO: Implement security settings
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SecuritySettingsScreen(),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 12),
@@ -51,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.notifications_outlined,
               title: 'Notifications',
               onTap: () {
-                // TODO: Implement notifications settings
+                Navigator.pushNamed(context, '/notifications-settings');
               },
             ),
             const SizedBox(height: 12),

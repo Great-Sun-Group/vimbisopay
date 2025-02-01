@@ -32,6 +32,7 @@ dependencies:
   screen_brightness: ^0.2.2
   firebase_messaging: ^14.7.4
   firebase_core: ^2.22.0
+  provider: ^6.1.1
 
   path: any
   audioplayers: ^6.1.0

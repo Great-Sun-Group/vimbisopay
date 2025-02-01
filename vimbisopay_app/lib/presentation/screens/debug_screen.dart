@@ -14,13 +14,43 @@ class _DebugScreenState extends State<DebugScreen> {
   String _notificationStatus = 'Checking...';
   String _fcmToken = 'Unknown';
   String _lastNotification = 'None';
+  String _initializationStatus = 'Not initialized';
   final NotificationService _notificationService = NotificationService();
+  bool _isInitialized = false;
   
   @override
   void initState() {
     super.initState();
-    _checkNotificationStatus();
-    _listenForNotifications();
+    _initializeNotificationService();
+  }
+
+  Future<void> _initializeNotificationService() async {
+    try {
+      setState(() {
+        _initializationStatus = 'Initializing...';
+      });
+
+      final initialized = await _notificationService.initialize();
+      
+      if (initialized) {
+        setState(() {
+          _isInitialized = true;
+          _initializationStatus = 'Initialized successfully';
+        });
+        
+        // Only proceed with these after successful initialization
+        await _checkNotificationStatus();
+        _listenForNotifications();
+      } else {
+        setState(() {
+          _initializationStatus = 'Initialization failed';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _initializationStatus = 'Initialization error: $e';
+      });
+    }
   }
 
   Future<void> _checkNotificationStatus() async {
@@ -45,6 +75,8 @@ Sound: ${settings.sound}
   }
 
   void _listenForNotifications() {
+    if (!_isInitialized) return;
+    
     _notificationService.onNotification.listen((message) {
       setState(() {
         _lastNotification = '''
@@ -55,6 +87,12 @@ Received at: ${DateTime.now()}
 ''';
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _notificationService.cleanup();
+    super.dispose();
   }
 
   @override
@@ -80,10 +118,25 @@ Received at: ${DateTime.now()}
               width: double.infinity,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(
+                  color: _isInitialized ? Colors.grey : Colors.red,
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(_notificationStatus),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Initialization Status: $_initializationStatus',
+                    style: TextStyle(
+                      color: _isInitialized ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_notificationStatus),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -137,6 +190,18 @@ Received at: ${DateTime.now()}
                       child: ElevatedButton(
                         onPressed: () async {
                           try {
+                            if (!_isInitialized) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('NotificationService not initialized'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
                             // Send a test notification using FCM's own token
                             final token = await FirebaseMessaging.instance.getToken();
                             if (token == null) {
@@ -207,6 +272,18 @@ Received at: ${DateTime.now()}
                         },
                         messageId: 'background_test_${DateTime.now().millisecondsSinceEpoch}',
                       );
+
+                      if (!_isInitialized) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('NotificationService not initialized'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
 
                       // Call background handler directly
                       print('Testing background handler...');
