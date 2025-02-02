@@ -51,9 +51,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       Logger.data('''Dashboard validation successful:
         FirstName: ${dashboard.firstname}
         LastName: ${dashboard.lastname}
-        MemberHandle: ${dashboard.member.memberHandle}
+        MemberHandle: ${dashboard.member.memberHandle ?? 'Missing member handle'}
+        Raw MemberHandle Value: ${dashboard.member.memberHandle}
+        MemberHandle Type: ${dashboard.member.memberHandle?.runtimeType}
         MemberTier: ${dashboard.memberTier.type.name}
       ''');
+
+      if (dashboard.member.memberHandle == null) {
+        Logger.state('Member handle is null in dashboard data');
+      } else if (dashboard.member.memberHandle!.isEmpty) {
+        Logger.state('Member handle is empty string in dashboard data');
+      } else {
+        Logger.state('Member handle found: ${dashboard.member.memberHandle}');
+      }
       
       if (mounted) {
         setState(() {
@@ -166,7 +176,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 ),
                 SettingsListTile(
                   title: 'Member Handle',
-                  subtitle: _user?.dashboard?.member.memberHandle ?? 'Not set',
+                  subtitle: _user?.dashboard?.member.memberHandle != null
+                      ? '@${_user!.dashboard!.member.memberHandle}'
+                      : 'Not set',
                   icon: Icons.alternate_email,
                 ),
                 SettingsListTile(

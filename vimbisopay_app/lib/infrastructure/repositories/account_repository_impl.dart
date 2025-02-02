@@ -530,8 +530,7 @@ class AccountRepositoryImpl implements AccountRepository {
             'memberTier': dashboardData['member']['memberTier'],
             'firstname': dashboardData['member']['firstname'],
             'lastname': dashboardData['member']['lastname'],
-            'memberHandle':
-                dashboardData['member']['memberHandle'] as String? ?? '',
+            'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
           },
           'accounts': dashboardData['accounts']

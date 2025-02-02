@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
@@ -42,21 +43,50 @@ class SettingsScreen extends StatelessWidget {
               onTap: () async {
                 Logger.interaction('User tapped Profile Settings');
                 try {
-                  final user = context.read<User>();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => Provider<User>.value(
-                        value: user,
-                        child: const ProfileSettingsScreen(),
-                      ),
-                    ),
+                  final accountRepository = AccountRepositoryImpl();
+                  final userResult = await accountRepository.getCurrentUser();
+
+                  if (!context.mounted) return;
+
+                  await userResult.fold(
+                    (failure) {
+                      Logger.error('Failed to get current user', failure);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Unable to load profile. Please try again.'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    },
+                    (user) async {
+                      if (user == null) {
+                        Logger.error('User session not found');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('User session expired. Please log in again.'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => Provider<User>.value(
+                            value: user,
+                            child: const ProfileSettingsScreen(),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 } catch (e, stackTrace) {
                   Logger.error('Failed to navigate to Profile Settings', e, stackTrace);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Unable to load profile. Please try again.'),
+                      content: Text('An unexpected error occurred. Please try again.'),
                       backgroundColor: AppColors.error,
                     ),
                   );
