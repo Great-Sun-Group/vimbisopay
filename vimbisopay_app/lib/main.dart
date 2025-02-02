@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/single_child_widget.dart';
+import 'dart:async';
+import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -117,10 +121,15 @@ void main() async {
     final initialized = await notificationService.initialize();
     
     if (!initialized) {
-      print('Failed to initialize NotificationService');
-    } else {
-      print('NotificationService initialized successfully');
+      Logger.error('Failed to initialize NotificationService');
+      // Don't proceed if notification service fails to initialize
+      return;
     }
+    Logger.data('''
+NotificationService initialized successfully:
+- Has refresh controller: ${notificationService.onRefreshNeeded != null}
+- Has notification controller: ${notificationService.onNotification != null}
+''');
     
     print('=== APP INITIALIZATION COMPLETE ===');
   } catch (e, stackTrace) {
@@ -145,8 +154,25 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Provider<SharedPreferences>.value(
-      value: sharedPreferences,
+    return MultiProvider(
+      providers: [
+        Provider<SharedPreferences>.value(value: sharedPreferences),
+        Provider<DatabaseHelper>(
+          create: (_) => DatabaseHelper(),
+          lazy: false,
+        ),
+        BlocProvider(
+          create: (context) => NotificationsBloc(sharedPreferences)..add(NotificationsInitialize()),
+        ),
+        StreamProvider<User?>(
+          create: (context) => context.read<DatabaseHelper>().userStream,
+          initialData: null,
+          catchError: (_, error) {
+            Logger.error('Error in User stream provider', error);
+            return null;
+          },
+        ),
+      ],
       child: MaterialApp(
         title: 'VimbisoPay',
         theme: ThemeData(

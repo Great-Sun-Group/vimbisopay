@@ -51,6 +51,12 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       
       final prefsJson = _prefs.getString(_prefsKey);
+      Logger.data('''
+Initializing notification preferences:
+- Has stored preferences: ${prefsJson != null}
+- Raw preferences: $prefsJson
+''');
+
       final preferences = prefsJson != null
           ? NotificationPreferences.fromJson(
               Map<String, dynamic>.from(
@@ -58,6 +64,22 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
               ),
             )
           : const NotificationPreferences();
+
+      Logger.data('''
+Notification preferences initialized:
+- Master enabled: ${preferences.masterEnabled}
+- Money transfers received: ${preferences.moneyTransfersReceived}
+- Hide preview content: ${preferences.hidePreviewContent}
+''');
+
+      // Ensure preferences are saved even if this is the first initialization
+      if (prefsJson == null) {
+        await _prefs.setString(
+          _prefsKey,
+          jsonEncode(preferences.toJson()),
+        );
+        Logger.data('Default preferences saved to storage');
+      }
 
       emit(NotificationsLoaded(preferences));
     } catch (e, stackTrace) {
@@ -74,10 +96,14 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
 
     try {
       // Save to SharedPreferences
-      await _prefs.setString(
-        _prefsKey,
-        jsonEncode(event.preferences.toJson()),
-      );
+      final prefsJson = jsonEncode(event.preferences.toJson());
+      Logger.data('''
+Updating notification preferences:
+- New preferences: $prefsJson
+''');
+
+      await _prefs.setString(_prefsKey, prefsJson);
+      Logger.data('Notification preferences saved successfully');
 
       emit(NotificationsLoaded(event.preferences));
     } catch (e, stackTrace) {

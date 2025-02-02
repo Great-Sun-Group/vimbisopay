@@ -3,11 +3,13 @@ import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
+import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
@@ -188,7 +190,100 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+  Future<Either<Failure, List<LedgerEntry>>> getLedger({
+    required String accountId,
+    DateTime? afterTimestamp,
+    int? limit,
+  }) async {
+    try {
+      // Check if we have any cached entries
+      final hasCachedEntries = await _databaseHelper.hasLedgerEntries(accountId);
+      final cachedEntries = await _databaseHelper.getLedgerEntries(accountId);
+      
+      // If no afterTimestamp provided and we have cached entries, return from cache
+      if (afterTimestamp == null && hasCachedEntries) {
+        Logger.data('Returning ${cachedEntries.length} cached ledger entries');
+        return Right(cachedEntries);
+      }
+
+      // Get latest timestamp from cache if not provided and we have cached entries
+      final latestTimestamp = afterTimestamp ?? (hasCachedEntries ? await _databaseHelper.getLatestLedgerTimestamp(accountId) : null);
+      
+      // Fetch from API
+      return _executeAuthenticatedRequest(
+        request: (token) async {
+          final url = '$baseUrl/getLedger';
+          final headers = _authHeaders(token);
+          final body = {
+            'accountID': accountId,
+            if (latestTimestamp != null) 'afterTimestamp': latestTimestamp.toIso8601String(),
+            if (limit != null || !hasCachedEntries) 'numRows': limit ?? 1000, // Load all entries if cache is empty
+          };
+
+          final response = await _loggedRequest(
+            () => _httpClient.post(
+              Uri.parse(url),
+              headers: headers,
+              body: json.encode(body),
+            ),
+            url,
+            'POST',
+            headers: headers,
+            body: body,
+          );
+
+          if (response.statusCode == 429) {
+            throw RateLimitException(json.decode(response.body));
+          } else if (response.statusCode == 200) {
+            final jsonResponse = json.decode(response.body);
+            if (!jsonResponse.containsKey('data') || 
+                !jsonResponse['data'].containsKey('dashboard') ||
+                !jsonResponse['data']['dashboard'].containsKey('ledger')) {
+              return const Left(InfrastructureFailure('Invalid response format'));
+            }
+
+            final ledgerData = jsonResponse['data']['dashboard']['ledger'] as List;
+            final newEntries = ledgerData.map((entry) {
+              try {
+                return LedgerEntry.fromJson(
+                  entry as Map<String, dynamic>,
+                  accountId: accountId,
+                  accountName: entry['accountName'] ?? '',
+                );
+              } catch (e) {
+                Logger.error('Error parsing ledger entry', e);
+                return null;
+              }
+            }).whereType<LedgerEntry>().toList();
+
+            // Save new entries to database
+            if (newEntries.isNotEmpty) {
+              await _databaseHelper.saveLedgerEntries(newEntries, accountId);
+              Logger.data('Saved ${newEntries.length} new ledger entries to database');
+            }
+
+            // If this was an incremental update, combine with cached entries
+            if (latestTimestamp != null) {
+              final allEntries = [...cachedEntries, ...newEntries];
+              allEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+              return Right(allEntries);
+            }
+
+            return Right(newEntries);
+          } else {
+            final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get ledger';
+            return Left(InfrastructureFailure(errorMessage));
+          }
+        },
+      );
+    } catch (e) {
+      Logger.error('Error in getLedger', e);
+      return Left(InfrastructureFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getLedgerLegacy({
     required String accountId,
     int? startRow,
     int? numRows,

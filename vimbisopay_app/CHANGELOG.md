@@ -2,6 +2,36 @@
 
 All notable changes to this app will be documented in this file.
 
+## [1.0.0+34] - 2025-02-01
+- Added ledger entry caching for improved performance:
+  - Implemented local caching of ledger entries
+  - Optimized API calls to only fetch new entries
+  - Reduced data usage and improved load times
+  - Added offline support for viewing transaction history
+  - Added documentation in docs/LEDGER_OPTIMIZATION_STEPS.md
+
+## [1.0.0+33] - 2025-01-30
+- member tier update workflow
+
+## [1.0.0+32] - 2025-01-30
+- bug fixes and enhancements
+
+## [1.0.0+31] - 2025-01-30
+- Miscellaneous bug fixes and enhancements 
+
+## [1.0.0+31] - 2025-01-28
+- Demo with lawrance
+
+## [1.0.0+30] - 2025-01-28
+- Demo with Lawrance
+
+## [1.0.1.0] - 2025-01-28
+
+## [1.0.0.30] - 2025-01-28
+
+## [1.0.0+28] - 2025-01-13
+- Foreground notifications
+
 ## [1.0.0+26] - 2025-01-08
 - Added Git hooks for automated testing:
   - Pre-push hook to run tests automatically
@@ -80,25 +110,3 @@ Example entry format:
 - Added new feature X
 - Fixed bug in Y
 - Improved Z
--e 
-## [1.0.0+28] - 2025-01-13
-- Foreground notifications
--e 
-## [1.0.0.30] - 2025-01-28
--e 
-## [1.0.1.0] - 2025-01-28
--e 
-## [1.0.0+30] - 2025-01-28
-- Demo with Lawrance
--e 
-## [1.0.0+31] - 2025-01-28
-- Demo with lawrance
--e 
-## [1.0.0+31] - 2025-01-30
-- Miscellaneous bug fixes and enhancements 
--e 
-## [1.0.0+32] - 2025-01-30
-- bug fixes and enhancements
--e 
-## [1.0.0+33] - 2025-01-30
-- member tier update workflow 

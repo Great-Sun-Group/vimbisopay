@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
+import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({
@@ -28,7 +29,20 @@ abstract class AccountRepository {
   
   Future<Either<Failure, Map<String, double>>> getBalances();
   
-  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+  /// Retrieves ledger entries for a specific account.
+  /// 
+  /// If [afterTimestamp] is provided, only returns entries after that timestamp.
+  /// This is used for incremental updates to avoid fetching the entire ledger.
+  /// 
+  /// [limit] can be used to paginate results.
+  Future<Either<Failure, List<LedgerEntry>>> getLedger({
+    required String accountId,
+    DateTime? afterTimestamp,
+    int? limit,
+  });
+
+  @Deprecated('Use getLedger with afterTimestamp instead')
+  Future<Either<Failure, Map<String, dynamic>>> getLedgerLegacy({
     required String accountId,
     int? startRow,
     int? numRows,

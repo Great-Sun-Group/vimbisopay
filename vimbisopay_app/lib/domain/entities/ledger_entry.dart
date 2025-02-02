@@ -1,3 +1,5 @@
+import 'package:vimbisopay_app/core/utils/logger.dart';
+
 class LedgerEntry {
   final String credexID;
   final DateTime timestamp;
@@ -93,21 +95,26 @@ class LedgerEntry {
 
     double parsedAmount;
     try {
-      if (json['amount'] is String) {
-        final amountStr = json['amount'].toString();
-        if (amountStr == 'NaN') {
-          // Handle NaN case by defaulting to 0.0
+      final amount = json['amount'];
+      if (amount is String) {
+        // Remove any non-numeric characters except decimal point and minus sign
+        final cleanAmount = amount.replaceAll(RegExp(r'[^\d.-]'), '');
+        if (cleanAmount == 'NaN' || cleanAmount.isEmpty) {
+          Logger.data('Amount was NaN or empty, defaulting to 0.0');
           parsedAmount = 0.0;
         } else {
-          parsedAmount = double.parse(amountStr);
+          parsedAmount = double.parse(cleanAmount);
+          Logger.data('Parsed string amount: $cleanAmount to $parsedAmount');
         }
-      } else if (json['amount'] is num) {
-        parsedAmount = (json['amount'] as num).toDouble();
+      } else if (amount is num) {
+        parsedAmount = amount.toDouble();
+        Logger.data('Converted numeric amount to double: $parsedAmount');
       } else {
-        throw const FormatException('Invalid amount format');
+        Logger.error('Invalid amount format', {'amount': amount, 'type': amount?.runtimeType});
+        parsedAmount = 0.0;
       }
     } catch (e) {
-      // If parsing fails for any reason, default to 0.0
+      Logger.error('Error parsing amount', {'error': e, 'amount': json['amount']});
       parsedAmount = 0.0;
     }
 

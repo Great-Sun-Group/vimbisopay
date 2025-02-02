@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/theme/app_spacing.dart';
 import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -26,29 +27,60 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   Future<void> _loadUserData() async {
+    final stopwatch = Stopwatch()..start();
+    Logger.lifecycle('Starting profile data load');
+    
     try {
       setState(() {
         _isLoading = true;
         _error = null;
       });
+      Logger.state('Set loading state to true');
 
-      // Simulate network delay for demo purposes
-      await Future.delayed(const Duration(seconds: 1));
-      
+      Logger.state('Attempting to read User from Provider');
       final user = context.read<User>();
+      Logger.data('User data retrieved - MemberId: ${user.memberId}, Phone: ${user.phone}');
+      
+      // Validate dashboard data
+      if (user.dashboard == null) {
+        Logger.error('Dashboard data is null');
+        throw Exception('Profile data not available. Please try again later.');
+      }
+      
+      final dashboard = user.dashboard!;
+      Logger.data('''Dashboard validation successful:
+        FirstName: ${dashboard.firstname}
+        LastName: ${dashboard.lastname}
+        MemberHandle: ${dashboard.member.memberHandle}
+        MemberTier: ${dashboard.memberTier.type.name}
+      ''');
       
       if (mounted) {
         setState(() {
           _user = user;
           _isLoading = false;
         });
+        Logger.state('Profile data loaded and state updated');
       }
-    } catch (e) {
+
+      stopwatch.stop();
+      Logger.performance('Profile data load completed in ${stopwatch.elapsedMilliseconds}ms');
+      
+    } catch (e, stackTrace) {
+      Logger.error(
+        'Failed to load profile data',
+        e,
+        stackTrace
+      );
+      
       if (mounted) {
         setState(() {
-          _error = 'Failed to load profile data. Please try again.';
+          _error = e is ProviderNotFoundException 
+              ? 'User session not found. Please log in again.'
+              : e.toString();
           _isLoading = false;
         });
+        Logger.state('Error state set: $_error');
       }
     }
   }

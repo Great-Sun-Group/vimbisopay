@@ -92,11 +92,11 @@ void main() {
     
     homeBloc = HomeBloc(
       accountRepository: mockRepository,
+      databaseHelper: mockDatabaseHelper,
       acceptCredexBulk: mockAcceptCredexBulk,
       acceptCredex: mockAcceptCredex,
       upgradeMemberTier: mockUpgradeMemberTier,
     );
-    homeBloc.databaseHelper = mockDatabaseHelper;
 
     // Register fallback values
     registerFallbackValue(mockUser);
@@ -122,6 +122,11 @@ void main() {
 
     // Default repository mocks
     when(() => mockRepository.getLedger(
+      accountId: any(named: 'accountId'),
+      limit: any(named: 'limit'),
+    )).thenAnswer((_) async => const Right([]));
+
+    when(() => mockRepository.getLedgerLegacy(
       accountId: any(named: 'accountId'),
       startRow: any(named: 'startRow'),
       numRows: any(named: 'numRows'),

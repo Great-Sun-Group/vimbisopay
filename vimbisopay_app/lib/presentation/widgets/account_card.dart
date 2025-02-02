@@ -67,6 +67,11 @@ class AccountCard extends StatelessWidget {
   }
 
   Widget _buildTierLimitBadge() {
+    // Don't show tier limit for special tier
+    if (memberTier.type == MemberTierType.special) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: HomeConstants.defaultPadding - 4,

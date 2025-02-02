@@ -11,11 +11,16 @@ class NotificationFilter {
 
   Future<bool> shouldShowNotification(RemoteMessage message) async {
     final prefsJson = _prefs.getString(_prefsKey);
+    print('Notification Filter - Message Data: ${message.data}');
+    print('Notification Filter - Type: ${message.data['type']}');
+    
     if (prefsJson == null) {
+      print('Notification Filter - No preferences found, showing notification');
       return true; // Default to showing notifications if preferences aren't set
     }
 
     try {
+      print('Notification Filter - Preferences JSON: $prefsJson');
       final preferences = NotificationPreferences.fromJson(
         Map<String, dynamic>.from(jsonDecode(prefsJson)),
       );
@@ -33,31 +38,36 @@ class NotificationFilter {
 
   String _getNotificationType(RemoteMessage message) {
     final data = message.data;
-    return data['type'] ?? 'unknown';
+    final type = (data['type'] ?? 'unknown').toUpperCase().trim();
+    print('Notification Filter - Getting notification type: $type');
+    print('Notification Filter - Raw data: $data');
+    return type;
   }
 
   bool _checkNotificationTypeEnabled(
     NotificationPreferences preferences,
     String type,
   ) {
-    switch (type.toLowerCase()) {
-      case 'money_sent':
+    print('Notification Filter - Checking if type is enabled: $type');
+    switch (type) {
+      case 'MONEY_SENT':
         return preferences.moneyTransfersSent;
-      case 'money_received':
+      case 'MONEY_RECEIVED':
+      case 'OFFER_CREATED':  // Map OFFER_CREATED to money received preference
         return preferences.moneyTransfersReceived;
-      case 'transfer_failed':
+      case 'TRANSFER_FAILED':
         return preferences.transferFailures;
-      case 'balance_update':
+      case 'BALANCE_UPDATE':
         return preferences.balanceUpdates;
-      case 'limit_change':
+      case 'LIMIT_CHANGE':
         return preferences.accountLimits;
-      case 'security_alert':
+      case 'SECURITY_ALERT':
         return preferences.securityAlerts;
-      case 'service_update':
+      case 'SERVICE_UPDATE':
         return preferences.serviceUpdates;
-      case 'app_update':
+      case 'APP_UPDATE':
         return preferences.appUpdates;
-      case 'new_feature':
+      case 'NEW_FEATURE':
         return preferences.newFeatures;
       default:
         return true; // Show unknown notification types by default

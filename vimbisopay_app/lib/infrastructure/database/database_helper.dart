@@ -1,45 +1,146 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dash;
+import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:vimbisopay_app/domain/entities/pending_offer.dart' as pending;
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+
 
 class DatabaseHelper {
-  static final DatabaseHelper _instance = DatabaseHelper._internal();
-  static Database? _database;
+  final _userController = StreamController<User?>.broadcast();
+  late Future<Database> database;
 
-  factory DatabaseHelper() {
-    return _instance;
+  DatabaseHelper() {
+    database = initDatabase();
   }
 
-  DatabaseHelper._internal();
+  Stream<User?> get userStream => _userController.stream;
 
-  Future<Database> get _db async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
-
-  Future<Database> get database => _db;
-
-  Future<Database> _initDatabase() async {
-    final String path = join(await getDatabasesPath(), 'vimbisopay.db');
+  Future<Database> initDatabase() async {
     return await openDatabase(
-      path,
-      version: 8,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      'vimbisopay.db',
+      version: 10,
+      onCreate: (Database db, int version) async {
+        await _createTables(db);
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        await _onUpgrade(db, oldVersion, newVersion);
+      },
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
-    await _createTables(db);
+  void dispose() {
+    _userController.close();
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 11) {
+      try {
+        await db.execute('DROP TABLE IF EXISTS ledger_entries_old');
+        await db.execute('ALTER TABLE ledger_entries RENAME TO ledger_entries_old');
+        
+        await db.execute('''
+          CREATE TABLE ledger_entries(
+            credexID TEXT PRIMARY KEY,
+            accountId TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            denomination TEXT NOT NULL,
+            description TEXT NOT NULL,
+            counterpartyAccountName TEXT NOT NULL,
+            formattedAmount TEXT NOT NULL,
+            accountName TEXT NOT NULL,
+            FOREIGN KEY (accountId) REFERENCES accounts (accountId)
+          )
+        ''');
+
+        await db.execute('''
+          INSERT INTO ledger_entries 
+          SELECT 
+            credexID,
+            accountId,
+            timestamp,
+            type,
+            CAST(REPLACE(REPLACE(amount, '+', ''), ' ' || denomination, '') AS REAL) as amount,
+            denomination,
+            description,
+            counterpartyAccountName,
+            formattedAmount,
+            accountName
+          FROM ledger_entries_old
+        ''');
+        
+        await db.execute('DROP TABLE ledger_entries_old');
+        await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
+        Logger.data('Successfully recreated ledger_entries table with proper amount format');
+      } catch (e) {
+        Logger.error('Error migrating ledger_entries table', e);
+      }
+    }
+
+    if (oldVersion < 10) {
+      // Add formattedAmount column to ledger_entries if it doesn't exist
+      try {
+        await db.execute('ALTER TABLE ledger_entries ADD COLUMN formattedAmount TEXT');
+        Logger.data('Added formattedAmount column to ledger_entries table');
+      } catch (e) {
+        Logger.error('Error adding formattedAmount column: $e');
+        // If error occurs, recreate the table with all columns
+        await db.execute('DROP TABLE IF EXISTS ledger_entries_old');
+        await db.execute('ALTER TABLE ledger_entries RENAME TO ledger_entries_old');
+        
+        await db.execute('''
+          CREATE TABLE ledger_entries(
+            credexID TEXT PRIMARY KEY,
+            accountId TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            denomination TEXT NOT NULL,
+            description TEXT NOT NULL,
+            counterpartyAccountName TEXT NOT NULL,
+            formattedAmount TEXT NOT NULL,
+            accountName TEXT NOT NULL,
+            FOREIGN KEY (accountId) REFERENCES accounts (accountId)
+          )
+        ''');
+        
+        // Copy data from old table, generating formattedAmount
+        await db.execute('''
+          INSERT INTO ledger_entries 
+          SELECT 
+            credexID,
+            accountId,
+            timestamp,
+            type,
+            amount,
+            denomination,
+            description,
+            counterpartyAccountName,
+            CASE 
+              WHEN amount >= 0 THEN '+' || printf('%.2f', amount) || ' ' || denomination
+              ELSE printf('%.2f', amount) || ' ' || denomination
+            END as formattedAmount,
+            accountName
+          FROM ledger_entries_old
+        ''');
+        
+        await db.execute('DROP TABLE ledger_entries_old');
+        await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
+        Logger.data('Successfully recreated ledger_entries table with formattedAmount column');
+      }
+    }
+    
+    if (oldVersion < 9) {
+      // Previous migration code...
+      await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
+    }
+    
     if (oldVersion < 8) {
       // Add new password columns
       await db.execute('ALTER TABLE users ADD COLUMN password_hash TEXT');
@@ -104,7 +205,7 @@ class DatabaseHelper {
             }
             
             try {
-              final dashboard = Dashboard.fromMap(dashboardMap);
+              final dashboard = dash.Dashboard.fromMap(dashboardMap);
               
               await db.insert('users', {
                 'memberId': oldUser['memberId'],
@@ -190,6 +291,24 @@ class DatabaseHelper {
         FOREIGN KEY (accountId) REFERENCES accounts (accountId)
       )
     ''');
+    
+    await db.execute('''
+      CREATE TABLE ledger_entries(
+        credexID TEXT PRIMARY KEY,
+        accountId TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        denomination TEXT NOT NULL,
+        description TEXT NOT NULL,
+        counterpartyAccountName TEXT NOT NULL,
+        formattedAmount TEXT NOT NULL,
+        accountName TEXT NOT NULL,
+        FOREIGN KEY (accountId) REFERENCES accounts (accountId)
+      )
+    ''');
+    
+    await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
     
     await db.execute('''
       CREATE TABLE pending_transactions(
@@ -331,7 +450,7 @@ class DatabaseHelper {
         whereArgs: [memberId],
       );
       
-      final List<DashboardAccount> dashboardAccounts = [];
+      final List<dash.DashboardAccount> dashboardAccounts = [];
       for (final account in accounts) {
         final accountId = account['accountId'] as String;
         
@@ -368,24 +487,24 @@ class DatabaseHelper {
           final pendingOut = pendingTxs.where((tx) => tx['direction'] == 'out').toList();
           Logger.data('Split into ${pendingIn.length} incoming and ${pendingOut.length} outgoing transactions');
 
-          dashboardAccounts.add(DashboardAccount(
+          dashboardAccounts.add(dash.DashboardAccount(
             accountID: accountId,
             accountName: account['accountName'] as String,
             accountHandle: account['accountHandle'] as String,
             defaultDenom: account['defaultDenom'] as String,
             isOwnedAccount: account['isOwnedAccount'] == 1,
-            balanceData: BalanceData(
+            balanceData: dash.BalanceData(
               securedNetBalancesByDenom: securedBalances,
-              unsecuredBalances: UnsecuredBalances(
+              unsecuredBalances: dash.UnsecuredBalances(
                 totalPayables: balance['totalPayables'] as String,
                 totalReceivables: balance['totalReceivables'] as String,
                 netPayRec: balance['netPayRec'] as String,
               ),
               netCredexAssetsInDefaultDenom: balance['netCredexAssetsInDefaultDenom'] as String,
             ),
-            pendingInData: PendingData(
+            pendingInData: dash.PendingData(
               success: true,
-              data: pendingIn.map((tx) => PendingOffer(
+              data: pendingIn.map((tx) => dash.PendingOffer(
                 credexID: tx['credexId'] as String,
                 formattedInitialAmount: tx['amount'] as String,
                 counterpartyAccountName: tx['counterpartyName'] as String,
@@ -393,9 +512,9 @@ class DatabaseHelper {
               )).toList(),
               message: pendingIn.isEmpty ? 'No pending offers found' : 'Retrieved ${pendingIn.length} pending offers',
             ),
-            pendingOutData: PendingData(
+            pendingOutData: dash.PendingData(
               success: true,
-              data: pendingOut.map((tx) => PendingOffer(
+              data: pendingOut.map((tx) => dash.PendingOffer(
                 credexID: tx['credexId'] as String,
                 formattedInitialAmount: tx['amount'] as String,
                 counterpartyAccountName: tx['counterpartyName'] as String,
@@ -403,7 +522,7 @@ class DatabaseHelper {
               )).toList(),
               message: pendingOut.isEmpty ? 'No pending outgoing offers found' : 'Retrieved ${pendingOut.length} pending outgoing offers',
             ),
-            sendOffersTo: SendOffersTo(
+            sendOffersTo: dash.SendOffersTo(
               firstname: tierData['firstname'] as String,
               lastname: tierData['lastname'] as String,
               memberID: memberId,
@@ -412,13 +531,13 @@ class DatabaseHelper {
         }
       }
       
-      Dashboard? dashboard;
+      dash.Dashboard? dashboardData;
       if (tiers.isNotEmpty && dashboardAccounts.isNotEmpty) {
         final tierData = tiers.first;
         
-        dashboard = Dashboard(
+        dashboardData = dash.Dashboard(
           id: memberId,
-          member: DashboardMember(
+          member: dash.DashboardMember(
             memberID: memberId,
             memberTier: tierData['high'] as int,
             firstname: tierData['firstname'] as String,
@@ -439,7 +558,7 @@ class DatabaseHelper {
         passwordChanged: userData['password_changed'] != null 
             ? DateTime.fromMillisecondsSinceEpoch(userData['password_changed'] as int)
             : null,
-        dashboard: dashboard,
+        dashboard: dashboardData,
       );
     } catch (e) {
       throw Exception('Failed to get user: $e');
@@ -484,7 +603,7 @@ class DatabaseHelper {
     await clearAllTables();
   }
 
-  Future<void> updateAccountPendingTransactions(String accountId, List<PendingOffer> pendingIn, List<PendingOffer> pendingOut) async {
+  Future<void> updateAccountPendingTransactions(String accountId, List<pending.PendingOffer> pendingIn, List<pending.PendingOffer> pendingOut) async {
     final Database db = await database;
     await db.transaction((txn) async {
       // Delete existing pending transactions for this account
@@ -567,13 +686,124 @@ class DatabaseHelper {
     Logger.data('Finished updating pending transactions');
   }
 
-  Future<(List<PendingOffer>, List<PendingOffer>)> getAllPendingTransactions() async {
+  Future<void> saveLedgerEntries(List<LedgerEntry> entries, String accountId) async {
+    final Database db = await database;
+    await db.transaction((txn) async {
+      for (final entry in entries) {
+        await txn.insert(
+          'ledger_entries',
+          {
+            'credexID': entry.credexID,
+            'accountId': accountId,
+            'timestamp': entry.timestamp.millisecondsSinceEpoch,
+            'type': entry.type,
+            'amount': entry.amount,
+            'denomination': entry.denomination,
+            'description': entry.description,
+            'counterpartyAccountName': entry.counterpartyAccountName,
+            'formattedAmount': entry.formattedAmount,
+            'accountName': entry.accountName,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<List<LedgerEntry>> getLedgerEntries(String accountId, {DateTime? afterTimestamp}) async {
+    final Database db = await database;
+    
+    final List<Map<String, dynamic>> results;
+    if (afterTimestamp != null) {
+      results = await db.query(
+        'ledger_entries',
+        where: 'accountId = ? AND timestamp > ?',
+        whereArgs: [accountId, afterTimestamp.millisecondsSinceEpoch],
+        orderBy: 'timestamp DESC',
+      );
+    } else {
+      results = await db.query(
+        'ledger_entries',
+        where: 'accountId = ?',
+        whereArgs: [accountId],
+        orderBy: 'timestamp DESC',
+      );
+    }
+
+    return results.map((row) {
+      // Handle amount conversion
+      double parsedAmount;
+      try {
+        final amount = row['amount'];
+        if (amount is String) {
+          final cleanAmount = amount.replaceAll(RegExp(r'[^\d.-]'), '');
+          parsedAmount = double.parse(cleanAmount);
+          Logger.data('Parsed string amount from DB: $cleanAmount to $parsedAmount');
+        } else if (amount is num) {
+          parsedAmount = amount.toDouble();
+          Logger.data('Converted numeric amount from DB to double: $parsedAmount');
+        } else {
+          Logger.error('Invalid amount format in DB', {'amount': amount, 'type': amount?.runtimeType});
+          parsedAmount = 0.0;
+        }
+      } catch (e) {
+        Logger.error('Error parsing amount from DB', {'error': e, 'row': row});
+        parsedAmount = 0.0;
+      }
+
+      return LedgerEntry(
+        credexID: row['credexID'] as String,
+        timestamp: DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int),
+        type: row['type'] as String,
+        amount: parsedAmount,
+        denomination: row['denomination'] as String,
+        description: row['description'] as String,
+        counterpartyAccountName: row['counterpartyAccountName'] as String,
+        formattedAmount: row['formattedAmount'] as String,
+        accountId: row['accountId'] as String,
+        accountName: row['accountName'] as String,
+      );
+    }).toList();
+  }
+
+  Future<bool> hasLedgerEntries(String accountId) async {
+    final Database db = await database;
+    final result = await db.query(
+      'ledger_entries',
+      where: 'accountId = ?',
+      whereArgs: [accountId],
+      limit: 1,
+    );
+    return result.isNotEmpty;
+  }
+
+  Future<DateTime?> getLatestLedgerTimestamp(String accountId) async {
+    final Database db = await database;
+    final result = await db.query(
+      'ledger_entries',
+      where: 'accountId = ?',
+      whereArgs: [accountId],
+      columns: ['timestamp'],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+    return DateTime.fromMillisecondsSinceEpoch(result.first['timestamp'] as int);
+  }
+
+  Future<void> clearLedgerEntries() async {
+    final Database db = await database;
+    await db.delete('ledger_entries');
+  }
+
+  Future<(List<pending.PendingOffer>, List<pending.PendingOffer>)> getAllPendingTransactions() async {
     final Database db = await database;
     final List<Map<String, dynamic>> pendingTxs = await db.query('pending_transactions');
     
     final pendingIn = pendingTxs
         .where((tx) => tx['direction'] == 'in')
-        .map((tx) => PendingOffer(
+        .map((tx) => pending.PendingOffer(
               credexID: tx['credexId'] as String,
               formattedInitialAmount: tx['amount'] as String,
               counterpartyAccountName: tx['counterpartyName'] as String,
@@ -583,7 +813,7 @@ class DatabaseHelper {
     
     final pendingOut = pendingTxs
         .where((tx) => tx['direction'] == 'out')
-        .map((tx) => PendingOffer(
+        .map((tx) => pending.PendingOffer(
               credexID: tx['credexId'] as String,
               formattedInitialAmount: tx['amount'] as String,
               counterpartyAccountName: tx['counterpartyName'] as String,

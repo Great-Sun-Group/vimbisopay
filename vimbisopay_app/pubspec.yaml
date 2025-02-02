@@ -1,7 +1,7 @@
 name: vimbisopay_app
 description: A new Flutter project.
 publish_to: 'none'
-version: 1.0.0+33
+version: 1.0.0+34
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -33,7 +33,7 @@ dependencies:
   firebase_messaging: ^14.7.4
   firebase_core: ^2.22.0
   provider: ^6.1.1
-
+  logger: ^2.0.2+1
   path: any
   audioplayers: ^6.1.0
   path_provider: any

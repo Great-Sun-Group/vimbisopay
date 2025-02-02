@@ -57,7 +57,7 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   void _acceptSingleTransaction(BuildContext context, String credexId) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([credexId]));
+    context.read<HomeBloc>().add(HomeAcceptCredexStarted(credexId));
   }
 
   void _cancelTransaction(BuildContext context, String credexId) {
@@ -295,17 +295,18 @@ class _TransactionsListState extends State<TransactionsList> {
                             ? null
                             : () => _cancelTransaction(context, offer.credexID),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
+                          backgroundColor: isProcessing 
+                              ? AppColors.primary.withOpacity(0.6)
+                              : AppColors.error,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           minimumSize: const Size(60, 30),
                         ),
                         child: isProcessing
-                            ? const SizedBox(
-                                height: 15,
-                                width: 15,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ? const Text(
+                                'Processing...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
                                 ),
                               )
                             : const Text(

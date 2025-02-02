@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
+import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
@@ -36,7 +37,22 @@ class MockAccountRepository implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> getLedger({
+  Future<Either<Failure, List<LedgerEntry>>> getLedger({
+    required String accountId,
+    DateTime? afterTimestamp,
+    int? limit,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      // Return empty list for now - we'll add mock entries later if needed
+      return const Right([]);
+    } else {
+      return const Left(InfrastructureFailure('Failed to get ledger'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getLedgerLegacy({
     required String accountId,
     int? startRow,
     int? numRows,

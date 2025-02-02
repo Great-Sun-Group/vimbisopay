@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
@@ -37,13 +39,28 @@ class SettingsScreen extends StatelessWidget {
             _buildSettingsTile(
               icon: Icons.person_outline,
               title: 'Profile',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileSettingsScreen(),
-                  ),
-                );
+              onTap: () async {
+                Logger.interaction('User tapped Profile Settings');
+                try {
+                  final user = context.read<User>();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => Provider<User>.value(
+                        value: user,
+                        child: const ProfileSettingsScreen(),
+                      ),
+                    ),
+                  );
+                } catch (e, stackTrace) {
+                  Logger.error('Failed to navigate to Profile Settings', e, stackTrace);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Unable to load profile. Please try again.'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
               },
             ),
             const SizedBox(height: 12),

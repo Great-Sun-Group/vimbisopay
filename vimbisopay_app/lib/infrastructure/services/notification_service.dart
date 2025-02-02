@@ -7,18 +7,27 @@ import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_filter.dart';
 import 'package:http/http.dart' as http;
-
 class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final player = AudioPlayer();
   bool _isInitialized = false;
   StreamController<RemoteMessage>? _notificationController;
+  StreamController<void>? _refreshController;
   StreamSubscription? _tokenRefreshSubscription;
   late final NotificationFilter _notificationFilter;
 
   // Stream for notification events
   Stream<RemoteMessage> get onNotification =>
       _notificationController?.stream ??
+      (throw StateError('NotificationService not initialized'));
+
+  // Stream for refresh events
+  Stream<void> get onRefreshNeeded =>
+      _refreshController?.stream ??
       (throw StateError('NotificationService not initialized'));
 
   void sendTestNotification(RemoteMessage message) {
@@ -31,11 +40,25 @@ class NotificationService {
   Future<void> cleanup() async {
     Logger.data('Cleaning up notification service');
     try {
-      // Close stream controller if it exists
-      await _notificationController?.close();
-      await _tokenRefreshSubscription?.cancel();
+      // Close stream controllers if they exist
+      await Future.wait([
+        _notificationController?.close() ?? Future.value(),
+        _refreshController?.close() ?? Future.value(),
+        _tokenRefreshSubscription?.cancel() ?? Future.value(),
+      ]);
+      
+      // Reset controllers
+      _notificationController = null;
+      _refreshController = null;
+      _tokenRefreshSubscription = null;
+      
+      Logger.data('Successfully cleaned up notification service');
     } catch (e, stackTrace) {
-      Logger.error('Error during notification service cleanup', e, stackTrace);
+      Logger.error('''
+Error during notification service cleanup:
+- Error: $e
+- Stack trace: $stackTrace
+''');
     } finally {
       _isInitialized = false;
     }
@@ -53,16 +76,53 @@ Failed to play notification sound:
     }
   }
 
+  bool _verifyServiceState() {
+    final state = {
+      'isInitialized': _isInitialized,
+      'hasNotificationController': _notificationController != null,
+      'hasRefreshController': _refreshController != null,
+      'hasNotificationListeners': _notificationController?.hasListener ?? false,
+      'hasRefreshListeners': _refreshController?.hasListener ?? false,
+    };
+
+    Logger.data('''
+Verifying NotificationService state:
+- Is initialized: ${state['isInitialized']}
+- Has notification controller: ${state['hasNotificationController']}
+- Has refresh controller: ${state['hasRefreshController']}
+- Has notification listeners: ${state['hasNotificationListeners']}
+- Has refresh listeners: ${state['hasRefreshListeners']}
+''');
+
+    return state['isInitialized']! &&
+           state['hasNotificationController']! &&
+           state['hasRefreshController']!;
+  }
+
   Future<bool> initialize() async {
+    Logger.data('Initializing NotificationService');
+    
     if (_isInitialized) {
-      return true;
+      Logger.data('NotificationService already initialized');
+      final isValid = _verifyServiceState();
+      if (!isValid) {
+        Logger.error('Service marked as initialized but state is invalid, reinitializing...');
+        await cleanup();
+      } else {
+        return true;
+      }
     }
 
     try {
-      // Create new stream controller
+      // Create new stream controllers
       _notificationController = StreamController<RemoteMessage>.broadcast();
+      _refreshController = StreamController<void>.broadcast();
 
-      Logger.data('Starting notification service initialization');
+      Logger.data('''
+Created stream controllers:
+- Notification controller: ${_notificationController != null}
+- Refresh controller: ${_refreshController != null}
+''');
 
       // Initialize notification filter
       final prefs = await SharedPreferences.getInstance();
@@ -80,29 +140,54 @@ Failed to play notification sound:
       );
 
       // Configure foreground notification presentation options
+      Logger.data('Configuring foreground notification presentation options...');
       await _firebaseMessaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
+        alert: true,    // Show alert
+        badge: true,    // Show badge
+        sound: true,    // Play sound
       );
+      Logger.data('Foreground notification presentation options configured');
+
 
       // Try to get FCM token
       String? token;
+      Logger.data('''
+Attempting to get FCM token:
+- Platform: ${Platform.isIOS ? 'iOS' : 'Android'}
+- Authorization Status: ${settings.authorizationStatus}
+''');
+
       if (Platform.isIOS) {
         // For iOS, wait for APNS token to be set
+        Logger.data('iOS: Getting FCM token (requires APNS token)...');
         token = await _firebaseMessaging.getToken();
       } else {
         // For Android, directly get FCM token
+        Logger.data('Android: Getting FCM token...');
         token = await _firebaseMessaging.getToken();
       }
 
       if (token == null) {
         final error = Platform.isIOS ? 'Failed to obtain FCM Token (APNS token not set)' : 'Failed to obtain FCM Token';
-        Logger.error(error);
+        Logger.error('''
+$error
+- Platform: ${Platform.isIOS ? 'iOS' : 'Android'}
+- Authorization Status: ${settings.authorizationStatus}
+- Notification Settings: ${await _firebaseMessaging.getNotificationSettings()}
+''');
         return false;
       }
 
-      Logger.data('FCM Token obtained successfully');
+      Logger.data('''
+FCM Token obtained successfully:
+- Token Length: ${token.length}
+- Platform: ${Platform.isIOS ? 'iOS' : 'Android'}
+- Authorization Status: ${settings.authorizationStatus}
+''');
+
+      // Register the token
+      Logger.data('Initiating token registration...');
+      await _registerToken(token);
 
       // Set up message handlers
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
@@ -113,7 +198,10 @@ Failed to play notification sound:
           print('Data: ${message.data}');
 
           // Check if notification should be shown based on user preferences
-          if (!await _notificationFilter.shouldShowNotification(message)) {
+          print('NotificationService - Received message type: ${message.data['type']}');
+          final shouldShow = await _notificationFilter.shouldShowNotification(message);
+          print('NotificationService - Should show notification: $shouldShow');
+          if (!shouldShow) {
             Logger.data('Notification filtered out based on user preferences');
             return;
           }
@@ -127,6 +215,11 @@ Failed to play notification sound:
               body: formattedBody,
             ),
             data: Map<String, String>.from(message.data),
+            senderId: message.senderId,
+            category: message.category,
+            from: message.from,
+            sentTime: message.sentTime,
+            threadId: message.threadId,
           );
 
           // Play notification sound
@@ -134,8 +227,8 @@ Failed to play notification sound:
           await playNotificationSound();
 
           print('Broadcasting message to stream...');
-          if (_notificationController == null) {
-            Logger.error('NotificationController is null when trying to broadcast message');
+          if (_notificationController == null || _refreshController == null) {
+            Logger.error('Stream controllers are null when trying to broadcast message');
             return;
           }
 
@@ -144,8 +237,49 @@ Failed to play notification sound:
           Logger.data('Body: ${processedMessage.notification?.body}');
           Logger.data('Data: ${processedMessage.data}');
 
+          // Broadcast the notification
           _notificationController!.add(processedMessage);
           Logger.data('Message broadcast complete');
+
+          // Trigger refresh if this is a transaction-related notification
+          final notificationType = processedMessage.data['type']?.toUpperCase().trim();
+          print('NotificationService - Processing notification type: $notificationType');
+          print('NotificationService - Raw notification data: ${processedMessage.data}');
+          Logger.data('''
+Processing notification for refresh:
+- Type: $notificationType
+- Raw Data: ${processedMessage.data}
+- Notification Body: ${processedMessage.notification?.body}
+''');
+          
+          final validTypes = [
+            'TRANSACTION',
+            'CREDEX_OFFER',
+            'OFFER_ACCEPTED',
+            'CREDEX_ACCEPTED',
+            'OFFER_CREATED',
+            'OFFER_CANCELLED'
+          ];
+          
+          if (notificationType != null && validTypes.contains(notificationType)) {
+            Logger.data('Transaction-related notification received, verifying service state');
+            
+            if (!_verifyServiceState()) {
+              Logger.error('Cannot trigger refresh - invalid service state');
+              return;
+            }
+            
+            if (!_refreshController!.hasListener) {
+              Logger.error('Cannot trigger refresh - no listeners attached to stream');
+              return;
+            }
+            
+            Logger.data('Service state verified, triggering refresh');
+            _refreshController!.add(null);
+            Logger.data('Refresh event sent to stream successfully');
+          } else {
+            Logger.data('Notification type does not require refresh: $notificationType');
+          }
 
           // Verify stream has listeners
           final hasListeners = _notificationController!.hasListener;
@@ -200,6 +334,9 @@ Current notification settings:
     Logger.data('''
 Registering notification token:
 - Platform: $platform
+- URL: $url
+- Token Length: ${token.length}
+- Request Body: $body
 ''');
 
     try {
@@ -212,17 +349,26 @@ Registering notification token:
         Logger.data('''
 Successfully registered notification token:
 - Status code: ${response.statusCode}
+- Response body: ${response.body}
+- Headers: ${response.headers}
 ''');
       } else {
         Logger.error('''
 Failed to register notification token:
 - Status code: ${response.statusCode}
+- Response body: ${response.body}
+- Headers: ${response.headers}
+- Request URL: $url
+- Request body: $body
 ''');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       Logger.error('''
 Error registering notification token:
 - Error: $e
+- Stack trace: $stackTrace
+- Request URL: $url
+- Request body: $body
 ''');
     }
   }

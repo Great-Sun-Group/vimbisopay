@@ -22,6 +22,7 @@ import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,6 +39,394 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late HomeBloc _homeBloc;
   bool _isDisposed = false;
   bool _isInitializing = true;
+  final NotificationService _notificationService = NotificationService();
+  StreamSubscription? _refreshSubscription;
+  StreamSubscription? _notificationSubscription;
+
+  Future<void> _setupNotificationListeners() async {
+    if (!mounted || _isDisposed) {
+      Logger.error('Cannot setup listeners - widget is disposed or unmounted');
+      return;
+    }
+
+    Logger.data('Setting up notification listeners');
+    
+    try {
+      // Cancel any existing subscriptions
+      await _refreshSubscription?.cancel();
+      await _notificationSubscription?.cancel();
+      _refreshSubscription = null;
+      _notificationSubscription = null;
+
+      final initialized = await _notificationService.initialize();
+      if (!initialized) {
+        Logger.error('Failed to initialize NotificationService');
+        return;
+      }
+
+      if (!mounted || _isDisposed) {
+        Logger.error('Widget disposed during initialization');
+        return;
+      }
+
+      // Listen for refresh events
+      Logger.data('Setting up refresh subscription');
+      _refreshSubscription = _notificationService.onRefreshNeeded.listen(
+        (_) {
+          Logger.data('''
+Refresh triggered by notification:
+- Is disposed: $_isDisposed
+- Is mounted: $mounted
+- Has HomeBloc: ${_homeBloc != null}
+''');
+          if (!_isDisposed && mounted) {
+            Logger.data('Triggering HomeRefreshStarted event');
+            _homeBloc.add(const HomeRefreshStarted());
+          } else {
+            Logger.error('Cannot refresh - widget is disposed or unmounted');
+          }
+        },
+        onError: (error, stackTrace) {
+          Logger.error('''
+Error in refresh subscription:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+        },
+      );
+      Logger.data('Refresh subscription setup complete');
+
+      // Listen for notifications to show SnackBar
+      Logger.data('Setting up notification subscription');
+      _notificationSubscription = _notificationService.onNotification.listen(
+        (message) {
+          if (!_isDisposed && mounted) {
+            Logger.data('Showing notification SnackBar');
+            // Clear any existing SnackBars first
+            ScaffoldMessenger.of(context).clearSnackBars();
+            
+            final notificationType = message.data['type']?.toUpperCase();
+            Logger.data('Processing notification type: $notificationType');
+            
+            // Handle OFFER_ACCEPTED notification
+            if (notificationType == 'OFFER_ACCEPTED') {
+              final credexId = message.data['credexID'];
+              if (credexId != null) {
+                Logger.data('Received OFFER_ACCEPTED for credexId: $credexId');
+                _homeBloc.add(HomeOfferAccepted(credexId));
+                
+                // Show status change snackbar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (message.notification?.title != null)
+                                  Text(
+                                    message.notification!.title!,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                if (message.notification?.body != null)
+                                  Text(
+                                    message.notification!.body!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 4),
+                    margin: const EdgeInsets.all(8),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              }
+              return;
+            }
+            
+            // Special handling for OFFER_CREATED
+            if (notificationType == 'OFFER_CREATED') {
+              Logger.data('Showing OFFER_CREATED notification');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Transform.rotate(
+                          angle: 180 * (3.14159 / 180), // Rotate 180 degrees to show incoming
+                          child: const Icon(
+                            Icons.payments,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'New Incoming Offer',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (message.notification?.body != null)
+                                Text(
+                                  message.notification!.body!,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 4),
+                  margin: const EdgeInsets.all(8),
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  action: SnackBarAction(
+                    label: 'DISMISS',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    },
+                  ),
+                ),
+              );
+              return;
+            }
+
+            // Default notification handling for other types
+            Logger.data('Showing default notification');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (message.notification?.title != null)
+                        Text(
+                          message.notification!.title!,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      if (message.notification?.title != null && message.notification?.body != null)
+                        const SizedBox(height: 4),
+                      if (message.notification?.body != null)
+                        Text(
+                          message.notification!.body!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                backgroundColor: AppColors.primary,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+                margin: const EdgeInsets.all(8),
+                elevation: 6,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                action: SnackBarAction(
+                  label: 'DISMISS',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  },
+                ),
+              ),
+            );
+          }
+        },
+        onError: (error, stackTrace) {
+          Logger.error('''
+Error in notification subscription:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+        },
+      );
+      Logger.data('''
+Notification listeners setup complete:
+- Refresh subscription active: ${_refreshSubscription != null}
+- Notification subscription active: ${_notificationSubscription != null}
+''');
+    } catch (e, stackTrace) {
+      Logger.error('''
+Error setting up notification listeners:
+- Error: $e
+- Stack trace: $stackTrace
+''');
+    }
+  }
+
+  void _initializeBloc() {
+    Logger.lifecycle('Initializing HomeBloc');
+    _homeBloc = HomeBloc(
+      accountRepository: _accountRepository,
+      databaseHelper: _databaseHelper,
+      acceptCredexBulk: AcceptCredexBulk(_accountRepository),
+      acceptCredex: AcceptCredex(_accountRepository),
+      upgradeMemberTier: UpgradeMemberTier(_accountRepository),
+    );
+    
+    // Use addPostFrameCallback to ensure widget is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_isDisposed && mounted) {
+        _homeBloc.loadInitialData();
+        await _setupNotificationListeners();
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    Logger.lifecycle('HomeScreen initialized');
+    _pageController = PageController(initialPage: 0);
+    _setupScrollListener();
+    WidgetsBinding.instance.addObserver(this);
+    _checkUserAndInitialize();
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent * 0.9) {
+        
+        // Cancel existing timer if any
+        _scrollDebounceTimer?.cancel();
+        
+        // Set new timer
+        _scrollDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+          if (mounted && !_isDisposed) {
+            Logger.interaction('Scroll threshold reached, loading more entries');
+            _homeBloc.add(const HomeLoadMoreStarted());
+          }
+        });
+      }
+    });
+  }
+
+  Timer? _scrollDebounceTimer;
+
+  Future<void> _checkUserAndInitialize() async {
+    try {
+      final hasUser = await _databaseHelper.hasUser();
+      if (!hasUser && mounted && !_isDisposed) {
+        Logger.state('No user found, redirecting to login');
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isInitializing = false;
+        });
+        _initializeBloc();
+      }
+    } catch (e) {
+      Logger.error('Error checking user existence', e);
+      if (mounted && !_isDisposed) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    Logger.lifecycle('App lifecycle state changed to: $state');
+    if (state == AppLifecycleState.resumed && mounted && !_isDisposed) {
+      Logger.lifecycle('App resumed - reinitializing services');
+      
+      // First check if we need to reinitialize the bloc
+      _checkUserAndInitialize();
+      
+      // Then reinitialize notification listeners
+      Logger.lifecycle('Reinitializing notification listeners');
+      _setupNotificationListeners().then((_) {
+        Logger.lifecycle('Notification listeners reinitialized');
+        
+        // Trigger a refresh to ensure data is up to date
+        if (mounted && !_isDisposed) {
+          Logger.lifecycle('Triggering refresh after resume');
+          _homeBloc.add(const HomeRefreshStarted());
+        }
+      }).catchError((error, stackTrace) {
+        Logger.error('''
+Error reinitializing notification listeners:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+      });
+    } else if (state == AppLifecycleState.paused) {
+      Logger.lifecycle('App paused - cleaning up notification subscriptions');
+      _refreshSubscription?.cancel();
+      _notificationSubscription?.cancel();
+      _refreshSubscription = null;
+      _notificationSubscription = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    Logger.lifecycle('HomeScreen disposing');
+    _isDisposed = true;
+    _pageController.dispose();
+    _scrollController.dispose();
+    _scrollDebounceTimer?.cancel();
+    _refreshSubscription?.cancel();
+    _notificationSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    // Don't close the HomeBloc here as it needs to stay alive for notifications
+    super.dispose();
+  }
 
   void _showUpgradeBottomSheet(BuildContext context, String accountId) {
     showModalBottomSheet(
@@ -113,86 +502,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
     );
-  }
-
-  void _setupScrollListener() {
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.9) {
-        Logger.interaction('Scroll threshold reached, loading more entries');
-        _homeBloc.add(const HomeLoadMoreStarted());
-      }
-    });
-  }
-
-  void _initializeBloc() {
-    Logger.lifecycle('Initializing HomeBloc');
-    _homeBloc = HomeBloc(
-      acceptCredexBulk: AcceptCredexBulk(_accountRepository),
-      acceptCredex: AcceptCredex(_accountRepository),
-      accountRepository: _accountRepository,
-      upgradeMemberTier: UpgradeMemberTier(_accountRepository),
-    );
-    
-    // Use addPostFrameCallback to ensure widget is fully mounted
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isDisposed && mounted) {
-        _homeBloc.loadInitialData();
-      }
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    Logger.lifecycle('HomeScreen initialized');
-    _pageController = PageController(initialPage: 0);
-    _setupScrollListener();
-    WidgetsBinding.instance.addObserver(this);
-    _checkUserAndInitialize();
-  }
-
-  Future<void> _checkUserAndInitialize() async {
-    try {
-      final hasUser = await _databaseHelper.hasUser();
-      if (!hasUser && mounted && !_isDisposed) {
-        Logger.state('No user found, redirecting to login');
-        Navigator.pushReplacementNamed(context, '/login');
-        return;
-      }
-
-      if (mounted && !_isDisposed) {
-        setState(() {
-          _isInitializing = false;
-        });
-        _initializeBloc();
-      }
-    } catch (e) {
-      Logger.error('Error checking user existence', e);
-      if (mounted && !_isDisposed) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    Logger.lifecycle('App lifecycle state changed to: $state');
-    if (state == AppLifecycleState.resumed && mounted && !_isDisposed) {
-      Logger.lifecycle('App resumed - reinitializing bloc and refreshing data');
-      _checkUserAndInitialize();
-    }
-  }
-
-  @override
-  void dispose() {
-    Logger.lifecycle('HomeScreen disposing');
-    _isDisposed = true;
-    _pageController.dispose();
-    _scrollController.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    // Don't close the HomeBloc here as it needs to stay alive for notifications
-    super.dispose();
   }
 
   PreferredSize _buildAppBar(HomeState state) {
@@ -409,7 +718,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ? AppColors.error 
                     : AppColors.success,
                 behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4), // Increased duration
+                duration: const Duration(seconds: 4),
                 action: SnackBarAction(
                   label: 'DISMISS',
                   textColor: Colors.white,

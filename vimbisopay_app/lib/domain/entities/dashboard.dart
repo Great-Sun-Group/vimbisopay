@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart' show listEquals;
 
 enum MemberTierType {
   open(1, 10.0, false, true, false, false, false, false),    // Free tier
-  hustler(3, 100.0, false, true, false, false, false, true); // $1 tier
+  hustler(3, 100.0, false, true, false, false, false, true), // $1 tier
+  special(5, 100.0, false, true, false, false, false, true); // Special tier
 
   final int value;
   final double dailyLimit;
@@ -35,10 +36,8 @@ class MemberTier {
     required this.low,
     required this.high,
   }) {
-    type = MemberTierType.values.firstWhere(
-      (type) => type.value == high,
-      orElse: () => MemberTierType.open,
-    );
+  // Map tier values with special handling for tier 5
+  type = high == 5 ? MemberTierType.special : (high >= 3 ? MemberTierType.hustler : MemberTierType.open);
   }
 
   Map<String, dynamic> toMap() => {

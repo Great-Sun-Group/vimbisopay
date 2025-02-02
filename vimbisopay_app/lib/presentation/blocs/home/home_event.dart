@@ -184,3 +184,10 @@ class HomeUpgradeTierFailed extends HomeEvent {
   @override
   List<Object> get props => [message];
 }
+
+class HomeOfferAccepted extends HomeEvent {
+  final String credexId;
+  const HomeOfferAccepted(this.credexId);
+  @override
+  List<Object> get props => [credexId];
+}

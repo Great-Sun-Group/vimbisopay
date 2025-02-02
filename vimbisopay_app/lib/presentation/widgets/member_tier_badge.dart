@@ -15,6 +15,11 @@ class MemberTierBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Don't show anything for special tier
+    if (tierType == MemberTierType.special) {
+      return const SizedBox.shrink();
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
