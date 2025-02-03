@@ -16,7 +16,7 @@ class UpgradeMemberTier {
       amount: 1.0,
       denomination: 'USD',
       securedCredex: true,
-      DCOgiveInCXX: 0.0,
+      DCOgiveInCXX: 1.0,
       DCOdenom: 'USD',
       memberTier: 3,
     );
