@@ -110,3 +110,6 @@ Example entry format:
 - Added new feature X
 - Fixed bug in Y
 - Improved Z
+-e 
+## [1.0.0+35] - 2025-02-03
+- Bug fixes and optimisations
