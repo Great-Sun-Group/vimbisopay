@@ -5,8 +5,8 @@ import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/domain/entities/security_event.dart';
-import 'package:vimbisopay_app/presentation/widgets/change_password_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/change_pin_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
+import 'package:vimbisopay_app/presentation/widgets/change_pin_bottom_sheet.dart';
 import 'package:vimbisopay_app/presentation/widgets/security_events_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_switch_tile.dart';
@@ -193,9 +193,11 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                             subtitle: 'Update your security PIN',
                             icon: Icons.pin,
                             onTap: () async {
-                              final result = await showDialog<bool>(
+                              final result = await showModalBottomSheet<bool>(
                                 context: context,
-                                builder: (context) => const ChangePinDialog(),
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => const ChangePinBottomSheet(),
                               );
                               
                               if (result == true && mounted) {
@@ -214,9 +216,11 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                             icon: Icons.password,
                             showDivider: false,
                             onTap: () async {
-                              final result = await showDialog<bool>(
+                              final result = await showModalBottomSheet<bool>(
                                 context: context,
-                                builder: (context) => const ChangePasswordDialog(),
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => const ChangePasswordBottomSheet(),
                               );
                               
                               if (result == true && mounted) {
