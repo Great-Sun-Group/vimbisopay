@@ -10,6 +10,7 @@ import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -73,8 +74,13 @@ class SettingsScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => Provider<User>.value(
-                            value: user,
+                          builder: (context) => MultiProvider(
+                            providers: [
+                              Provider<User>.value(value: user),
+                              Provider(
+                                create: (context) => UpgradeMemberTier(accountRepository),
+                              ),
+                            ],
                             child: const ProfileSettingsScreen(),
                           ),
                         ),

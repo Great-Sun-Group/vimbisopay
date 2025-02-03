@@ -58,36 +58,58 @@ class UpgradeTierBottomSheet extends StatelessWidget {
           _buildBenefitItem('Priority support'),
           _buildBenefitItem('Exclusive features'),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: isLoading ? null : onCancel,
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : onConfirm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SizedBox(
+                  width: 140,
+                  height: 48,
+                  child: TextButton(
+                    onPressed: isLoading ? null : onCancel,
+                    style: TextButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 16),
+                    ),
                   ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text('Confirm Upgrade'),
                 ),
-              ),
-            ],
+                SizedBox(
+                  width: 140,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Confirm Upgrade',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

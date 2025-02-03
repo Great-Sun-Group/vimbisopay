@@ -19,6 +19,7 @@ import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
@@ -429,17 +430,49 @@ Error reinitializing notification listeners:
   }
 
   void _showUpgradeBottomSheet(BuildContext context, String accountId) {
+    late AnimationController spinController;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => UpgradeTierBottomSheet(
-        onConfirm: () {
-          Navigator.pop(context);
-          _homeBloc.add(HomeUpgradeTierStarted(accountId));
-        },
-        onCancel: () => Navigator.pop(context),
-        isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
+      builder: (context) => BlocProvider.value(
+        value: _homeBloc,
+        child: BlocListener<HomeBloc, HomeState>(
+          listenWhen: (previous, current) => 
+            previous.status != current.status && 
+            (current.status == HomeStatus.upgradingTier || 
+             current.status == HomeStatus.success || 
+             current.status == HomeStatus.error),
+          listener: (context, state) {
+            if (state.status == HomeStatus.upgradingTier) {
+              spinController = AnimationController(
+                duration: const Duration(seconds: 2),
+                vsync: Navigator.of(context),
+              )..repeat();
+              
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => LoadingDialog(
+                  spinController: spinController,
+                  message: 'Upgrading your account...',
+                ),
+              );
+            } else {
+              // Close loading dialog on success or error
+              Navigator.of(context).pop(); // Pop loading dialog
+              spinController.dispose();
+              Navigator.of(context).pop(); // Pop bottom sheet
+            }
+          },
+          child: UpgradeTierBottomSheet(
+            onConfirm: () {
+              _homeBloc.add(HomeUpgradeTierStarted(accountId));
+            },
+            onCancel: () => Navigator.pop(context),
+            isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
+          ),
+        ),
       ),
     );
   }

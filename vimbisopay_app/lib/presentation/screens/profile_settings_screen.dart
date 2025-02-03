@@ -7,6 +7,10 @@ import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/presentation/widgets/initials_avatar.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
+import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -15,15 +19,26 @@ class ProfileSettingsScreen extends StatefulWidget {
   State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
 }
 
-class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String? _error;
   User? _user;
+  late final AnimationController _spinController;
   
   @override
   void initState() {
     super.initState();
+    _spinController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    )..repeat();
     _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    _spinController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -191,10 +206,128 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             ),
             const SizedBox(height: 24),
 
+            // Membership Status Section
+            SettingsContainer(
+              title: 'Membership Status',
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: MemberTierBadge(
+                          tierType: _user?.dashboard?.memberTier.type ?? MemberTierType.open,
+                          onUpgrade: _user?.dashboard?.memberTier.type == MemberTierType.open
+                              ? () async {
+                                  try {
+                                    final sourceAccountId = _user?.dashboard?.member.memberID;
+                                    if (sourceAccountId != null) {
+                                      // Show loading dialog
+                                      if (!context.mounted) return;
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (context) => LoadingDialog(
+                                          spinController: _spinController,
+                                          message: 'Upgrading membership...',
+                                        ),
+                                      );
+
+                                      await context.read<UpgradeMemberTier>()(sourceAccountId);
+                                      
+                                      // Dismiss loading dialog
+                                      if (!context.mounted) return;
+                                      Navigator.pop(context);
+
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Membership upgrade initiated successfully'),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                      _loadUserData(); // Refresh to show updated status
+                                    }
+                                  } catch (e) {
+                                    // Dismiss loading dialog
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Failed to upgrade membership: ${e.toString()}'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      if (_user?.dashboard?.memberTier.type == MemberTierType.open) ...[
+                        const Text(
+                          'Hustler Benefits',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildBenefitItem(Icons.all_inclusive, 'Issue secured and unsecured credex without limits'),
+                        const SizedBox(height: 12),
+                        _buildBenefitItem(Icons.manage_accounts, 'Manage accounts'),
+                        const SizedBox(height: 12),
+                        _buildBenefitItem(Icons.attach_money, '\$1.00 monthly membership fee'),
+                      ] else if (_user?.dashboard?.memberTier.type == MemberTierType.hustler) ...[
+                        const Text(
+                          'Active Hustler Benefits',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildBenefitItem(Icons.check_circle, 'Issue secured and unsecured credex without limits', isActive: true),
+                        const SizedBox(height: 12),
+                        _buildBenefitItem(Icons.check_circle, 'Manage accounts', isActive: true),
+                        const SizedBox(height: 12),
+                        _buildBenefitItem(Icons.check_circle, '\$1.00 monthly membership fee', isActive: true),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
+
+Widget _buildBenefitItem(IconData icon, String text, {bool isActive = false}) {
+  return Row(
+    children: [
+      Icon(
+        icon,
+        size: 20,
+        color: isActive ? AppColors.success : AppColors.primary,
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            color: isActive ? AppColors.success : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
 }
