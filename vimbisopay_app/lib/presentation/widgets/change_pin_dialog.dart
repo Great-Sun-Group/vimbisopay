@@ -121,7 +121,7 @@ class _ChangePinDialogState extends State<ChangePinDialog> {
                     ),
                     child: Text(
                       _error!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.error,
                         fontSize: 14,
                       ),

@@ -23,7 +23,7 @@ class SettingsContainer extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(
+          padding: const EdgeInsets.only(
             left: AppSpacing.md,
             bottom: AppSpacing.sm,
           ),
@@ -55,7 +55,7 @@ class SettingsContainer extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: padding ?? EdgeInsets.all(AppSpacing.containerPadding),
+              padding: padding ?? const EdgeInsets.all(AppSpacing.containerPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: children,
@@ -85,7 +85,7 @@ class SettingsIconContainer extends StatelessWidget {
     return Container(
       width: AppSpacing.iconContainerSize,
       height: AppSpacing.iconContainerSize,
-      padding: EdgeInsets.all(AppSpacing.iconPadding),
+      padding: const EdgeInsets.all(AppSpacing.iconPadding),
       decoration: BoxDecoration(
         color: backgroundColor ?? AppColors.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppSpacing.containerBorderRadius),
@@ -125,14 +125,14 @@ class SettingsListTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSpacing.containerBorderRadius),
         child: Padding(
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             vertical: AppSpacing.sm,
             horizontal: AppSpacing.md,
           ),
           child: Row(
             children: [
               SettingsIconContainer(icon: icon),
-              SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +142,7 @@ class SettingsListTile extends StatelessWidget {
                       style: AppTextStyles.itemTitle,
                     ),
                     if (subtitle != null) ...[
-                      SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         subtitle!,
                         style: AppTextStyles.description,
@@ -152,7 +152,7 @@ class SettingsListTile extends StatelessWidget {
                 ),
               ),
               if (trailing != null) ...[
-                SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.sm),
                 trailing!,
               ],
             ],
@@ -168,7 +168,7 @@ class SettingsListTile extends StatelessWidget {
     return Column(
       children: [
         tile,
-        Divider(
+        const Divider(
           color: AppColors.highlightOverlay,
           height: AppSpacing.md,
           indent: AppSpacing.xl + AppSpacing.md, // Icon width + padding

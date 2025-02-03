@@ -154,7 +154,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                       ),
                       child: Text(
                         _error!,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: AppColors.error,
                           fontSize: 14,
                         ),

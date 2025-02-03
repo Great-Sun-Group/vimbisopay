@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
-import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 import '../../../infrastructure/mocks/mock_upgrade_member_tier.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';

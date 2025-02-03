@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/core/theme/app_spacing.dart';
-import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/presentation/widgets/initials_avatar.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';

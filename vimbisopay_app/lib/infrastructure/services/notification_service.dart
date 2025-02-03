@@ -325,7 +325,7 @@ Current notification settings:
 
   Future<void> _registerToken(String token) async {
     final platform = Platform.isIOS ? 'ios' : 'android';
-    final url = '${ApiConfig.baseUrl}/api/notifications/register-token';
+    const url = '${ApiConfig.baseUrl}/api/notifications/register-token';
     final body = {
       'token': token,
       'platform': platform,

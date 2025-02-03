@@ -41,20 +41,20 @@ class AccountRepositoryImpl implements AccountRepository {
     required String defaultDenom,
   }) {
     // Extract base values, defaulting to 0.00 if not present
-    double baseReceivables = double.tryParse(baseBalances['totalReceivables']
+    final double baseReceivables = double.tryParse(baseBalances['totalReceivables']
                 ?.toString()
                 .replaceAll(RegExp(r'[^\d.-]'), '') ??
             '0.00') ??
         0.00;
 
-    double basePayables = double.tryParse(baseBalances['totalPayables']
+    final double basePayables = double.tryParse(baseBalances['totalPayables']
                 ?.toString()
                 .replaceAll(RegExp(r'[^\d.-]'), '') ??
             '0.00') ??
         0.00;
 
     // Calculate pending amounts
-    double pendingInTotal = pendingIn.fold(0.00, (sum, tx) {
+    final double pendingInTotal = pendingIn.fold(0.00, (sum, tx) {
       final amount = double.tryParse(tx['formattedInitialAmount']
                   ?.toString()
                   .replaceAll(RegExp(r'[^\d.-]'), '') ??
@@ -63,7 +63,7 @@ class AccountRepositoryImpl implements AccountRepository {
       return sum + amount;
     });
 
-    double pendingOutTotal = pendingOut.fold(0.00, (sum, tx) {
+    final double pendingOutTotal = pendingOut.fold(0.00, (sum, tx) {
       final amount = double.tryParse(tx['formattedInitialAmount']
                   ?.toString()
                   .replaceAll(RegExp(r'[^\d.-]'), '') ??
@@ -747,7 +747,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> acceptCredex(String credexId) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = 'https://dev.mycredex.dev/acceptCredex';
+        const url = 'https://dev.mycredex.dev/acceptCredex';
         final headers = _authHeaders(token);
         final body = {'credexID': credexId};
 

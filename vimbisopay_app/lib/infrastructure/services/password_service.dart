@@ -29,7 +29,7 @@ class PasswordService {
     final salt = base64.encode(saltBytes);
 
     // Hash the password with the salt
-    final codec = Utf8Codec();
+    final codec = const Utf8Codec();
     final key = codec.encode(password);
     final saltedKey = key + saltBytes;
     final hash = sha256.convert(saltedKey);

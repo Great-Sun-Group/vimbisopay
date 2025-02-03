@@ -104,17 +104,17 @@ class _NotificationsContentState extends State<NotificationsContent> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       controller: _scrollController,
-      padding: EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: [
           const GeneralSection(),
           AnimatedSwitcher(
-            duration: Duration(milliseconds: AppSpacing.mediumAnimationDuration),
+            duration: const Duration(milliseconds: AppSpacing.mediumAnimationDuration),
             child: widget.preferences.masterEnabled
-                ? Padding(
+                ? const Padding(
                     padding: EdgeInsets.only(top: AppSpacing.lg),
                     child: Column(
-                      children: const [
+                      children: [
                         MoneyTransfersSection(),
                         SizedBox(height: 16),
                         AccountSection(),

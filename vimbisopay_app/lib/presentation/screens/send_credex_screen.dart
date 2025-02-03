@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:lottie/lottie.dart';
-import 'package:dartz/dartz.dart' hide State;
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;

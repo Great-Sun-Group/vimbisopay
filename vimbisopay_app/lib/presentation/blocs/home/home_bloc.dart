@@ -10,8 +10,8 @@ import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
 import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
-import 'home_event.dart';
-import 'home_state.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
+import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final AccountRepository accountRepository;
@@ -310,7 +310,7 @@ Dashboard refresh stats:
       }
     } catch (e, stackTrace) {
       _logger.e('Error in _onHomeLoadMoreStarted: $e\n$stackTrace');
-      add(HomeErrorOccurred('Failed to load more entries'));
+      add(const HomeErrorOccurred('Failed to load more entries'));
     }
   }
 
@@ -361,7 +361,7 @@ Dashboard refresh stats:
     result.fold(
       (failure) {
         // On failure, remove from processing state
-        add(HomeErrorOccurred('Failed to accept Credex'));
+        add(const HomeErrorOccurred('Failed to accept Credex'));
         emit(state.copyWith(
           processingCredexIds: state.processingCredexIds.where((id) => id != event.credexId).toList(),
         ));
@@ -392,7 +392,7 @@ Dashboard refresh stats:
     result.fold(
       (failure) {
         // On failure, remove all from processing state
-        add(HomeErrorOccurred('Failed to accept Credex transactions'));
+        add(const HomeErrorOccurred('Failed to accept Credex transactions'));
         emit(state.copyWith(
           processingCredexIds: state.processingCredexIds.where((id) => !event.credexIds.contains(id)).toList(),
         ));
@@ -417,7 +417,7 @@ Dashboard refresh stats:
     ));
     final result = await accountRepository.cancelCredex(event.credexId);
     result.fold(
-      (failure) => add(HomeErrorOccurred('Failed to cancel Credex')),
+      (failure) => add(const HomeErrorOccurred('Failed to cancel Credex')),
       (_) {
         emit(state.copyWith(
           status: HomeStatus.success,

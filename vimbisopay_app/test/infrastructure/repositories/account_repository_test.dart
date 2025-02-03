@@ -5,7 +5,6 @@ import 'package:mockito/annotations.dart';
 import 'package:http/http.dart' as http;
 import 'account_repository_test.mocks.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
-import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';

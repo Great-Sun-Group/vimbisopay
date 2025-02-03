@@ -5,8 +5,6 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dash;
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
-import 'package:vimbisopay_app/domain/entities/pending_offer.dart' as pending;
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class DatabaseHelper {
