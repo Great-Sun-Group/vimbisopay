@@ -72,10 +72,13 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      padding: EdgeInsets.zero,
                     ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(fontSize: 16),
+                    child: const Center(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(fontSize: 16),
+                      ),
                     ),
                   ),
                 ),
@@ -90,7 +93,7 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.zero,
                     ),
                     child: isLoading
                         ? const SizedBox(
@@ -102,9 +105,11 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                                   AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Text(
-                            'Confirm Upgrade',
-                            style: TextStyle(fontSize: 16),
+                        : const Center(
+                            child: Text(
+                              'Confirm Upgrade',
+                              style: TextStyle(fontSize: 16),
+                            ),
                           ),
                   ),
                 ),
