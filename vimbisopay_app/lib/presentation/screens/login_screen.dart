@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
@@ -27,8 +26,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _repository = AccountRepositoryImpl();
-  final _databaseHelper = DatabaseHelper();
+  final _repository = ServiceLocator.accountRepository;
+  final _databaseHelper = ServiceLocator.databaseHelper;
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _showPassword = false;

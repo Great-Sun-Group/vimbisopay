@@ -4,8 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
@@ -50,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () async {
                     Logger.interaction('User tapped Profile Settings');
                     try {
-                      final accountRepository = AccountRepositoryImpl();
+                      final accountRepository = ServiceLocator.accountRepository;
                       final userResult = await accountRepository.getCurrentUser();
 
                       if (!context.mounted) return;
@@ -253,7 +252,7 @@ class SettingsScreen extends StatelessWidget {
                       }
 
                       try {
-                        final securityService = SecurityService();
+                        final securityService = ServiceLocator.securityService;
                         await securityService.clearAllData();
                         Logger.state('All user data cleared for logout');
                         

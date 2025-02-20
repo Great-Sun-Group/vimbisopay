@@ -3,7 +3,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/theme/app_spacing.dart';
 import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/domain/entities/security_event.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_pin_bottom_sheet.dart';
@@ -19,7 +19,7 @@ class SecuritySettingsScreen extends StatefulWidget {
 }
 
 class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
-  final SecurityService _securityService = SecurityService();
+  final _securityService = ServiceLocator.securityService;
   bool _isLoading = true;
   String? _error;
   bool _useBiometric = false;

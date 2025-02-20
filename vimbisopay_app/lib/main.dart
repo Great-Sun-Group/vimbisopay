@@ -22,6 +22,7 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -48,7 +49,7 @@ Message details:
 
     // Initialize NotificationService to handle background message
     print('Initializing NotificationService in background...');
-    final notificationService = NotificationService();
+    final notificationService = ServiceLocator.notificationService;
     final initialized = await notificationService.initialize();
     
     if (initialized) {
@@ -77,7 +78,7 @@ Message details:
       
       // Initialize database helper to refresh data
       print('Initializing database helper...');
-      final databaseHelper = DatabaseHelper();
+      final databaseHelper = ServiceLocator.databaseHelper;
       final user = await databaseHelper.getUser();
       if (user != null) {
         print('User found, refreshing data...');
@@ -116,7 +117,7 @@ void main() async {
     
     // Initialize NotificationService after Firebase is ready
     print('Initializing NotificationService...');
-    final notificationService = NotificationService();
+    final notificationService = ServiceLocator.notificationService;
     final initialized = await notificationService.initialize();
     
     if (!initialized) {
@@ -156,9 +157,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<SharedPreferences>.value(value: sharedPreferences),
-        Provider<DatabaseHelper>(
-          create: (_) => DatabaseHelper(),
-          lazy: false,
+        Provider<DatabaseHelper>.value(
+          value: ServiceLocator.databaseHelper,
         ),
         BlocProvider(
           create: (context) => NotificationsBloc(sharedPreferences)..add(NotificationsInitialize()),
@@ -303,8 +303,8 @@ class _IntroWrapperState extends State<IntroWrapper> {
   bool _showIntro = true;
   bool _loading = true;
   bool _hasExistingUser = false;
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
-  final SecurityService _securityService = SecurityService();
+  final _databaseHelper = ServiceLocator.databaseHelper;
+  final _securityService = ServiceLocator.securityService;
 
   @override
   void initState() {

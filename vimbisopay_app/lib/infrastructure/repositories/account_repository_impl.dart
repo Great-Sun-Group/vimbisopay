@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:dartz/dartz.dart';
+import 'package:meta/meta.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
@@ -24,10 +25,17 @@ import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
 
-  DatabaseHelper _databaseHelper = DatabaseHelper();
-  SecurityService _securityService = SecurityService();
-  PasswordService _passwordService = PasswordService();
-  http.Client _httpClient = http.Client();
+  final DatabaseHelper _databaseHelper;
+  final PasswordService _passwordService;
+  final http.Client _httpClient;
+
+  AccountRepositoryImpl({
+    required PasswordService passwordService,
+    DatabaseHelper? databaseHelper,
+    http.Client? httpClient,
+  }) : _databaseHelper = databaseHelper ?? DatabaseHelper(),
+       _passwordService = passwordService,
+       _httpClient = httpClient ?? http.Client();
 
   @override
   Future<Either<Failure, User>> loginV2({
@@ -191,10 +199,18 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   // For testing
-  set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
-  set securityService(SecurityService service) => _securityService = service;
-  set passwordService(PasswordService service) => _passwordService = service;
-  set httpClient(http.Client client) => _httpClient = client;
+  @visibleForTesting
+  static AccountRepositoryImpl createForTesting({
+    required PasswordService passwordService,
+    DatabaseHelper? databaseHelper,
+    http.Client? httpClient,
+  }) {
+    return AccountRepositoryImpl(
+      passwordService: passwordService,
+      databaseHelper: databaseHelper,
+      httpClient: httpClient,
+    );
+  }
 
   Map<String, dynamic> _calculateUnsecuredBalances({
     required Map<String, dynamic> baseBalances,
@@ -936,7 +952,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> acceptCredex(String credexId) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        final url = '$baseUrl/v2/acceptCredex';
+        final url = '$baseUrl/acceptCredex';
         final headers = _authHeaders(token);
         final body = {'credexID': credexId};
 
@@ -998,7 +1014,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> registerNotificationToken(String token) async {
     return _executeAuthenticatedRequest(
       request: (authToken) async {
-        final url = '$baseUrl/v2/notifications/register-token';
+        final url = '$baseUrl/notifications/register-token';
         final headers = _authHeaders(authToken);
         final body = {
           'token': token,
@@ -1036,7 +1052,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }) async {
     try {
       final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
-      final url = '$baseUrl/v2/verify/requestOtp';
+      final url = '$baseUrl/verify/requestOtp';
       final body = {
         'phone': sanitizedPhone,
         'purpose': purpose,
@@ -1072,7 +1088,7 @@ class AccountRepositoryImpl implements AccountRepository {
     required String memberId,
   }) async {
     try {
-      final url = '$baseUrl/v2/verify/verifyOtp';
+      final url = '$baseUrl/verify/verifyOtp';
       final headers = _authHeaders(token);
       final body = {
         'memberID': memberId,
@@ -1114,7 +1130,7 @@ class AccountRepositoryImpl implements AccountRepository {
         return const Left(InfrastructureFailure('Not authenticated'));
       }
 
-      final url = '$baseUrl/v2/setInitialPassword';
+      final url = '$baseUrl/setInitialPassword';
       final headers = _authHeaders(user.token);
       final body = {
         'phone': user.phone,

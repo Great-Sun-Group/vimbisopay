@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class ChangePinDialog extends StatefulWidget {
   const ChangePinDialog({super.key});
@@ -15,7 +15,7 @@ class _ChangePinDialogState extends State<ChangePinDialog> {
   final _currentPinController = TextEditingController();
   final _newPinController = TextEditingController();
   final _confirmPinController = TextEditingController();
-  final _securityService = SecurityService();
+  final _securityService = ServiceLocator.securityService;
   bool _isLoading = false;
   String? _error;
 

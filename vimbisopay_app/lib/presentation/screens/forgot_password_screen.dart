@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'dart:async' show unawaited;
 
@@ -227,6 +228,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     );
   }
 
+  final _repository = ServiceLocator.accountRepository;
+
   Future<void> _handleSubmit() async {
     Logger.interaction('[ForgotPassword] Submit button pressed');
     
@@ -269,13 +272,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     ));
 
     try {
-      // TODO: Implement actual password reset API call
-      await Future.delayed(const Duration(seconds: 2));
+      final phoneNumber = '+${_phoneController.text}';
+      final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+      final result = await _repository.requestOtp(
+        phone: sanitizedPhone,
+        purpose: 'PASSWORD_RESET',
+      );
 
       if (!mounted) return;
 
-      Logger.interaction('[ForgotPassword] Instructions sent successfully');
-      
       // Helper function to safely pop dialog and update state
       void cleanup() {
         if (mounted) {
@@ -287,10 +292,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
         }
       }
 
-      cleanup();
-      setState(() {
-        _isSubmitted = true;
-      });
+      result.fold(
+        (failure) {
+          cleanup();
+          _showError(failure.message ?? 'Failed to send reset instructions. Please try again.');
+        },
+        (_) {
+          cleanup();
+          setState(() {
+            _isSubmitted = true;
+          });
+        },
+      );
     } catch (e) {
       Logger.error('[ForgotPassword] Error sending reset instructions', e);
       if (mounted) {

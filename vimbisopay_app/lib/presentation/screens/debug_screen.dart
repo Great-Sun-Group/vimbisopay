@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/main.dart';
 
 class DebugScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class _DebugScreenState extends State<DebugScreen> {
   String _fcmToken = 'Unknown';
   String _lastNotification = 'None';
   String _initializationStatus = 'Not initialized';
-  final NotificationService _notificationService = NotificationService();
+  final _notificationService = ServiceLocator.notificationService;
   bool _isInitialized = false;
   
   @override

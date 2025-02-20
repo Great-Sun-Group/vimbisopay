@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 
 class OTPVerificationDialog extends StatefulWidget {
@@ -26,7 +26,7 @@ class OTPVerificationDialog extends StatefulWidget {
 
 class _OTPVerificationDialogState extends State<OTPVerificationDialog> with SingleTickerProviderStateMixin {
   final _otpController = TextEditingController();
-  final _repository = AccountRepositoryImpl();
+  final _repository = ServiceLocator.accountRepository;
   bool _isLoading = false;
   String? _error;
   bool _isResending = false;

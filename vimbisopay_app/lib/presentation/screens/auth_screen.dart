@@ -3,8 +3,7 @@ import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_pin_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -20,8 +19,8 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final SecurityService _securityService = SecurityService();
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final _securityService = ServiceLocator.securityService;
+  final _databaseHelper = ServiceLocator.databaseHelper;
   late final FocusNode _pinFocusNode;
   String _pin = '';
   bool _isLoading = true;

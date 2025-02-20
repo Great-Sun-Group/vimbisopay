@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class SecuritySetupScreen extends StatefulWidget {
   final User user;
@@ -18,8 +17,8 @@ class SecuritySetupScreen extends StatefulWidget {
 }
 
 class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
-  final SecurityService _securityService = SecurityService();
-  final AccountRepositoryImpl _repository = AccountRepositoryImpl();
+  final _securityService = ServiceLocator.securityService;
+  final _repository = ServiceLocator.accountRepository;
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _pinFocusNode = FocusNode();
   bool _isBiometricAvailable = false;

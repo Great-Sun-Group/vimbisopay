@@ -12,10 +12,13 @@ class PasswordService {
   final SecurityService _securityService;
   final http.Client _httpClient;
 
-  PasswordService({http.Client? httpClient}) 
-    : _databaseHelper = DatabaseHelper(),
-      _securityService = SecurityService(),
-      _httpClient = httpClient ?? http.Client();
+  PasswordService({
+    required SecurityService securityService,
+    DatabaseHelper? databaseHelper,
+    http.Client? httpClient,
+  }) : _databaseHelper = databaseHelper ?? DatabaseHelper(),
+       _securityService = securityService,
+       _httpClient = httpClient ?? http.Client();
 
   Future<bool> verifyPassword(String? username, String? password, String? deviceId) async {
     try {

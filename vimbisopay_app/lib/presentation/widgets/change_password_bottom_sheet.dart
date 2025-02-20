@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class ChangePasswordBottomSheet extends StatefulWidget {
   const ChangePasswordBottomSheet({super.key});
@@ -15,7 +15,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _passwordService = PasswordService();
+  final _passwordService = ServiceLocator.passwordService;
   bool _isLoading = false;
   String? _error;
   double _passwordStrength = 0.0;

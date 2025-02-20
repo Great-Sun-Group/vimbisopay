@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class SetupPasswordDialog extends StatefulWidget {
   const SetupPasswordDialog({super.key});
@@ -91,7 +89,7 @@ class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
     });
 
     try {
-      final repository = AccountRepositoryImpl();
+      final repository = ServiceLocator.accountRepository;
       final result = await repository.setInitialPassword(
         password: newPassword,
       );
@@ -107,7 +105,7 @@ class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
         },
         (user) async {
           // Save updated user to database
-          final databaseHelper = DatabaseHelper();
+          final databaseHelper = ServiceLocator.databaseHelper;
           await databaseHelper.saveUser(user);
           
           if (!mounted) return;

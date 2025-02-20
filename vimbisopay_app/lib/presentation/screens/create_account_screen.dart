@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
@@ -37,7 +36,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _repository = AccountRepositoryImpl();
+  final _repository = ServiceLocator.accountRepository;
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _acceptedTerms = false;
