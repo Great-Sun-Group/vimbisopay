@@ -19,6 +19,7 @@ import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
@@ -27,6 +28,167 @@ class AccountRepositoryImpl implements AccountRepository {
   SecurityService _securityService = SecurityService();
   PasswordService _passwordService = PasswordService();
   http.Client _httpClient = http.Client();
+
+  @override
+  Future<Either<Failure, User>> loginV2({
+    required String phone,
+    String? password,
+    String? passwordHash,
+  }) async {
+    try {
+      final url = '$baseUrl/v2/login';
+      final body = {
+        'phone': phone,
+      };
+
+      // For v2 login, we send phone and hashed password
+      if (password != null) {
+        // Hash the password before sending
+        final hash = await _passwordService.hashPassword(password);
+        body['password'] = hash;
+        // Store the hash for later use
+        passwordHash = hash;
+      } else if (passwordHash != null) {
+        // For token refresh, use the stored hash
+        body['password'] = passwordHash;
+      }
+
+      final response = await _loggedRequest(
+        () => _httpClient.post(
+          Uri.parse(url),
+          headers: _baseHeaders,
+          body: json.encode(body),
+        ),
+        url,
+        'POST',
+        headers: _baseHeaders,
+        body: body,
+      );
+
+      final jsonResponse = json.decode(response.body);
+
+      // Check for PASSWORD_REQUIRED error
+      if (jsonResponse['data']?['action']?['details']?['code'] == 'PASSWORD_REQUIRED') {
+        return Left(AuthFailure(
+          message: jsonResponse['message'] ?? 'Password is required for this account',
+          code: 'PASSWORD_REQUIRED',
+        ));
+      }
+
+      if (response.statusCode == 200) {
+        if (!jsonResponse.containsKey('data') ||
+            !jsonResponse['data'].containsKey('action') ||
+            !jsonResponse['data']['action'].containsKey('details') ||
+            !jsonResponse['data'].containsKey('dashboard')) {
+          return const Left(InfrastructureFailure('Invalid response format'));
+        }
+
+        final actionDetails = jsonResponse['data']['action']['details'];
+        final dashboardData = jsonResponse['data']['dashboard'];
+
+        final memberId = actionDetails['memberID']?.toString();
+        final userPhone = actionDetails['phone']?.toString();
+        final token = actionDetails['token']?.toString();
+        final version = actionDetails['version']?.toString();
+        final authMethod = actionDetails['authMethod']?.toString();
+        final otpVerified = actionDetails['otpVerified'] as bool? ?? false;
+
+        if (memberId == null || userPhone == null || token == null) {
+          return const Left(InfrastructureFailure(
+              'Missing required user fields in response'));
+        }
+
+        // Check if this is a phone-only v2 login
+        if (version == 'v2' && authMethod == 'phone_only') {
+          // Create user with minimal info for password setup flow
+        final user = User(
+          memberId: memberId,
+          phone: userPhone,
+          token: token,
+          otpVerified: otpVerified,
+          version: version,
+          authMethod: authMethod,
+          passwordHash: passwordHash,
+          passwordChanged: password != null ? DateTime.now() : null,
+        );
+        
+        // Save user with password info to database
+        await _databaseHelper.saveUser(user);
+        
+        return Right(user);
+        }
+
+        // Otherwise process as normal login with dashboard
+        final dashboardObj = dashboard.Dashboard.fromMap({
+          'member': {
+            'memberID': actionDetails['memberID'],
+            'memberTier': dashboardData['member']['memberTier'],
+            'firstname': dashboardData['member']['firstname'],
+            'lastname': dashboardData['member']['lastname'],
+            'memberHandle': dashboardData['member']['memberHandle'] as String?,
+            'defaultDenom': dashboardData['member']['defaultDenom'],
+          },
+          'accounts': dashboardData['accounts']
+              .map((accountData) => {
+                    'accountID': accountData['accountID'],
+                    'accountName': accountData['accountName'],
+                    'accountHandle': accountData['accountHandle'],
+                    'defaultDenom': accountData['defaultDenom'],
+                    'isOwnedAccount': accountData['isOwnedAccount'],
+                    'balanceData': {
+                      'securedNetBalancesByDenom': accountData['balanceData']
+                          ['securedNetBalancesByDenom'],
+                      'unsecuredBalancesInDefaultDenom':
+                          _calculateUnsecuredBalances(
+                        baseBalances: accountData['balanceData']
+                            ['unsecuredBalancesInDefaultDenom'],
+                        pendingIn: accountData['pendingInData'] ?? [],
+                        pendingOut: accountData['pendingOutData'] ?? [],
+                        defaultDenom: accountData['defaultDenom'],
+                      ),
+                      'netCredexAssetsInDefaultDenom':
+                          accountData['balanceData']
+                              ['netCredexAssetsInDefaultDenom'],
+                    },
+                    'pendingInData': {
+                      'success': true,
+                      'data': accountData['pendingInData'] ?? [],
+                      'message': 'Pending offers retrieved',
+                    },
+                    'pendingOutData': {
+                      'success': true,
+                      'data': accountData['pendingOutData'] ?? [],
+                      'message': 'Pending outgoing offers retrieved',
+                    },
+                    'sendOffersTo': accountData['sendOffersTo'],
+                  })
+              .toList(),
+        });
+
+        final user = User(
+          memberId: memberId,
+          phone: userPhone,
+          token: token,
+          otpVerified: otpVerified,
+          version: version,
+          authMethod: authMethod,
+          passwordHash: passwordHash,
+          passwordChanged: password != null ? DateTime.now() : null,
+          dashboard: dashboardObj,
+        );
+
+        // Save user with password info to database
+        await _databaseHelper.saveUser(user);
+
+        return Right(user);
+      } else {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Login failed';
+        return Left(InfrastructureFailure(errorMessage));
+      }
+    } catch (e) {
+      return Left(InfrastructureFailure(e.toString()));
+    }
+  }
 
   // For testing
   set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
@@ -113,16 +275,15 @@ class AccountRepositoryImpl implements AccountRepository {
           if (!isRetry &&
               failure.message?.toLowerCase().contains('token expired') ==
                   true) {
-            if (user.passwordHash == null || user.passwordSalt == null) {
-              return const Left(InfrastructureFailure(
-                  'Authentication failed: No stored password hash'));
-            }
+      if (user.passwordHash == null) {
+        return const Left(InfrastructureFailure(
+            'Authentication failed: No stored password hash'));
+      }
 
             // Re-login with stored password hash
-            final loginResult = await login(
+            final loginResult = await loginV2(
               phone: user.phone,
-              passwordHash: user.passwordHash!,
-              passwordSalt: user.passwordSalt!,
+              passwordHash: user.passwordHash,
             );
 
             return loginResult.fold(
@@ -133,7 +294,6 @@ class AccountRepositoryImpl implements AccountRepository {
                   phone: newUser.phone,
                   token: newUser.token,
                   passwordHash: user.passwordHash,
-                  passwordSalt: user.passwordSalt,
                   passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
                 );
@@ -424,8 +584,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }) async {
     try {
       // Hash password before sending to server
-      final ({String hash, String salt}) hashResult =
-          await _passwordService.hashPassword(password);
+      final hash = await _passwordService.hashPassword(password);
 
       final url = '$baseUrl/onboardMember';
       final body = {
@@ -433,8 +592,7 @@ class AccountRepositoryImpl implements AccountRepository {
         'lastname': lastName,
         'phone': phone,
         'defaultDenom': 'CXX',
-        'password_hash': hashResult.hash,
-        'password_salt': hashResult.salt,
+        'password': hash,
       };
 
       final response = await _loggedRequest(
@@ -461,12 +619,31 @@ class AccountRepositoryImpl implements AccountRepository {
     }
   }
 
+  Map<String, String>? _extractTokenInfo(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final data = json.decode(decoded);
+
+      return {
+        'version': data['version']?.toString() ?? 'v1',
+        'authMethod': data['authMethod']?.toString() ?? 'password',
+      };
+    } catch (e) {
+      Logger.error('Error decoding token', e);
+      return null;
+    }
+  }
+
   @override
   Future<Either<Failure, User>> login({
     required String phone,
     String? password,
     String? passwordHash,
-    String? passwordSalt,
   }) async {
     try {
       final url = '$baseUrl/login';
@@ -474,20 +651,12 @@ class AccountRepositoryImpl implements AccountRepository {
         'phone': phone,
       };
 
-      if (passwordHash != null && passwordSalt != null) {
-        // Use existing hash for token refresh
+      // For phone-only authentication, we don't send any password fields
+      if (passwordHash != null) {
+        // Only include password fields for token refresh
         body['password_hash'] = passwordHash;
-        body['password_salt'] = passwordSalt;
-      } else {
-        if (password == null) {
-          return const Left(InfrastructureFailure('Password is required'));
-        }
-        // Hash new password
-        final ({String hash, String salt}) hashResult =
-            await _passwordService.hashPassword(password);
-        body['password_hash'] = hashResult.hash;
-        body['password_salt'] = hashResult.salt;
       }
+
 
       final response = await _loggedRequest(
         () => _httpClient.post(
@@ -570,13 +739,33 @@ class AccountRepositoryImpl implements AccountRepository {
               .toList(),
         });
 
+        // Extract version and authMethod from token
+        final tokenInfo = _extractTokenInfo(token);
+        final version = tokenInfo?['version'] ?? 'v1';
+        final authMethod = tokenInfo?['authMethod'] ?? 'password';
+
+        // For v1 phone-only auth, return minimal user info
+        if (version == 'v1' && authMethod == 'phone_only') {
+          final user = User(
+            memberId: memberId,
+            phone: userPhone,
+            token: token,
+            otpVerified: false,
+            version: version,
+            authMethod: authMethod,
+          );
+          return Right(user);
+        }
+
+        // Otherwise return full user info
         final user = User(
           memberId: memberId,
           phone: userPhone,
           token: token,
           passwordHash: body['password_hash'],
-          passwordSalt: body['password_salt'],
           passwordChanged: DateTime.now(),
+          version: version,
+          authMethod: authMethod,
           dashboard: dashboardObj,
         );
 
@@ -747,7 +936,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> acceptCredex(String credexId) async {
     return _executeAuthenticatedRequest(
       request: (token) async {
-        const url = 'https://dev.mycredex.dev/acceptCredex';
+        final url = '$baseUrl/v2/acceptCredex';
         final headers = _authHeaders(token);
         final body = {'credexID': credexId};
 
@@ -809,7 +998,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> registerNotificationToken(String token) async {
     return _executeAuthenticatedRequest(
       request: (authToken) async {
-        final url = '$baseUrl/api/notifications/register-token';
+        final url = '$baseUrl/v2/notifications/register-token';
         final headers = _authHeaders(authToken);
         final body = {
           'token': token,
@@ -840,6 +1029,127 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  @override
+  Future<Either<Failure, bool>> requestOtp({
+    required String phone,
+    required String purpose,
+  }) async {
+    try {
+      final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
+      final url = '$baseUrl/v2/verify/requestOtp';
+      final body = {
+        'phone': sanitizedPhone,
+        'purpose': purpose,
+      };
+
+      final response = await _loggedRequest(
+        () => _httpClient.post(
+          Uri.parse(url),
+          headers: _baseHeaders,
+          body: json.encode(body),
+        ),
+        url,
+        'POST',
+        headers: _baseHeaders,
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        return const Right(true);
+      } else {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to request OTP';
+        return Left(InfrastructureFailure(errorMessage));
+      }
+    } catch (e) {
+      return Left(InfrastructureFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> verifyOtp({
+    required String token,
+    required String otp,
+    required String memberId,
+  }) async {
+    try {
+      final url = '$baseUrl/v2/verify/verifyOtp';
+      final headers = _authHeaders(token);
+      final body = {
+        'memberID': memberId,
+        'otp': otp,
+        'purpose': 'PASSWORD_RESET',
+      };
+
+      final response = await _loggedRequest(
+        () => _httpClient.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(body),
+        ),
+        url,
+        'POST',
+        headers: headers,
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        return const Right(true);
+      } else {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify OTP';
+        return Left(InfrastructureFailure(errorMessage));
+      }
+    } catch (e) {
+      return Left(InfrastructureFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, User>> setInitialPassword({
+    required String password,
+  }) async {
+    try {
+      // Get current user to access token and phone
+      final user = await _databaseHelper.getUser();
+      if (user == null) {
+        return const Left(InfrastructureFailure('Not authenticated'));
+      }
+
+      final url = '$baseUrl/v2/setInitialPassword';
+      final headers = _authHeaders(user.token);
+      final body = {
+        'phone': user.phone,
+        'password': password,
+      };
+
+      final response = await _loggedRequest(
+        () => _httpClient.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(body),
+        ),
+        url,
+        'POST',
+        headers: headers,
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        // Now try to login with the new password to get updated user info
+        final loginResult = await loginV2(
+          phone: user.phone,
+          password: password,
+        );
+
+        return loginResult;
+      } else {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to set initial password';
+        return Left(InfrastructureFailure(errorMessage));
+      }
+    } catch (e) {
+      return Left(InfrastructureFailure(e.toString()));
+    }
+  }
+
   Future<Either<Failure, RecurringResponse>> createRecurring(
       RecurringRequest request) async {
     Logger.data('Creating Recurring request: ${request.toJson()}');

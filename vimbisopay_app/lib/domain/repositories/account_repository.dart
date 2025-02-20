@@ -9,11 +9,17 @@ import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 
 abstract class AccountRepository {
+  Future<Either<Failure, User>> loginV2({
+    required String phone,
+    String? password,
+    String? passwordHash,
+  });
+
+  @Deprecated('Use loginV2 instead')
   Future<Either<Failure, User>> login({
     required String phone,
     String? password,
     String? passwordHash,
-    String? passwordSalt,
   });
 
   Future<Either<Failure, bool>> onboardMember({
@@ -61,4 +67,31 @@ abstract class AccountRepository {
   Future<Either<Failure, bool>> registerNotificationToken(String token);
 
   Future<Either<Failure, RecurringResponse>> createRecurring(RecurringRequest request);
+
+  /// Request an OTP for a specific purpose
+  /// 
+  /// [phone] The phone number to send the OTP to
+  /// [purpose] The purpose of the OTP (e.g. 'PASSWORD_RESET')
+  Future<Either<Failure, bool>> requestOtp({
+    required String phone,
+    required String purpose,
+  });
+
+  /// Verify an OTP using a token
+  /// 
+  /// [token] The v1 token to use for verification
+  /// [otp] The OTP code to verify
+  /// [memberId] The member ID to verify the OTP for
+  Future<Either<Failure, bool>> verifyOtp({
+    required String token,
+    required String otp,
+    required String memberId,
+  });
+
+  /// Set the initial password for a user
+  /// 
+  /// [password] The password to set
+  Future<Either<Failure, User>> setInitialPassword({
+    required String password,
+  });
 }

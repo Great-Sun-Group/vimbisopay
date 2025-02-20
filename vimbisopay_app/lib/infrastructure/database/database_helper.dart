@@ -20,7 +20,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 11,
+      version: 12,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -35,37 +35,61 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 11) {
-      try {
-        // Add memberHandle column to users table
-        await db.execute('ALTER TABLE users ADD COLUMN memberHandle TEXT');
-        Logger.data('Added memberHandle column to users table');
-      } catch (e) {
-        Logger.error('Error adding memberHandle column', e);
-        // If error occurs, recreate the table with all columns
-        await db.execute('DROP TABLE IF EXISTS users_old');
-        await db.execute('ALTER TABLE users RENAME TO users_old');
-        
-        await db.execute('''
-          CREATE TABLE users(
-            memberId TEXT PRIMARY KEY,
-            phone TEXT NOT NULL,
-            token TEXT NOT NULL,
-            password_hash TEXT,
-            password_salt TEXT,
-            password_changed INTEGER,
-            memberHandle TEXT
-          )
-        ''');
-        
-        await db.execute('''
-          INSERT INTO users(memberId, phone, token, password_hash, password_salt, password_changed)
-          SELECT memberId, phone, token, password_hash, password_salt, password_changed
-          FROM users_old
-        ''');
-        
-        await db.execute('DROP TABLE users_old');
-        Logger.data('Successfully recreated users table with memberHandle column');
+    if (oldVersion < 12) {
+      Logger.data('Starting database upgrade to version 12');
+      
+      // Check if memberHandle column exists
+      var tableInfo = await db.rawQuery("PRAGMA table_info('users')");
+      bool hasMemberHandle = tableInfo.any((column) => column['name'] == 'memberHandle');
+      
+      if (!hasMemberHandle) {
+        Logger.data('memberHandle column not found, attempting to add it');
+        try {
+          // First attempt: Try to add the column
+          await db.execute('ALTER TABLE users ADD COLUMN memberHandle TEXT');
+          Logger.data('Successfully added memberHandle column using ALTER TABLE');
+        } catch (e) {
+          Logger.error('Failed to add memberHandle column using ALTER TABLE', e);
+          Logger.data('Attempting table recreation approach');
+          
+          try {
+            // Second attempt: Recreate the table
+            await db.transaction((txn) async {
+              // Create backup table
+              await txn.execute('DROP TABLE IF EXISTS users_backup');
+              await txn.execute('ALTER TABLE users RENAME TO users_backup');
+              
+              // Create new table with all columns
+              await txn.execute('''
+                CREATE TABLE users(
+                  memberId TEXT PRIMARY KEY,
+                  phone TEXT NOT NULL,
+                  token TEXT NOT NULL,
+                  password_hash TEXT,
+                  password_salt TEXT,
+                  password_changed INTEGER,
+                  memberHandle TEXT
+                )
+              ''');
+              
+              // Copy data
+              await txn.execute('''
+                INSERT INTO users(memberId, phone, token, password_hash, password_salt, password_changed)
+                SELECT memberId, phone, token, password_hash, password_salt, password_changed
+                FROM users_backup
+              ''');
+              
+              // Clean up
+              await txn.execute('DROP TABLE users_backup');
+            });
+            Logger.data('Successfully recreated users table with memberHandle column');
+          } catch (e) {
+            Logger.error('Failed to recreate users table', e);
+            throw Exception('Failed to upgrade database: $e');
+          }
+        }
+      } else {
+        Logger.data('memberHandle column already exists');
       }
     }
 
@@ -109,7 +133,6 @@ class DatabaseHelper {
         phone TEXT NOT NULL,
         token TEXT NOT NULL,
         password_hash TEXT,
-        password_salt TEXT,
         password_changed INTEGER,
         memberHandle TEXT
       )
@@ -212,7 +235,6 @@ class DatabaseHelper {
           'phone': user.phone,
           'token': user.token,
           'password_hash': user.passwordHash,
-          'password_salt': user.passwordSalt,
           'password_changed': user.passwordChanged?.millisecondsSinceEpoch,
           'memberHandle': user.dashboard?.member.memberHandle,
         });
@@ -412,7 +434,6 @@ class DatabaseHelper {
         phone: userData['phone'] as String,
         token: userData['token'] as String,
         passwordHash: userData['password_hash'] as String?,
-        passwordSalt: userData['password_salt'] as String?,
         passwordChanged: userData['password_changed'] != null 
             ? DateTime.fromMillisecondsSinceEpoch(userData['password_changed'] as int)
             : null,

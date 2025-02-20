@@ -8,7 +8,11 @@ import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
 class LoginScreen extends StatefulWidget {
@@ -250,6 +254,54 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
+  Future<void> _doV1Login(String phoneNumber) async {
+    _spinController.repeat();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black26,
+      builder: (context) => LoadingDialog(
+        spinController: _spinController,
+        message: 'Verifying phone number...',
+      ),
+    );
+
+    final v1Result = await _repository.login(
+      phone: phoneNumber,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context); // Pop loading dialog
+    _spinController.stop();
+
+    v1Result.fold(
+      (v1Failure) {
+        _showErrorDialog(
+          'Failed to initialize verification. Please try again.',
+        );
+      },
+      (v1User) {
+        // Show success dialog for phone verification
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => SuccessDialog(
+            title: 'Phone Verified',
+            message: 'Your phone number has been verified. Please set up your password.',
+            onDismiss: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const SetupPasswordDialog(),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleLogin() async {
     Logger.interaction('[Login] Login button pressed');
     
@@ -297,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     Logger.interaction('[Login] Calling login API');
     Logger.performance('[Login] API call start: login');
     
-    final result = await _repository.login(
+    final result = await _repository.loginV2(
       phone: phoneNumber,
       password: password,
     );
@@ -321,9 +373,97 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       (failure) async {
         Logger.error('[Login] Login failed', failure);
         cleanup();
-        _showErrorDialog(
-          'We couldn\'t log you in. Please check your phone number and password, then try again.',
-        );
+
+        // Check if this is a PASSWORD_REQUIRED error
+        if (failure is AuthFailure && failure.isPasswordRequired) {
+          // Show loading while doing v1 login
+          _spinController.repeat();
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => LoadingDialog(
+              spinController: _spinController,
+              message: 'Initializing verification...',
+            ),
+          );
+
+          // Do v1 login first to get token
+          final v1Result = await _repository.login(phone: phoneNumber);
+
+          if (!mounted) return;
+          Navigator.pop(context); // Pop loading dialog
+          _spinController.stop();
+          
+          v1Result.fold(
+            (v1Failure) {
+              _showErrorDialog('Failed to initialize verification. Please try again.');
+            },
+            (v1User) async {
+              // Request OTP with loading dialog
+              _spinController.repeat();
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => LoadingDialog(
+                  spinController: _spinController,
+                  message: 'Sending verification code...',
+                ),
+              );
+
+              final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+              final otpResult = await _repository.requestOtp(
+                phone: sanitizedPhone,
+                purpose: 'PASSWORD_RESET',
+              );
+
+              if (!mounted) return;
+              Navigator.pop(context); // Pop loading dialog
+              _spinController.stop();
+
+              otpResult.fold(
+                (otpFailure) {
+                  _showErrorDialog('Failed to send verification code.');
+                },
+                (_) {
+                  // Show success dialog
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => SuccessDialog(
+                      title: 'Code Sent',
+                      message: 'A verification code has been sent to your phone number.',
+                      onDismiss: () {
+                        Navigator.pop(context);
+                        // Show OTP dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => OTPVerificationDialog(
+                            token: v1User.token,
+                            phone: phoneNumber,
+                            memberId: v1User.memberId,
+                            onVerified: () {
+                              Navigator.pop(context);
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const SetupPasswordDialog(),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        } else {
+          _showErrorDialog(
+            'We couldn\'t log you in. Please check your phone number and password, then try again.',
+          );
+        }
       },
       (user) async {
         Logger.interaction('[Login] Login successful');

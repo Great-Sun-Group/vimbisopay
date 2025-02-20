@@ -122,7 +122,7 @@ Starting home refresh:
     try {
       // Get stored user first
       final storedUser = await databaseHelper.getUser();
-      if (storedUser == null || storedUser.passwordHash == null || storedUser.passwordSalt == null) {
+      if (storedUser == null || storedUser.passwordHash == null) {
         emit(state.copyWith(
           status: HomeStatus.error,
           error: 'No stored credentials found',
@@ -132,10 +132,10 @@ Starting home refresh:
 
       _logger.i('Re-logging in to refresh token...');
       // Re-login with stored password hash to refresh token
-      final loginResult = await accountRepository.login(
+      // Re-login with stored password hash to refresh token
+      final loginResult = await accountRepository.loginV2(
         phone: storedUser.phone,
         passwordHash: storedUser.passwordHash,
-        passwordSalt: storedUser.passwordSalt,
       );
       _logger.i('Re-login completed');
       

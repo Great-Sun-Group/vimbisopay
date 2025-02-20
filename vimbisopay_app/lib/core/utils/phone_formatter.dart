@@ -2,6 +2,17 @@ import 'package:flutter/services.dart';
 import 'dart:math' show min;
 
 class PhoneNumberFormatter extends TextInputFormatter {
+  /// Sanitizes a phone number by:
+  /// - Removing any '+' prefix
+  /// - Removing all spaces
+  /// - Removing any other non-digit characters
+  /// 
+  /// Example:
+  /// "+353 834 140 208" -> "353834140208"
+  static String sanitizePhoneNumber(String phone) {
+    return phone.replaceAll(RegExp(r'[^\d]'), '');
+  }
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,

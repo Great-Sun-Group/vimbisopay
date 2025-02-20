@@ -18,6 +18,25 @@ class MockAccountRepository implements AccountRepository {
   MockAccountRepository({this.shouldSucceed = true});
 
   @override
+  Future<Either<Failure, User>> loginV2({
+    required String phone,
+    String? password,
+    String? passwordHash,
+    String? passwordSalt,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      const data = MockApiResponses.loginSuccess;
+      if (data['data'] == null) {
+        return const Left(InfrastructureFailure('Invalid data format'));
+      }
+      return Right(User.fromMap(data['data'] as Map<String, dynamic>));
+    } else {
+      return const Left(InfrastructureFailure('Invalid credentials'));
+    }
+  }
+
+  @override
   Future<Either<Failure, User>> login({
     required String phone,
     String? password,
@@ -103,22 +122,22 @@ class MockAccountRepository implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> acceptCredexBulk(List<String> credexIds) async {
-    await Future.delayed(const Duration(milliseconds: 10));
-    if (shouldSucceed) {
-      return const Right(true);
-    } else {
-      return const Left(InfrastructureFailure('Failed to accept credex bulk'));
-    }
-  }
-
-  @override
   Future<Either<Failure, bool>> acceptCredex(String credexId) async {
     await Future.delayed(const Duration(milliseconds: 10));
     if (shouldSucceed) {
       return const Right(true);
     } else {
       return const Left(InfrastructureFailure('Failed to accept credex'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> acceptCredexBulk(List<String> credexIds) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      return const Right(true);
+    } else {
+      return const Left(InfrastructureFailure('Failed to accept credex bulk'));
     }
   }
 
@@ -168,10 +187,10 @@ class MockAccountRepository implements AccountRepository {
 
   @override
   Future<Either<Failure, bool>> onboardMember({
-    required String phone,
-    required String password,
     required String firstName,
     required String lastName,
+    required String phone,
+    required String password,
   }) async {
     await Future.delayed(const Duration(milliseconds: 10));
     if (shouldSucceed) {
@@ -198,6 +217,52 @@ class MockAccountRepository implements AccountRepository {
       return const Right(true);
     } else {
       return const Left(InfrastructureFailure('Failed to save user'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> requestOtp({
+    required String phone,
+    required String purpose,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      return const Right(true);
+    } else {
+      return const Left(InfrastructureFailure('Failed to request OTP'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> verifyOtp({
+    required String token,
+    required String otp,
+    required String memberId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      return const Right(true);
+    } else {
+      return const Left(InfrastructureFailure('Failed to verify OTP'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, User>> setInitialPassword({
+    required String password,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 10));
+    if (shouldSucceed) {
+      return Right(User(
+        memberId: 'test-member-id',
+        phone: '+353834140206',
+        token: 'test-token',
+        passwordHash: 'test-hash',
+        passwordSalt: 'test-salt',
+        passwordChanged: DateTime.now(),
+      ));
+    } else {
+      return const Left(InfrastructureFailure('Failed to set initial password'));
     }
   }
 

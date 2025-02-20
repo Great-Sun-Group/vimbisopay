@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
@@ -304,11 +305,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
           messageController.add('Logging you in...');
           await Future.delayed(const Duration(milliseconds: 300));
           
-          // Attempt login
-          Logger.interaction('[CreateAccount] Calling login API');
-          Logger.performance('[CreateAccount] API call start: login');
+          // Attempt login with same password
+          Logger.interaction('[CreateAccount] Calling login v2 API');
+          Logger.performance('[CreateAccount] API call start: loginV2');
           
-          final loginResult = await _repository.login(
+          final loginResult = await _repository.loginV2(
             phone: phoneNumber,
             password: password,
           );

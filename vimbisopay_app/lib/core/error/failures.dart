@@ -23,3 +23,15 @@ class ServerFailure extends InfrastructureFailure {
 class ApplicationFailure extends Failure {
   const ApplicationFailure([super.message]);
 }
+
+// Authentication failures
+class AuthFailure extends InfrastructureFailure {
+  final String? code;
+  
+  const AuthFailure({
+    String? message,
+    this.code,
+  }) : super(message);
+
+  bool get isPasswordRequired => code == 'PASSWORD_REQUIRED';
+}

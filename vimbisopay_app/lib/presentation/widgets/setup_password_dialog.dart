@@ -3,20 +3,20 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
-class ChangePasswordDialog extends StatefulWidget {
-  const ChangePasswordDialog({super.key});
+class SetupPasswordDialog extends StatefulWidget {
+  const SetupPasswordDialog({super.key});
 
   @override
-  State<ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+  State<SetupPasswordDialog> createState() => _SetupPasswordDialogState();
 }
 
-class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
-  final _currentPasswordController = TextEditingController();
+class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _passwordService = PasswordService();
-  bool _isLoading = false;
+  bool _isLoading = false; // Keep this for future implementation
   String? _error;
   double _passwordStrength = 0.0;
   String _strengthText = 'Too weak';
@@ -30,7 +30,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
   @override
   void dispose() {
-    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -54,61 +53,79 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     });
   }
 
-  Future<void> _changePassword() async {
-    final currentPassword = _currentPasswordController.text;
+  Future<void> _setupPassword() async {
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    // Validation
-    if (currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      setState(() => _error = 'All fields are required');
-      return;
-    }
+    // Reset error state
+    setState(() {
+      _error = null;
+    });
 
-    if (!PasswordValidator.isValid(newPassword)) {
-      setState(() => _error = 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character');
+    // Validate passwords
+    if (newPassword.isEmpty || confirmPassword.isEmpty) {
+      setState(() {
+        _error = 'Please fill in both password fields';
+      });
       return;
     }
 
     if (newPassword != confirmPassword) {
-      setState(() => _error = 'New passwords do not match');
+      setState(() {
+        _error = 'Passwords do not match';
+      });
       return;
     }
 
-    try {
+    final validation = PasswordValidator.validatePassword(newPassword);
+    if (!validation.isValid) {
       setState(() {
-        _isLoading = true;
-        _error = null;
+        _error = validation.error;
       });
+      return;
+    }
 
-      // Verify current password
-      final isValid = await _passwordService.verifyPassword(
-        null, // username not needed for local verification
-        currentPassword,
-        null, // deviceId not needed for local verification
+    // Show loading state
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final repository = AccountRepositoryImpl();
+      final result = await repository.setInitialPassword(
+        password: newPassword,
       );
-      if (!isValid) {
-        setState(() {
-          _error = 'Current password is incorrect';
-          _isLoading = false;
-        });
-        return;
-      }
 
-      // Change password using the API
-      await _passwordService.changePassword(currentPassword, newPassword);
+      if (!mounted) return;
 
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+      result.fold(
+        (failure) {
+          setState(() {
+            _error = failure.message ?? 'Failed to set up password';
+            _isLoading = false;
+          });
+        },
+        (user) async {
+          // Save updated user to database
+          final databaseHelper = DatabaseHelper();
+          await databaseHelper.saveUser(user);
+          
+          if (!mounted) return;
+          
+          // Close dialog and navigate to auth screen
+          Navigator.pushReplacementNamed(
+            context,
+            '/auth',
+            arguments: user,
+          );
+        },
+      );
     } catch (e) {
-      Logger.error('Error changing password', e);
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to change password. Please try again.';
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = 'An error occurred: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
@@ -117,7 +134,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     return AlertDialog(
       backgroundColor: AppColors.surface,
       title: const Text(
-        'Change Password',
+        'Set Up Password',
         style: TextStyle(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.bold,
@@ -132,7 +149,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                 ),
                 SizedBox(height: 16),
                 Text(
-                  'Changing password...',
+                  'Setting up password...',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                   ),
@@ -144,6 +161,13 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Text(
+                    'Please set up a password for your account to continue.',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   if (_error != null)
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -159,16 +183,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _currentPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Current Password',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _newPasswordController,
@@ -204,12 +218,12 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                   TextField(
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(
-                      labelText: 'Confirm New Password',
+                      labelText: 'Confirm Password',
                       prefixIcon: Icon(Icons.lock_outline),
                     ),
                     obscureText: true,
                     textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _changePassword(),
+                    onSubmitted: (_) => _setupPassword(),
                   ),
                 ],
               ),
@@ -220,16 +234,16 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text(
-                  'Cancel',
+                  'Later',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                   ),
                 ),
               ),
               TextButton(
-                onPressed: _changePassword,
+                onPressed: _setupPassword,
                 child: const Text(
-                  'Change Password',
+                  'Set Password',
                   style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.bold,
