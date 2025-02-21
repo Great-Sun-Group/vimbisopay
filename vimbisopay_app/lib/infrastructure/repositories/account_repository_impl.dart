@@ -1219,20 +1219,15 @@ Response body: ${response.body}
           return const Left(InfrastructureFailure('Missing required user fields in response'));
         }
 
-        // Return user with v1 token and password info
-        final updatedUser = User(
-          memberId: memberId,
+        Logger.data('[SET_INITIAL_PASSWORD] Password set successfully, proceeding with v2 login');
+        
+        // Immediately perform v2 login with the new password hash
+        final loginResult = await loginV2(
           phone: formattedPhone,
-          token: token, // Keep original v1 token
           passwordHash: hashedPassword,
-          passwordChanged: DateTime.now(),
-          version: 'v1',
-          authMethod: 'phone_only',
-          otpVerified: true,
         );
 
-        Logger.data('Initial password set successfully');
-        return Right(updatedUser);
+        return loginResult;
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to set initial password';
         Logger.error('Failed to set initial password', errorMessage);
