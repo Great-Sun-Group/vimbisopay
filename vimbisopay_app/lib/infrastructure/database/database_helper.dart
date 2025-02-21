@@ -20,7 +20,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 12,
+      version: 13,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -35,6 +35,21 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 13) {
+      Logger.data('Starting database upgrade to version 13');
+      
+      // Add version, authMethod, and otpVerified columns
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN version TEXT');
+        await db.execute('ALTER TABLE users ADD COLUMN authMethod TEXT');
+        await db.execute('ALTER TABLE users ADD COLUMN otpVerified INTEGER DEFAULT 0');
+        Logger.data('Added version, authMethod, and otpVerified columns to users table');
+      } catch (e) {
+        Logger.error('Failed to add version and authMethod columns', e);
+        throw Exception('Failed to upgrade database: $e');
+      }
+    }
+
     if (oldVersion < 12) {
       Logger.data('Starting database upgrade to version 12');
       
@@ -68,14 +83,25 @@ class DatabaseHelper {
                   password_hash TEXT,
                   password_salt TEXT,
                   password_changed INTEGER,
-                  memberHandle TEXT
+                  memberHandle TEXT,
+                  version TEXT,
+                  authMethod TEXT,
+                  otpVerified INTEGER DEFAULT 0
                 )
               ''');
               
               // Copy data
               await txn.execute('''
-                INSERT INTO users(memberId, phone, token, password_hash, password_salt, password_changed)
-                SELECT memberId, phone, token, password_hash, password_salt, password_changed
+                INSERT INTO users(
+                  memberId, phone, token, password_hash, password_salt, 
+                  password_changed, memberHandle, version, authMethod, otpVerified
+                )
+                SELECT 
+                  memberId, phone, token, password_hash, password_salt,
+                  password_changed, memberHandle, 
+                  'v1' as version, 
+                  'phone_only' as authMethod,
+                  0 as otpVerified
                 FROM users_backup
               ''');
               
@@ -134,7 +160,10 @@ class DatabaseHelper {
         token TEXT NOT NULL,
         password_hash TEXT,
         password_changed INTEGER,
-        memberHandle TEXT
+        memberHandle TEXT,
+        version TEXT,
+        authMethod TEXT,
+        otpVerified INTEGER DEFAULT 0
       )
     ''');
     
@@ -218,10 +247,17 @@ class DatabaseHelper {
 
   Future<void> saveUser(User user) async {
     try {
+      Logger.data('[DATABASE] Starting saveUser operation for ${user.memberId}');
+      Logger.data('[DATABASE] User token: ${user.token}');
+      
       final Database db = await database;
       final processedCredexIds = <String>{};
+      
       await db.transaction((txn) async {
+        Logger.data('[DATABASE] Starting transaction');
+        
         // Delete existing data
+        Logger.data('[DATABASE] Clearing existing data');
         await txn.delete('pending_transactions');
         await txn.delete('balance_data');
         await txn.delete('accounts');
@@ -229,15 +265,21 @@ class DatabaseHelper {
         await txn.delete('member_tiers');
         await txn.delete('users');
 
+        Logger.data('[DATABASE] Inserting new user data');
         // Insert user data with memberHandle
-        await txn.insert('users', {
+        final userData = {
           'memberId': user.memberId,
           'phone': user.phone,
           'token': user.token,
           'password_hash': user.passwordHash,
           'password_changed': user.passwordChanged?.millisecondsSinceEpoch,
           'memberHandle': user.dashboard?.member.memberHandle,
-        });
+          'version': user.version,
+          'authMethod': user.authMethod,
+          'otpVerified': user.otpVerified ? 1 : 0,
+        };
+        Logger.data('[DATABASE] Inserting user data: ${userData.map((k, v) => MapEntry(k, k == 'token' ? '[REDACTED]' : v))}');
+        await txn.insert('users', userData);
 
         if (user.dashboard != null) {
           final dashboard = user.dashboard!;
@@ -309,12 +351,19 @@ class DatabaseHelper {
 
   Future<User?> getUser() async {
     try {
+      Logger.data('[DATABASE] Starting getUser operation');
       final Database db = await database;
+      
+      Logger.data('[DATABASE] Querying users table');
       final List<Map<String, dynamic>> users = await db.query('users', limit: 1);
       
-      if (users.isEmpty) return null;
+      if (users.isEmpty) {
+        Logger.data('[DATABASE] No user found in database');
+        return null;
+      }
       
       final userData = users.first;
+      Logger.data('[DATABASE] Found user with token: ${userData['token']}');
       final memberId = userData['memberId'] as String;
       
       final List<Map<String, dynamic>> tiers = await db.query(
@@ -429,7 +478,7 @@ class DatabaseHelper {
         );
       }
       
-      return User(
+      final user = User(
         memberId: memberId,
         phone: userData['phone'] as String,
         token: userData['token'] as String,
@@ -437,8 +486,16 @@ class DatabaseHelper {
         passwordChanged: userData['password_changed'] != null 
             ? DateTime.fromMillisecondsSinceEpoch(userData['password_changed'] as int)
             : null,
+        version: userData['version'] as String?,
+        authMethod: userData['authMethod'] as String?,
+        otpVerified: (userData['otpVerified'] as int? ?? 0) == 1,
         dashboard: dashboardData,
       );
+      
+      Logger.data('[DATABASE] Returning user with token: ${user.token}');
+      Logger.data('[DATABASE] User version: ${user.version}, authMethod: ${user.authMethod}');
+      
+      return user;
     } catch (e) {
       throw Exception('Failed to get user: $e');
     }

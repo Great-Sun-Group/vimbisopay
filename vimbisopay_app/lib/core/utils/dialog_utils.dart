@@ -12,7 +12,11 @@ class DialogUtils {
       showDialog(
         context: context,
         barrierDismissible: false, // User must choose an option
-        builder: (context) => const SetupPasswordDialog(),
+        builder: (context) => SetupPasswordDialog(
+          token: user.token,
+          memberId: user.memberId,
+          phone: user.phone,
+        ),
       );
     }
   }

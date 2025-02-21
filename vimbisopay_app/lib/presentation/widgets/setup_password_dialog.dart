@@ -5,7 +5,16 @@ import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class SetupPasswordDialog extends StatefulWidget {
-  const SetupPasswordDialog({super.key});
+  final String token;
+  final String memberId;
+  final String phone;
+
+  const SetupPasswordDialog({
+    super.key,
+    required this.token,
+    required this.memberId,
+    required this.phone,
+  });
 
   @override
   State<SetupPasswordDialog> createState() => _SetupPasswordDialogState();
@@ -91,6 +100,9 @@ class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
     try {
       final repository = ServiceLocator.accountRepository;
       final result = await repository.setInitialPassword(
+        token: widget.token,
+        memberId: widget.memberId,
+        phone: widget.phone,
         password: newPassword,
       );
 

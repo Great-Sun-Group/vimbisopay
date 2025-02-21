@@ -14,6 +14,7 @@ import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
 import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
+import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
@@ -44,9 +45,13 @@ class AccountRepositoryImpl implements AccountRepository {
     String? passwordHash,
   }) async {
     try {
+      // Format phone number before sending
+      final formattedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
+      Logger.data('[LOGIN_V2] Formatted phone number: $formattedPhone');
+
       final url = '$baseUrl/v2/login';
       final body = {
-        'phone': phone,
+        'phone': formattedPhone,
       };
 
       // For v2 login, we send phone and hashed password
@@ -602,11 +607,15 @@ class AccountRepositoryImpl implements AccountRepository {
       // Hash password before sending to server
       final hash = await _passwordService.hashPassword(password);
 
+      // Format phone number before sending
+      final formattedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
+      Logger.data('[ONBOARD_MEMBER] Formatted phone number: $formattedPhone');
+
       final url = '$baseUrl/onboardMember';
       final body = {
         'firstname': firstName,
         'lastname': lastName,
-        'phone': phone,
+        'phone': formattedPhone,
         'defaultDenom': 'CXX',
         'password': hash,
       };
@@ -662,9 +671,13 @@ class AccountRepositoryImpl implements AccountRepository {
     String? passwordHash,
   }) async {
     try {
+      // Format phone number before sending
+      final formattedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
+      Logger.data('[LOGIN] Formatted phone number: $formattedPhone');
+
       final url = '$baseUrl/login';
       final body = {
-        'phone': phone,
+        'phone': formattedPhone,
       };
 
       // For phone-only authentication, we don't send any password fields
@@ -1082,7 +1095,7 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> verifyOtp({
+  Future<Either<Failure, OtpVerificationResponse>> verifyOtp({
     required String token,
     required String otp,
     required String memberId,
@@ -1096,6 +1109,7 @@ class AccountRepositoryImpl implements AccountRepository {
         'purpose': 'PASSWORD_RESET',
       };
 
+      Logger.data('[SET_INITIAL_PASSWORD] Sending request...');
       final response = await _loggedRequest(
         () => _httpClient.post(
           Uri.parse(url),
@@ -1108,8 +1122,16 @@ class AccountRepositoryImpl implements AccountRepository {
         body: body,
       );
 
+      Logger.data('''
+[SET_INITIAL_PASSWORD] Response received:
+Status code: ${response.statusCode}
+Response body: ${response.body}
+''');
+
       if (response.statusCode == 200) {
-        return const Right(true);
+        Logger.data('[SET_INITIAL_PASSWORD] Request successful, parsing response');
+        final jsonResponse = json.decode(response.body);
+        return Right(OtpVerificationResponse.fromJson(jsonResponse));
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify OTP';
         return Left(InfrastructureFailure(errorMessage));
@@ -1121,22 +1143,36 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<Either<Failure, User>> setInitialPassword({
+    required String token,
+    required String memberId,
+    required String phone,
     required String password,
   }) async {
     try {
-      // Get current user to access token and phone
-      final user = await _databaseHelper.getUser();
-      if (user == null) {
-        return const Left(InfrastructureFailure('Not authenticated'));
-      }
-
+      Logger.data('[SET_INITIAL_PASSWORD] Starting password setup');
+      
       final url = '$baseUrl/setInitialPassword';
-      final headers = _authHeaders(user.token);
+      final headers = _authHeaders(token);
+      
+      // Format phone number
+      final formattedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phone);
+      
+      // Hash password and prepare body
+      final hashedPassword = await _passwordService.hashPassword(password);
       final body = {
-        'phone': user.phone,
-        'password': password,
+        'phone': formattedPhone,
+        'password': hashedPassword,
+        'memberID': memberId,
       };
 
+      Logger.data('''
+[SET_INITIAL_PASSWORD] Request details:
+URL: $url
+Headers: ${headers.map((k, v) => MapEntry(k, k == 'Authorization' ? 'Bearer [REDACTED]' : v))}
+Request body (redacted):
+${{'phone': formattedPhone, 'password': '[REDACTED]', 'memberID': memberId}}
+Using token from v1 login: ${token.substring(0, 10)}...
+''');
       final response = await _loggedRequest(
         () => _httpClient.post(
           Uri.parse(url),
@@ -1149,19 +1185,61 @@ class AccountRepositoryImpl implements AccountRepository {
         body: body,
       );
 
+      Logger.data('''
+[SET_INITIAL_PASSWORD] Response received:
+Status code: ${response.statusCode}
+Response body: ${response.body}
+''');
+
       if (response.statusCode == 200) {
-        // Now try to login with the new password to get updated user info
-        final loginResult = await loginV2(
-          phone: user.phone,
-          password: password,
+        final jsonResponse = json.decode(response.body);
+        Logger.data('[SET_INITIAL_PASSWORD] Response parsed successfully');
+        
+        if (!jsonResponse.containsKey('data')) {
+          Logger.error('[SET_INITIAL_PASSWORD] Invalid response format: Missing data field');
+          return const Left(InfrastructureFailure('Invalid response format: Missing data field'));
+        }
+        
+        if (!jsonResponse['data'].containsKey('action')) {
+          Logger.error('[SET_INITIAL_PASSWORD] Invalid response format: Missing action field');
+          return const Left(InfrastructureFailure('Invalid response format: Missing action field'));
+        }
+        
+        if (!jsonResponse['data']['action'].containsKey('details')) {
+          Logger.error('[SET_INITIAL_PASSWORD] Invalid response format: Missing details field');
+          return const Left(InfrastructureFailure('Invalid response format: Missing details field'));
+        }
+
+        final actionDetails = jsonResponse['data']['action']['details'];
+        final memberId = actionDetails['memberID']?.toString();
+        final userPhone = actionDetails['phone']?.toString();
+        final token = actionDetails['token']?.toString();
+
+        if (memberId == null || userPhone == null || token == null) {
+          return const Left(InfrastructureFailure('Missing required user fields in response'));
+        }
+
+        // Return user with v1 token and password info
+        final updatedUser = User(
+          memberId: memberId,
+          phone: formattedPhone,
+          token: token, // Keep original v1 token
+          passwordHash: hashedPassword,
+          passwordChanged: DateTime.now(),
+          version: 'v1',
+          authMethod: 'phone_only',
+          otpVerified: true,
         );
 
-        return loginResult;
+        Logger.data('Initial password set successfully');
+        return Right(updatedUser);
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to set initial password';
+        Logger.error('Failed to set initial password', errorMessage);
         return Left(InfrastructureFailure(errorMessage));
       }
     } catch (e) {
+      Logger.error('Error setting initial password', e);
       return Left(InfrastructureFailure(e.toString()));
     }
   }

@@ -7,6 +7,7 @@ import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> loginV2({
@@ -82,7 +83,7 @@ abstract class AccountRepository {
   /// [token] The v1 token to use for verification
   /// [otp] The OTP code to verify
   /// [memberId] The member ID to verify the OTP for
-  Future<Either<Failure, bool>> verifyOtp({
+  Future<Either<Failure, OtpVerificationResponse>> verifyOtp({
     required String token,
     required String otp,
     required String memberId,
@@ -90,8 +91,14 @@ abstract class AccountRepository {
 
   /// Set the initial password for a user
   /// 
+  /// [token] The v1 token to use for authentication
+  /// [memberId] The member ID to set the password for
+  /// [phone] The phone number associated with the account
   /// [password] The password to set
   Future<Either<Failure, User>> setInitialPassword({
+    required String token,
+    required String memberId,
+    required String phone,
     required String password,
   });
 }

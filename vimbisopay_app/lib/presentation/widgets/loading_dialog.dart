@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
-class LoadingDialog extends StatelessWidget {
+class LoadingDialog extends StatefulWidget {
   final AnimationController spinController;
   final String message;
   final Stream<String>? messageStream;
@@ -12,6 +13,35 @@ class LoadingDialog extends StatelessWidget {
     required this.message,
     this.messageStream,
   });
+
+  @override
+  State<LoadingDialog> createState() => _LoadingDialogState();
+}
+
+class _LoadingDialogState extends State<LoadingDialog> {
+  late String _currentMessage;
+  StreamSubscription<String>? _messageSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentMessage = widget.message;
+    if (widget.messageStream != null) {
+      _messageSubscription = widget.messageStream!.listen((message) {
+        if (mounted) {
+          setState(() {
+            _currentMessage = message;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,30 +56,14 @@ class LoadingDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             RotationTransition(
-              turns: spinController,
+              turns: widget.spinController,
               child: const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             ),
             const SizedBox(height: 16),
-            if (messageStream != null)
-              StreamBuilder<String>(
-                stream: messageStream,
-                initialData: message,
-                builder: (context, snapshot) {
-                  return Text(
-                    snapshot.data ?? message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textPrimary,
-                    ),
-                  );
-                },
-              )
-            else
-              Text(
-                message,
+            Text(
+                _currentMessage,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 16,

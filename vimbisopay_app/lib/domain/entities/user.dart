@@ -110,4 +110,18 @@ class User {
         passwordChanged,
         dashboard,
       );
+
+  @override
+  String toString() {
+    return '''User {
+  memberId: $memberId,
+  phone: $phone,
+  otpVerified: $otpVerified,
+  version: $version,
+  authMethod: $authMethod,
+  passwordHash: ${passwordHash != null ? '[REDACTED]' : 'null'},
+  passwordChanged: $passwordChanged,
+  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'}
+}''';
+  }
 }

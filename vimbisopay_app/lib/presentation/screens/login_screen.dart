@@ -292,7 +292,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const SetupPasswordDialog(),
+                builder: (context) => SetupPasswordDialog(
+                  token: v1User.token,
+                  memberId: v1User.memberId,
+                  phone: phoneNumber,
+                ),
               );
             },
           ),
@@ -434,23 +438,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       onDismiss: () {
                         Navigator.pop(context);
                         // Show OTP dialog
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => OTPVerificationDialog(
-                            token: v1User.token,
-                            phone: phoneNumber,
-                            memberId: v1User.memberId,
-                            onVerified: () {
-                              Navigator.pop(context);
+                              // Show OTP dialog with stored password
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => const SetupPasswordDialog(),
+                                builder: (context) => OTPVerificationDialog(
+                                  token: v1User.token,
+                                  phone: phoneNumber,
+                                  memberId: v1User.memberId,
+                                  password: password,
+                                ),
                               );
-                            },
-                          ),
-                        );
                       },
                     ),
                   );
