@@ -113,3 +113,6 @@ Example entry format:
 -e 
 ## [1.0.0+35] - 2025-02-03
 - Bug fixes and optimisations
+-e 
+## [1.0.0+36] - 2025-02-22
+- onboarding verification and optimisations
