@@ -1239,6 +1239,68 @@ Response body: ${response.body}
     }
   }
 
+  @override
+  Future<Either<Failure, bool>> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    return _executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/updatePassword';
+        final headers = _authHeaders(token);
+
+        // Get current user to verify password hash
+        final user = await _databaseHelper.getUser();
+        if (user == null) {
+          return const Left(InfrastructureFailure('Not authenticated'));
+        }
+
+        // Hash both passwords
+        final currentHash = await _passwordService.hashPassword(currentPassword);
+        final newHash = await _passwordService.hashPassword(newPassword);
+
+        // Verify current password matches stored hash
+        if (user.passwordHash != null && currentHash != user.passwordHash) {
+          return const Left(AuthFailure(
+            message: 'Current password is incorrect',
+            code: 'INVALID_PASSWORD',
+          ));
+        }
+
+        final body = {
+          'currentPassword': currentHash,
+          'newPassword': newHash,
+        };
+
+        final response = await _loggedRequest(
+          () => _httpClient.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          // Update stored password hash
+          final updatedUser = user.copyWith(
+            passwordHash: newHash,
+            passwordChanged: DateTime.now(),
+          );
+          await _databaseHelper.saveUser(updatedUser);
+          
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to update password';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
   Future<Either<Failure, RecurringResponse>> createRecurring(
       RecurringRequest request) async {
     Logger.data('Creating Recurring request: ${request.toJson()}');

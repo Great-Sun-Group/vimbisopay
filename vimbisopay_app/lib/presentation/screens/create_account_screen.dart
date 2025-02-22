@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
@@ -268,6 +269,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       Logger.interaction('[CreateAccount] Calling onboardMember API');
       Logger.performance('[CreateAccount] API call start: onboardMember');
       
+      // Create account with v2 endpoint
       final result = await _repository.onboardMember(
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
@@ -292,49 +294,109 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
           }
 
           Logger.interaction('[CreateAccount] Account created successfully');
-          Logger.interaction('[CreateAccount] Attempting login');
+          Logger.interaction('[CreateAccount] Attempting v2 login');
           
-          if (!mounted) {
-            cleanup();
-            return;
-          }
-
-          // Update to login message with fade
-          Logger.interaction('[CreateAccount] Updating to login message');
-          messageController.add('Logging you in...');
-          await Future.delayed(const Duration(milliseconds: 300));
-          
-          // Attempt login with same password
-          Logger.interaction('[CreateAccount] Calling login v2 API');
-          Logger.performance('[CreateAccount] API call start: loginV2');
-          
+          // Get v2 login response after successful onboarding
           final loginResult = await _repository.loginV2(
             phone: phoneNumber,
             password: password,
           );
 
           if (!mounted) return;
-
-          Logger.performance('[CreateAccount] API call complete: login');
+          
+          Logger.performance('[CreateAccount] API call complete: loginV2');
           loginResult.fold(
-            (failure) async {
-              Logger.error('[CreateAccount] Login failed after account creation', failure);
-              await Future.delayed(const Duration(milliseconds: 300));
+            (failure) {
               cleanup();
-              _showError('Account created but login failed. Please try logging in manually.');
+              _showError(failure.message ?? 'Failed to create account');
             },
             (user) async {
-              Logger.interaction('[CreateAccount] Login successful');
-              Logger.interaction('[CreateAccount] Navigating to security setup');
-              await Future.delayed(const Duration(milliseconds: 300));
-              cleanup();
+              Logger.interaction('[CreateAccount] Account created and logged in successfully');
               
-              if (mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/security-setup',
-                  (route) => false,
-                  arguments: user,
+              // Save complete user object with dashboard
+              Logger.data('[CreateAccount] Saving complete user object with dashboard');
+              final hashedPassword = await ServiceLocator.passwordService.hashPassword(password);
+              final userToSave = user.copyWith(
+                passwordHash: hashedPassword,
+                passwordChanged: DateTime.now(),
+              );
+              
+              final saveResult = await _repository.saveUser(userToSave);
+              
+              if (!mounted) return;
+              
+              // Handle save failure
+              if (saveResult.isLeft()) {
+                Logger.error('[CreateAccount] Failed to save user');
+                cleanup();
+                _showError('Failed to save account. Please try again.');
+                return;
+              }
+              
+              Logger.data('[CreateAccount] User saved successfully with dashboard data');
+              
+              if (!user.otpVerified) {
+                Logger.interaction('[CreateAccount] OTP verification required');
+                messageController.add('Sending verification code...');
+                await Future.delayed(const Duration(milliseconds: 300));
+                
+                // Request OTP for verification
+                final otpResult = await _repository.requestOtp(
+                  phone: phoneNumber,
+                  purpose: 'PASSWORD_RESET',
                 );
+
+                if (!mounted) return;
+
+                otpResult.fold(
+                  (failure) {
+                    Logger.error('[CreateAccount] OTP request failed', failure);
+                    cleanup();
+                    _showError('Failed to send verification code. Please try again.');
+                  },
+                  (_) {
+                    Logger.interaction('[CreateAccount] OTP sent successfully');
+                    cleanup();
+                    
+                    if (mounted) {
+                      // Show OTP verification flow
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => OTPVerificationFlow(
+                          token: user.token,
+                          phone: phoneNumber,
+                          memberId: user.memberId,
+                          password: password,
+                          isAccountCreation: true,
+                          user: userToSave, // Pass the complete user object
+                          onVerificationComplete: (verifiedUser) {
+                            Logger.interaction('[CreateAccount] OTP verification complete');
+                            Logger.interaction('[CreateAccount] Navigating to security setup');
+                            
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/security-setup',
+                              (route) => false,
+                              arguments: verifiedUser,
+                            );
+                          },
+                        ),
+                      );
+                    }
+                  },
+                );
+              } else {
+                Logger.interaction('[CreateAccount] User already verified, navigating to security setup');
+                await Future.delayed(const Duration(milliseconds: 300));
+                cleanup();
+                
+                if (mounted) {
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/security-setup',
+                    (route) => false,
+                    arguments: user,
+                  );
+                }
               }
             },
           );

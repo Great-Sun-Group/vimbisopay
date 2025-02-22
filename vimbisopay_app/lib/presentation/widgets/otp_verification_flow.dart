@@ -13,6 +13,8 @@ class OTPVerificationFlow extends StatefulWidget {
   final String phone;
   final String memberId;
   final User? user; // Optional user object for v2 flow
+  final String? password; // Optional password for v1->v2 migration
+  final bool isAccountCreation; // Flag to indicate if this is for account creation
   final Function(User) onVerificationComplete;
 
   const OTPVerificationFlow({
@@ -22,6 +24,8 @@ class OTPVerificationFlow extends StatefulWidget {
     required this.memberId,
     required this.onVerificationComplete,
     this.user,
+    this.password,
+    this.isAccountCreation = false,
   });
 
   @override
@@ -110,56 +114,77 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
               throw Exception('OTP verification failed according to response');
             }
 
-            // For v2 login flow, we already have a user object
-            if (widget.user != null) {
-              // Update user with otpVerified status
-              final verifiedUser = widget.user!.copyWith(
-                otpVerified: true,
-              );
-              
-              // Save updated user
-              await _repository.saveUser(verifiedUser);
-              
-              // Pop loading dialog
-              Navigator.of(dialogContext).pop();
-              
-              // Complete verification
-              widget.onVerificationComplete(verifiedUser);
-            } else {
-              // For v1->v2 migration flow, we need to set initial password
-              // Keep spinner running and update message
-              _messageController.add('Completing verification...');
-              
-              // Format phone number
-              final formattedPhone = PhoneNumberFormatter.sanitizePhoneNumber(widget.phone);
-              
-              final loginResult = await _repository.loginV2(
-                phone: formattedPhone,
-                passwordHash: widget.user?.passwordHash,
-              );
+              // Handle different flows based on context
+              if (widget.user != null) {
+                // For v2 login flow, we already have a user object
+                final verifiedUser = widget.user!.copyWith(
+                  otpVerified: true,
+                );
+                
+                // Save updated user
+                await _repository.saveUser(verifiedUser);
+                
+                // Pop loading dialog
+                Navigator.of(dialogContext).pop();
+                
+                // Complete verification
+                widget.onVerificationComplete(verifiedUser);
+              } else if (widget.isAccountCreation) {
+                // For account creation flow, preserve full user data and just update otpVerified
+                if (widget.user == null) {
+                  throw Exception('User object is required for account creation flow');
+                }
+                
+                final verifiedUser = widget.user!.copyWith(
+                  otpVerified: true,
+                );
+                
+                // Save user with all data preserved
+                await _repository.saveUser(verifiedUser);
+                
+                // Pop loading dialog
+                Navigator.of(dialogContext).pop();
+                
+                // Complete verification
+                widget.onVerificationComplete(verifiedUser);
+              } else {
+                // For v1->v2 migration flow, we need to set initial password
+                // Keep spinner running and update message
+                _messageController.add('Setting up password...');
 
-              if (!mounted) return;
+                if (widget.password == null) {
+                  throw Exception('Password is required for v1->v2 migration');
+                }
+                
+                final setPasswordResult = await _repository.setInitialPassword(
+                  token: widget.token,
+                  memberId: widget.memberId,
+                  phone: widget.phone,
+                  password: widget.password!,
+                );
 
-              loginResult.fold(
-                (failure) {
-                  Logger.error('Failed to complete v2 login', failure);
-                  Navigator.of(dialogContext).pop();
-                  setState(() {
-                    _error = failure.message ?? 'Failed to complete verification';
-                    _isLoading = false;
-                  });
-                },
-                (user) {
-                  Logger.interaction('V2 login completed successfully');
-                  
-                  // Pop loading dialog
-                  Navigator.of(dialogContext).pop();
-                  
-                  // Complete verification
-                  widget.onVerificationComplete(user);
-                },
-              );
-            }
+                if (!mounted) return;
+
+                setPasswordResult.fold(
+                  (failure) {
+                    Logger.error('Failed to set initial password', failure);
+                    Navigator.of(dialogContext).pop();
+                    setState(() {
+                      _error = failure.message ?? 'Failed to set password';
+                      _isLoading = false;
+                    });
+                  },
+                  (user) {
+                    Logger.interaction('Password setup completed successfully');
+                    
+                    // Pop loading dialog
+                    Navigator.of(dialogContext).pop();
+                    
+                    // Complete verification with v2 user
+                    widget.onVerificationComplete(user);
+                  },
+                );
+              }
           } catch (e) {
             Logger.error('Error completing verification', e);
             if (!mounted) return;

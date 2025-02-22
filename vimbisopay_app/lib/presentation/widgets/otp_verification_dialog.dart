@@ -21,6 +21,7 @@ class OTPVerificationDialog extends StatelessWidget {
       token: token,
       phone: phone,
       memberId: memberId,
+      password: password,
       onVerificationComplete: (user) {
         // Navigate to auth screen
         Navigator.pushReplacementNamed(

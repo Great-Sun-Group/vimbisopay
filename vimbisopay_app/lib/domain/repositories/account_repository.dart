@@ -69,6 +69,15 @@ abstract class AccountRepository {
 
   Future<Either<Failure, RecurringResponse>> createRecurring(RecurringRequest request);
 
+  /// Updates a member's password after validating their current password
+  /// 
+  /// [currentPassword] The current password
+  /// [newPassword] The new password that meets complexity requirements
+  Future<Either<Failure, bool>> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
   /// Request an OTP for a specific purpose
   /// 
   /// [phone] The phone number to send the OTP to
