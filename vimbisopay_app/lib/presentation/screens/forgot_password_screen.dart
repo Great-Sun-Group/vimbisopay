@@ -7,7 +7,7 @@ import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
-import 'package:vimbisopay_app/presentation/widgets/reset_password_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'dart:async' show unawaited;
 
@@ -142,21 +142,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
           // Close OTP dialog
           Navigator.pop(context);
           
-          // Show reset password dialog with reset token
-          showDialog(
+          // Show reset password bottom sheet
+          showModalBottomSheet(
             context: context,
-            barrierDismissible: false,
-            builder: (context) => ResetPasswordFlow(
+            isScrollControlled: true,
+            isDismissible: false,
+            enableDrag: false,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            builder: (context) => ChangePasswordBottomSheet(
               resetToken: response.details.resetToken,
-              phone: phone,
               memberId: response.details.memberId,
-              onResetComplete: () {
-                // Navigate back to login with success message
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/auth',
-                  (route) => false,
-                );
-              },
             ),
           );
         },

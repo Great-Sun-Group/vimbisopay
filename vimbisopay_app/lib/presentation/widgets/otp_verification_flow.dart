@@ -301,7 +301,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Please enter the 6-digit code sent to your phone number to verify your account.',
+                    'Please enter the 6-digit code sent to your Whatsapp phone number to verify your account.',
                     style: TextStyle(
                       color: AppColors.textPrimary,
                     ),

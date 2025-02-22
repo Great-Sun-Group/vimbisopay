@@ -435,7 +435,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     barrierDismissible: false,
                     builder: (context) => SuccessDialog(
                       title: 'Code Sent',
-                      message: 'A verification code has been sent to your phone number.',
+                      message: 'A verification code has been sent to your Whatsapp phone number.',
                       onDismiss: () {
                         Navigator.pop(context);
                         // Show OTP dialog

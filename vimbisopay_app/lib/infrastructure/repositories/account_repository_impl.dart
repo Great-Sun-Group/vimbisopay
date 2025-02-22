@@ -616,7 +616,7 @@ class AccountRepositoryImpl implements AccountRepository {
         'firstname': firstName,
         'lastname': lastName,
         'phone': formattedPhone,
-        'defaultDenom': 'CXX',
+        'defaultDenom': 'USD',
         'password': hash,
       };
 
