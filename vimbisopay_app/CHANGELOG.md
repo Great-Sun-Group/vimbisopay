@@ -116,3 +116,6 @@ Example entry format:
 -e 
 ## [1.0.0+36] - 2025-02-22
 - onboarding verification and optimisations
+-e 
+## [1.0.0+37] - 2025-02-22
+- Onboarding phone verification / change password / reset password and pin
