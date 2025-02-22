@@ -11,6 +11,7 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
 import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
@@ -464,16 +465,77 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       },
       (user) async {
         Logger.interaction('[Login] Login successful');
-        Logger.interaction('[Login] Saving user data');
-        await _databaseHelper.saveUser(user);
         
-        if (mounted) {
-          Logger.interaction('[Login] Navigating to auth screen');
-          Navigator.pushReplacementNamed(
-            context,
-            '/auth',
-            arguments: user,
+        // Check if OTP verification is needed
+        if (user.version == 'v2' && user.authMethod == 'password' && !user.otpVerified) {
+          Logger.interaction('[Login] OTP verification required');
+          cleanup();
+          
+          // Request OTP
+          _spinController.repeat();
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => LoadingDialog(
+              spinController: _spinController,
+              message: 'Sending verification code...',
+            ),
           );
+
+          final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+          final otpResult = await _repository.requestOtp(
+            phone: sanitizedPhone,
+            purpose: 'PASSWORD_RESET',
+          );
+
+          if (!mounted) return;
+          Navigator.pop(context); // Pop loading dialog
+          _spinController.stop();
+
+          otpResult.fold(
+            (otpFailure) {
+              _showErrorDialog('Failed to send verification code.');
+            },
+            (_) {
+              // Show OTP verification flow
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => OTPVerificationFlow(
+                  token: user.token,
+                  phone: phoneNumber,
+                  memberId: user.memberId,
+                  user: user,
+                  onVerificationComplete: (verifiedUser) async {
+                    // Save verified user
+                    await _databaseHelper.saveUser(verifiedUser);
+                    
+                    if (mounted) {
+                      // Navigate to auth screen
+                      Navigator.pushReplacementNamed(
+                        context,
+                        '/auth',
+                        arguments: verifiedUser,
+                      );
+                    }
+                  },
+                ),
+              );
+            },
+          );
+        } else {
+          // No OTP verification needed, proceed normally
+          Logger.interaction('[Login] Saving user data');
+          await _databaseHelper.saveUser(user);
+          
+          if (mounted) {
+            Logger.interaction('[Login] Navigating to auth screen');
+            Navigator.pushReplacementNamed(
+              context,
+              '/auth',
+              arguments: user,
+            );
+          }
         }
       },
     );
