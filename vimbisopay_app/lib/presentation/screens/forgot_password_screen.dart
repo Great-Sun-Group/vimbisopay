@@ -5,7 +5,10 @@ import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/reset_password_flow.dart';
+import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'dart:async' show unawaited;
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -21,7 +24,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
   final _phoneController = TextEditingController();
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _isSubmitted = false;
   final Map<String, String?> _fieldErrors = {
     'phone': null,
   };
@@ -129,74 +131,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     );
   }
 
-  Widget _buildSuccessContent() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildHeaderBanner(),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.success.withOpacity(0.2),
+  void _showOtpVerification(String phone, String memberId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PasswordResetOTPFlow(
+        phone: phone,
+        memberId: memberId,
+        onVerificationComplete: (response) {
+          // Close OTP dialog
+          Navigator.pop(context);
+          
+          // Show reset password dialog with reset token
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => ResetPasswordFlow(
+              resetToken: response.details.resetToken,
+              phone: phone,
+              memberId: response.details.memberId,
+              onResetComplete: () {
+                // Navigate back to login with success message
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/auth',
+                  (route) => false,
+                );
+              },
             ),
-          ),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                color: AppColors.success,
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Instructions Sent!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We\'ve sent password reset instructions to +${_phoneController.text}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.4,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: FilledButton(
-            onPressed: () {
-              Logger.interaction('Returning to login from forgot password success');
-              Navigator.of(context).pop();
-            },
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Return to Login',
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 
@@ -297,11 +261,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
           cleanup();
           _showError(failure.message ?? 'Failed to send reset instructions. Please try again.');
         },
-        (_) {
+        (response) {
           cleanup();
-          setState(() {
-            _isSubmitted = true;
-          });
+          final memberId = response['data']?['action']?['details']?['memberID'];
+          if (memberId == null) {
+            _showError('Failed to get member ID from response');
+            return;
+          }
+          Logger.data('[ForgotPassword] Got memberId from response: $memberId');
+          // Show OTP verification dialog with memberId
+          _showOtpVerification(sanitizedPhone, memberId);
         },
       );
     } catch (e) {
@@ -319,17 +288,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
 
   @override
   Widget build(BuildContext context) {
-    if (_isSubmitted) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: _buildSuccessContent(),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

@@ -6,33 +6,25 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 
-class OTPVerificationFlow extends StatefulWidget {
-  final String token;
+class PasswordResetOTPFlow extends StatefulWidget {
   final String phone;
   final String memberId;
-  final User? user; // Optional user object for v2 flow
-  final String? password; // Optional password for v1->v2 migration
-  final bool isAccountCreation; // Flag to indicate if this is for account creation
-  final Function(User) onVerificationComplete;
+  final Function(OtpVerificationResponse) onVerificationComplete;
 
-  const OTPVerificationFlow({
+  const PasswordResetOTPFlow({
     super.key,
-    required this.token,
     required this.phone,
     required this.memberId,
     required this.onVerificationComplete,
-    this.user,
-    this.password,
-    this.isAccountCreation = false,
   });
 
   @override
-  State<OTPVerificationFlow> createState() => _OTPVerificationFlowState();
+  State<PasswordResetOTPFlow> createState() => _PasswordResetOTPFlowState();
 }
 
-class _OTPVerificationFlowState extends State<OTPVerificationFlow>
+class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow>
     with SingleTickerProviderStateMixin {
   final _otpController = TextEditingController();
   final _repository = ServiceLocator.accountRepository;
@@ -41,6 +33,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
   bool _isResending = false;
   late AnimationController _spinController;
   final _messageController = StreamController<String>.broadcast();
+  String? _memberId;
 
   @override
   void initState() {
@@ -50,6 +43,9 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
       vsync: this,
       animationBehavior: AnimationBehavior.preserve,
     );
+    
+    // Initialize memberId from props
+    _memberId = widget.memberId;
   }
 
   @override
@@ -90,10 +86,10 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
 
     try {
       final result = await _repository.verifyOtp(
-        token: widget.token,
+        token: '', // Empty token for password reset flow
         otp: otp,
-        memberId: widget.memberId,
-        purpose: widget.isAccountCreation ? 'PASSWORD_RESET' : 'PASSWORD_RESET',
+        purpose: 'PASSWORD_RESET',
+        memberId: _memberId,
       );
 
       if (!mounted) return;
@@ -115,77 +111,11 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
               throw Exception('OTP verification failed according to response');
             }
 
-              // Handle different flows based on context
-              if (widget.user != null) {
-                // For v2 login flow, we already have a user object
-                final verifiedUser = widget.user!.copyWith(
-                  otpVerified: true,
-                );
-                
-                // Save updated user
-                await _repository.saveUser(verifiedUser);
-                
-                // Pop loading dialog
-                Navigator.of(dialogContext).pop();
-                
-                // Complete verification
-                widget.onVerificationComplete(verifiedUser);
-              } else if (widget.isAccountCreation) {
-                // For account creation flow, preserve full user data and just update otpVerified
-                if (widget.user == null) {
-                  throw Exception('User object is required for account creation flow');
-                }
-                
-                final verifiedUser = widget.user!.copyWith(
-                  otpVerified: true,
-                );
-                
-                // Save user with all data preserved
-                await _repository.saveUser(verifiedUser);
-                
-                // Pop loading dialog
-                Navigator.of(dialogContext).pop();
-                
-                // Complete verification
-                widget.onVerificationComplete(verifiedUser);
-              } else {
-                // For v1->v2 migration flow, we need to set initial password
-                // Keep spinner running and update message
-                _messageController.add('Setting up password...');
-
-                if (widget.password == null) {
-                  throw Exception('Password is required for v1->v2 migration');
-                }
-                
-                final setPasswordResult = await _repository.setInitialPassword(
-                  token: widget.token,
-                  memberId: widget.memberId,
-                  phone: widget.phone,
-                  password: widget.password!,
-                );
-
-                if (!mounted) return;
-
-                setPasswordResult.fold(
-                  (failure) {
-                    Logger.error('Failed to set initial password', failure);
-                    Navigator.of(dialogContext).pop();
-                    setState(() {
-                      _error = failure.message ?? 'Failed to set password';
-                      _isLoading = false;
-                    });
-                  },
-                  (user) {
-                    Logger.interaction('Password setup completed successfully');
-                    
-                    // Pop loading dialog
-                    Navigator.of(dialogContext).pop();
-                    
-                    // Complete verification with v2 user
-                    widget.onVerificationComplete(user);
-                  },
-                );
-              }
+            // Pop loading dialog
+            Navigator.of(dialogContext).pop();
+            
+            // Complete verification with response
+            widget.onVerificationComplete(response);
           } catch (e) {
             Logger.error('Error completing verification', e);
             if (!mounted) return;
@@ -223,7 +153,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
       barrierColor: Colors.black26,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
-        message: 'Resending verification code...',
+        message: _isResending ? 'Resending verification code...' : 'Sending verification code...',
         messageStream: _messageController.stream,
       ),
     );
@@ -245,10 +175,17 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
             _error = failure.message ?? 'Failed to resend OTP';
           });
         },
-        (_) {
+        (response) {
+          // Store memberId from response
+          if (response['data']?['action']?['details']?['memberID'] != null) {
+            setState(() {
+              _memberId = response['data']['action']['details']['memberID'];
+            });
+            Logger.data('[REQUEST_OTP] Stored memberId: $_memberId');
+          }
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP has been resent'),
+            SnackBar(
+              content: Text(_isResending ? 'OTP has been resent' : 'OTP has been sent'),
               backgroundColor: AppColors.success,
             ),
           );

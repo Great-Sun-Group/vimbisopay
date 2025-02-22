@@ -82,7 +82,8 @@ abstract class AccountRepository {
   /// 
   /// [phone] The phone number to send the OTP to
   /// [purpose] The purpose of the OTP (e.g. 'PASSWORD_RESET')
-  Future<Either<Failure, bool>> requestOtp({
+  /// Returns the full response containing memberId in data.action.details
+  Future<Either<Failure, Map<String, dynamic>>> requestOtp({
     required String phone,
     required String purpose,
   });
@@ -91,11 +92,13 @@ abstract class AccountRepository {
   /// 
   /// [token] The v1 token to use for verification
   /// [otp] The OTP code to verify
-  /// [memberId] The member ID to verify the OTP for
+  /// [memberId] The member ID to verify the OTP for (optional for password reset)
+  /// [purpose] The purpose of the OTP verification (e.g. 'PASSWORD_RESET')
   Future<Either<Failure, OtpVerificationResponse>> verifyOtp({
     required String token,
     required String otp,
-    required String memberId,
+    required String purpose,
+    String? memberId,
   });
 
   /// Set the initial password for a user
@@ -109,5 +112,19 @@ abstract class AccountRepository {
     required String memberId,
     required String phone,
     required String password,
+  });
+
+  /// Reset a member's password using a reset token
+  /// 
+  /// [resetToken] The token obtained from OTP verification
+  // /// [newPassword] The new password to set
+  // Future<Either<Failure, User>> resetPassword({
+  //   required String resetToken,
+  //   required String newPassword,
+  // });
+
+  Future<bool> resetPassword({
+    required String resetToken,
+    required String newPassword,
   });
 }

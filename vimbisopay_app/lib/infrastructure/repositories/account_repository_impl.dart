@@ -1059,7 +1059,7 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   @override
-  Future<Either<Failure, bool>> requestOtp({
+  Future<Either<Failure, Map<String, dynamic>>> requestOtp({
     required String phone,
     required String purpose,
   }) async {
@@ -1084,7 +1084,8 @@ class AccountRepositoryImpl implements AccountRepository {
       );
 
       if (response.statusCode == 200) {
-        return const Right(true);
+        final jsonResponse = json.decode(response.body);
+        return Right(jsonResponse);
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to request OTP';
         return Left(InfrastructureFailure(errorMessage));
@@ -1098,18 +1099,23 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, OtpVerificationResponse>> verifyOtp({
     required String token,
     required String otp,
-    required String memberId,
+    required String purpose,
+    String? memberId,
   }) async {
     try {
       final url = '$baseUrl/verify/verifyOtp';
       final headers = _authHeaders(token);
       final body = {
-        'memberID': memberId,
         'otp': otp,
-        'purpose': 'PASSWORD_RESET',
+        'purpose': purpose,
       };
 
-      Logger.data('[SET_INITIAL_PASSWORD] Sending request...');
+      // Only include memberId if provided
+      if (memberId != null) {
+        body['memberID'] = memberId;
+      }
+
+      Logger.data('[VERIFY_OTP] Sending request...');
       final response = await _loggedRequest(
         () => _httpClient.post(
           Uri.parse(url),
@@ -1123,13 +1129,13 @@ class AccountRepositoryImpl implements AccountRepository {
       );
 
       Logger.data('''
-[SET_INITIAL_PASSWORD] Response received:
+[VERIFY_OTP] Response received:
 Status code: ${response.statusCode}
 Response body: ${response.body}
 ''');
 
       if (response.statusCode == 200) {
-        Logger.data('[SET_INITIAL_PASSWORD] Request successful, parsing response');
+        Logger.data('[VERIFY_OTP] Request successful, parsing response');
         final jsonResponse = json.decode(response.body);
         return Right(OtpVerificationResponse.fromJson(jsonResponse));
       } else {
@@ -1300,6 +1306,48 @@ Response body: ${response.body}
       },
     );
   }
+
+@override
+Future<bool> resetPassword({
+  required String resetToken,
+  required String newPassword,
+}) async {
+  try {
+    final url = '$baseUrl/resetPassword';
+    final headers = _baseHeaders;
+
+    // Hash the new password before sending
+    final hashedPassword = await _passwordService.hashPassword(newPassword);
+    
+    final body = {
+      'resetToken': resetToken,
+      'newPassword': hashedPassword,
+    };
+
+    final response = await _loggedRequest(
+      () => _httpClient.post(
+        Uri.parse(url),
+        headers: headers,
+        body: json.encode(body),
+      ),
+      url,
+      'POST',
+      headers: headers,
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      Logger.data('[RESET_PASSWORD] Password reset successful');
+      return true;
+    } else {
+      final errorMessage = json.decode(response.body)['message'] ?? 'Failed to reset password';
+      return false;
+    }
+  } catch (e) {
+    Logger.error('Error resetting password', e);
+    return false;
+  }
+}
 
   Future<Either<Failure, RecurringResponse>> createRecurring(
       RecurringRequest request) async {
