@@ -683,6 +683,57 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           style: TextStyle(fontSize: 14),
                         ),
                       ),
+                      const SizedBox(height: 32),
+                      // Register section
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.highlightOverlay,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Don\'t have an account?',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      Navigator.pushNamed(context, '/create-account');
+                                    },
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 50),
+                                backgroundColor: AppColors.surface,
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Register',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
