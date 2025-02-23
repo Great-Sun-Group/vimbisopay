@@ -206,12 +206,17 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                               );
                               
                               if (result == true && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(_hasPin ? 'PIN changed successfully' : 'PIN set successfully'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                                // Refresh security settings
+                                await _loadSecuritySettings();
+                                
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(_hasPin ? 'PIN changed successfully' : 'PIN set successfully'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),
