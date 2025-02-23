@@ -5,7 +5,12 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class ChangePinBottomSheet extends StatefulWidget {
-  const ChangePinBottomSheet({super.key});
+  final bool isChangingPin;
+
+  const ChangePinBottomSheet({
+    super.key,
+    required this.isChangingPin,
+  });
 
   @override
   State<ChangePinBottomSheet> createState() => _ChangePinBottomSheetState();
@@ -27,13 +32,18 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
     super.dispose();
   }
 
-  Future<void> _changePin() async {
-    final currentPin = _currentPinController.text.trim();
+  Future<void> _handlePinAction() async {
     final newPin = _newPinController.text.trim();
     final confirmPin = _confirmPinController.text.trim();
+    final currentPin = _currentPinController.text.trim();
 
     // Validation
-    if (currentPin.isEmpty || newPin.isEmpty || confirmPin.isEmpty) {
+    if (widget.isChangingPin && currentPin.isEmpty) {
+      setState(() => _error = 'Current PIN is required');
+      return;
+    }
+
+    if (newPin.isEmpty || confirmPin.isEmpty) {
       setState(() => _error = 'All fields are required');
       return;
     }
@@ -54,17 +64,19 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
         _error = null;
       });
 
-      // Verify current PIN
-      final isValid = await _securityService.verifyPin(currentPin);
-      if (!isValid) {
-        setState(() {
-          _error = 'Current PIN is incorrect';
-          _isLoading = false;
-        });
-        return;
+      // If changing PIN, verify current PIN first
+      if (widget.isChangingPin) {
+        final isValid = await _securityService.verifyPin(currentPin);
+        if (!isValid) {
+          setState(() {
+            _error = 'Current PIN is incorrect';
+            _isLoading = false;
+          });
+          return;
+        }
       }
 
-      // Set new PIN
+      // Set PIN
       await _securityService.setPin(newPin);
       
       if (mounted) {
@@ -101,8 +113,8 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Change PIN',
+          Text(
+            widget.isChangingPin ? 'Change PIN' : 'Set PIN',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 20,
@@ -116,16 +128,16 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
             ],
           ),
           if (_isLoading)
-            const Column(
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(
+                const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
-                  'Changing PIN...',
-                  style: TextStyle(
+                  widget.isChangingPin ? 'Changing PIN...' : 'Setting PIN...',
+                  style: const TextStyle(
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -152,21 +164,23 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
                       ),
                     ),
                   ),
-                TextField(
-                  controller: _currentPinController,
-                  decoration: const InputDecoration(
-                    labelText: 'Current PIN',
-                    hintText: '****',
+                if (widget.isChangingPin) ...[
+                  TextField(
+                    controller: _currentPinController,
+                    decoration: const InputDecoration(
+                      labelText: 'Current PIN',
+                      hintText: '****',
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(4),
+                    ],
+                    obscureText: true,
+                    textInputAction: TextInputAction.next,
                   ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(4),
-                  ],
-                  obscureText: true,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 TextField(
                   controller: _newPinController,
                   decoration: const InputDecoration(
@@ -195,11 +209,11 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
                   ],
                   obscureText: true,
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _changePin(),
+                  onSubmitted: (_) => _handlePinAction(),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: _changePin,
+                  onPressed: _handlePinAction,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -207,9 +221,9 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Change PIN',
-                    style: TextStyle(
+                  child: Text(
+                    widget.isChangingPin ? 'Change PIN' : 'Set PIN',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),

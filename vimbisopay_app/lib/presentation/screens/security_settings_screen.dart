@@ -25,6 +25,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   bool _useBiometric = false;
   bool _isBiometricAvailable = false;
   bool _isLoadingEvents = true;
+  bool _hasPin = false;
   List<SecurityEvent> _securityEvents = [];
 
   @override
@@ -42,6 +43,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
       final isBiometricAvailable = await _securityService.isBiometricAvailable();
       final usesBiometric = await _securityService.usesBiometric();
+      final pin = await _securityService.getSecurePin();
       
       // For demo purposes, create some sample security events
       final events = [
@@ -66,13 +68,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       ];
 
       if (mounted) {
-        setState(() {
-          _isBiometricAvailable = isBiometricAvailable;
-          _useBiometric = usesBiometric;
-          _securityEvents = events;
-          _isLoading = false;
-          _isLoadingEvents = false;
-        });
+          setState(() {
+            _isBiometricAvailable = isBiometricAvailable;
+            _useBiometric = usesBiometric;
+            _hasPin = pin != null;
+            _securityEvents = events;
+            _isLoading = false;
+            _isLoadingEvents = false;
+          });
       }
     } catch (e) {
       Logger.error('Error loading security settings', e);
@@ -189,21 +192,23 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                               onChanged: _toggleBiometric,
                             ),
                           SettingsListTile(
-                            title: 'Change PIN',
-                            subtitle: 'Update your security PIN',
+                            title: _hasPin ? 'Change PIN' : 'Set PIN',
+                            subtitle: _hasPin ? 'Update your security PIN' : 'Set up a security PIN',
                             icon: Icons.pin,
                             onTap: () async {
                               final result = await showModalBottomSheet<bool>(
                                 context: context,
                                 isScrollControlled: true,
                                 backgroundColor: Colors.transparent,
-                                builder: (context) => const ChangePinBottomSheet(),
+                                builder: (context) => ChangePinBottomSheet(
+                                isChangingPin: _hasPin,
+                              ),
                               );
                               
                               if (result == true && mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('PIN changed successfully'),
+                                  SnackBar(
+                                    content: Text(_hasPin ? 'PIN changed successfully' : 'PIN set successfully'),
                                     backgroundColor: AppColors.success,
                                   ),
                                 );
