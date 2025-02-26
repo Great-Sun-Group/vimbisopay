@@ -119,3 +119,6 @@ Example entry format:
 -e 
 ## [1.0.0+37] - 2025-02-22
 - Onboarding phone verification / change password / reset password and pin
+-e 
+## [1.0.0+38] - 2025-02-26
+- Minor update -- fixed push notification issue 
