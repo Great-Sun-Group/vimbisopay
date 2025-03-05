@@ -12,7 +12,12 @@ class SecurityService {
   static const String _pinKey = 'user_pin';
   static const String _useBiometricKey = 'use_biometric';
   static const String _lastAuthTimeKey = 'last_auth_time';
+  static const String _pinHistoryKey = 'pin_history';
+  static const String _failedAttemptsKey = 'failed_pin_attempts';
   static const int _authValidityDuration = 300; // 5 minutes in seconds
+  static const int _maxFailedAttempts = 5;
+  static const int _lockoutDuration = 300; // 5 minutes in seconds
+  static const int _maxPinHistory = 5; // Number of previous PINs to remember
 
   SecurityService()
       : _storage = const FlutterSecureStorage(),
@@ -168,10 +173,76 @@ class SecurityService {
 
   Future<void> setPin(String pin) async {
     Logger.data('Setting new PIN');
+    
+    // Check if PIN is in history
+    final history = await _getPinHistory();
+    if (history.contains(pin)) {
+      throw Exception('This PIN has been used recently. Please choose a different PIN.');
+    }
+
+    // Add current PIN to history before setting new one
+    final currentPin = await _storage.read(key: _pinKey);
+    if (currentPin != null) {
+      await _addPinToHistory(currentPin);
+    }
+
+    // Set new PIN
     await _storage.write(key: _pinKey, value: pin);
     await _storage.write(key: _useBiometricKey, value: 'false');
     await _markAuthenticationTime();
+    
+    // Reset failed attempts
+    await _resetFailedAttempts();
+    
     Logger.state('PIN set successfully');
+  }
+
+  Future<List<String>> _getPinHistory() async {
+    final historyStr = await _storage.read(key: _pinHistoryKey);
+    if (historyStr == null) return [];
+    return historyStr.split(',');
+  }
+
+  Future<void> _addPinToHistory(String pin) async {
+    final history = await _getPinHistory();
+    history.insert(0, pin);
+    if (history.length > _maxPinHistory) {
+      history.removeLast();
+    }
+    await _storage.write(key: _pinHistoryKey, value: history.join(','));
+  }
+
+  Future<bool> _isLockedOut() async {
+    final attemptsStr = await _storage.read(key: _failedAttemptsKey);
+    if (attemptsStr == null) return false;
+
+    final attempts = attemptsStr.split(',');
+    if (attempts.isEmpty) return false;
+
+    // Check if we have max failed attempts within lockout duration
+    final now = DateTime.now();
+    final recentAttempts = attempts
+        .map((ts) => DateTime.fromMillisecondsSinceEpoch(int.parse(ts)))
+        .where((date) => now.difference(date).inSeconds < _lockoutDuration)
+        .length;
+
+    return recentAttempts >= _maxFailedAttempts;
+  }
+
+  Future<void> _recordFailedAttempt() async {
+    final now = DateTime.now().millisecondsSinceEpoch.toString();
+    final attemptsStr = await _storage.read(key: _failedAttemptsKey);
+    final attempts = attemptsStr?.split(',') ?? [];
+    
+    attempts.insert(0, now);
+    
+    // Keep only recent attempts
+    final recentAttempts = attempts.take(_maxFailedAttempts).join(',');
+    await _storage.write(key: _failedAttemptsKey, value: recentAttempts);
+  }
+
+  Future<void> _resetFailedAttempts() async {
+    await _storage.delete(key: _failedAttemptsKey);
   }
 
   Future<void> setBiometricEnabled() async {
@@ -188,12 +259,28 @@ class SecurityService {
 
   Future<bool> verifyPin(String pin) async {
     Logger.interaction('Verifying PIN');
+
+    // Check for lockout
+    if (await _isLockedOut()) {
+      throw Exception('Too many failed attempts. Please try again later.');
+    }
+
     final storedPin = await _storage.read(key: _pinKey);
     final isValid = storedPin == pin;
     Logger.state('PIN verification result: $isValid');
+    
     if (isValid) {
       await _markAuthenticationTime();
+      await _resetFailedAttempts();
+    } else {
+      await _recordFailedAttempt();
+      
+      // Check if this attempt caused a lockout
+      if (await _isLockedOut()) {
+        throw Exception('Too many failed attempts. Please try again in ${_lockoutDuration ~/ 60} minutes.');
+      }
     }
+    
     return isValid;
   }
 
