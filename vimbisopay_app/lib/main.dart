@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
@@ -16,6 +17,11 @@ import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/vendor_sales_tab_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -110,10 +116,33 @@ void main() async {
     await Firebase.initializeApp();
     print('Firebase initialized successfully');
     
+    // Initialize Firebase Analytics
+    print('Initializing Firebase Analytics...');
+    final analytics = ServiceLocator.analytics;
+    print('Firebase Analytics initialized successfully');
+    
     // Set up background message handler
     print('Setting up background message handler...');
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('Background message handler set up');
+    
+    // Initialize feature flag service
+    print('Initializing FeatureFlagService...');
+    final featureFlagService = await ServiceLocator.initializeFeatureFlagService();
+    final featureFlagsInitialized = await featureFlagService.initialize();
+    
+    if (featureFlagsInitialized) {
+      Logger.data('FeatureFlagService initialized successfully');
+      Logger.data('Marketplace feature enabled: ${featureFlagService.isMarketplaceEnabled()}');
+      
+      // Debug: Try to force refresh to ensure we have the latest values
+      print('Attempting to force refresh Remote Config...');
+      final refreshed = await featureFlagService.forceRefresh();
+      print('Force refresh result: $refreshed');
+      print('Marketplace feature enabled after refresh: ${featureFlagService.isMarketplaceEnabled()}');
+    } else {
+      Logger.error('Failed to initialize FeatureFlagService, using default values');
+    }
     
     // Initialize NotificationService after Firebase is ready
     print('Initializing NotificationService...');
@@ -214,6 +243,111 @@ class MyApp extends StatelessWidget {
         if (settings.name == '/notifications-settings') {
           return MaterialPageRoute(
             builder: (context) => const NotificationsSettingsScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/marketplace') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(
+              builder: (context) => const MarketplaceScreen(),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Vendor profile screen route
+        if (settings.name == '/vendor-profile') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('vendorId')) {
+              Logger.error('No vendor ID provided for vendor-profile route');
+              return MaterialPageRoute(
+                builder: (context) => const MarketplaceScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorProfileScreen(
+                vendorId: args['vendorId'] as String,
+                isOwner: args['isOwner'] as bool? ?? false,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Vendor registration screen route
+        if (settings.name == '/vendor-registration') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('memberId')) {
+              Logger.error('No member ID provided for vendor-registration route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorRegistrationScreen(
+                memberId: args['memberId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Vendor sales tab screen route
+        if (settings.name == '/vendor-sales-tab') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('vendorId')) {
+              Logger.error('No vendor ID provided for vendor-sales-tab route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorSalesTabScreen(
+                vendorId: args['vendorId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        if (settings.name == '/debug') {
+          return MaterialPageRoute(
+            builder: (context) => const DebugScreen(),
             settings: settings,
           );
         }

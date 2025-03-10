@@ -32,11 +32,15 @@ dependencies:
   screen_brightness: ^0.2.2
   firebase_messaging: ^14.7.4
   firebase_core: ^2.22.0
+  firebase_remote_config: ^4.3.4
+  firebase_analytics: ^10.7.4  # Added for Remote Config ABT support
   provider: ^6.1.1
   logger: ^2.0.2+1
   path: any
   audioplayers: ^6.1.0
   path_provider: any
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

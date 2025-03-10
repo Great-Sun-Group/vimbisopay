@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
+import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/initials_avatar.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
@@ -23,6 +28,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
   User? _user;
   late final AnimationController _spinController;
   
+  bool _isVendor = false;
+  bool _isCheckingVendorStatus = false;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +94,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
         Logger.state('Profile data loaded and state updated');
       }
 
+      // Check if the user is a vendor
+      _checkVendorStatus(user.memberId);
+
       stopwatch.stop();
       Logger.performance('Profile data load completed in ${stopwatch.elapsedMilliseconds}ms');
       
@@ -105,6 +116,98 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
         });
         Logger.state('Error state set: $_error');
       }
+    }
+  }
+
+  Future<void> _checkVendorStatus(String memberId) async {
+    try {
+      setState(() {
+        _isCheckingVendorStatus = true;
+      });
+
+      final marketplaceRepository = ServiceLocator.marketplaceRepository;
+      final isVendor = await marketplaceRepository.isMemberVendor(memberId);
+
+      if (mounted) {
+        setState(() {
+          _isVendor = isVendor;
+          _isCheckingVendorStatus = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error checking vendor status', e);
+      if (mounted) {
+        setState(() {
+          _isVendor = false;
+          _isCheckingVendorStatus = false;
+        });
+      }
+    }
+  }
+
+  void _navigateToVendorRegistration() {
+    if (_user == null) return;
+    
+    Navigator.pushNamed(
+      context,
+      '/vendor-registration',
+      arguments: {
+        'memberId': _user!.memberId,
+      },
+    ).then((_) {
+      // Refresh vendor status when returning from registration
+      if (_user != null) {
+        _checkVendorStatus(_user!.memberId);
+      }
+    });
+  }
+
+  void _navigateToVendorProfile() async {
+    if (_user == null) return;
+    
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      final marketplaceRepository = ServiceLocator.marketplaceRepository;
+      final result = await marketplaceRepository.getVendorByMemberId(_user!.memberId);
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(failure.message ?? 'Failed to load vendor profile'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        (vendor) {
+          Navigator.pushNamed(
+            context,
+            '/vendor-profile',
+            arguments: {
+              'vendorId': vendor.id,
+              'isOwner': true,
+            },
+          );
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -300,9 +403,96 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
               ],
             ),
             const SizedBox(height: 24),
+            
+            // Marketplace Settings Section (only if feature flag is enabled)
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) ...[
+              _buildMarketplaceSection(),
+              const SizedBox(height: 24),
+            ],
           ],
         ),
       ),
+    );
+  }
+  
+  Widget _buildMarketplaceSection() {
+    return SettingsContainer(
+      title: 'Marketplace Settings',
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sell your products and services in the Vimbiso Marketplace.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              if (_isCheckingVendorStatus)
+                const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                )
+              else if (_isVendor)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.storefront,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    'Manage Vendor Profile',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Edit your business information and products',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _navigateToVendorProfile,
+                )
+              else
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.add_business,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    'Become a Vendor',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Create a vendor profile to sell in the marketplace',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _navigateToVendorRegistration,
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

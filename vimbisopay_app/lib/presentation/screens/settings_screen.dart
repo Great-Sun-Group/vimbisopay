@@ -158,20 +158,16 @@ class SettingsScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 12),
-                if (kDebugMode) ...[
-                  _buildSettingsTile(
-                    icon: Icons.bug_report,
-                    title: 'Debug Mode',
-                    subtitle: 'Developer options and testing',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const DebugScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                // Always show debug option to help troubleshoot feature flags
+                _buildSettingsTile(
+                  icon: Icons.bug_report,
+                  title: 'Debug Tools',
+                  subtitle: 'Feature flags and remote config testing',
+                  onTap: () {
+                    Navigator.pushNamed(context, '/debug');
+                  },
+                ),
+                const SizedBox(height: 12),
                 _buildSettingsTile(
                   icon: Icons.logout,
                   title: 'Logout',
