@@ -42,6 +42,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
   late final TextEditingController _amountController;
   final _amountFocusNode = FocusNode();
   late Denomination _selectedDenomination;
+  late List<Denomination> _availableDenominations;
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAmountFirstEdit = true;
@@ -58,21 +59,76 @@ class _SendCredexScreenState extends State<SendCredexScreen>
 
   double get _availableBalance {
     final denom = _selectedDenomination.toString().split('.').last;
-    final balanceStr =
-        widget.senderAccount.balanceData.securedNetBalancesByDenom.firstWhere(
-      (balance) => balance.endsWith(' $denom') && 
-                   (balance.startsWith('-') || 
-                    balance.startsWith('+') || 
-                    RegExp(r'^\d').hasMatch(balance)),
+    
+    // For default denomination, use netCredexAssetsInDefaultDenom if no direct balance
+    if (denom == widget.senderAccount.defaultDenom) {
+      // Look for direct balance first
+      final directBalanceStr = _findBalanceForDenomination(denom);
+      final directBalance = _parseBalance(directBalanceStr);
+      
+      // If direct balance is zero, use netCredexAssetsInDefaultDenom as fallback
+      if (directBalance > 0) {
+        return directBalance;
+      } else {
+        // Use netCredexAssetsInDefaultDenom as fallback
+        return _parseBalance(widget.senderAccount.balanceData.netCredexAssetsInDefaultDenom);
+      }
+    }
+    
+    // For non-default denominations, find specific balance entry
+    final balanceStr = _findBalanceForDenomination(denom);
+    return _parseBalance(balanceStr);
+  }
+  
+  // Helper method to find balance for a specific denomination
+  String _findBalanceForDenomination(String denom) {
+    // Simply match by the denomination suffix, regardless of the format of the number part
+    return widget.senderAccount.balanceData.securedNetBalancesByDenom.firstWhere(
+      (balance) => balance.endsWith(' $denom'),
       orElse: () => '0.0 $denom',
     );
-    return double.tryParse(balanceStr.split(' ').first) ?? 0.0;
+  }
+  
+  // Helper method to parse balance string to double
+  double _parseBalance(String balanceStr) {
+    // Extract the number part (before the currency code)
+    final parts = balanceStr.split(' ');
+    if (parts.isEmpty) return 0.0;
+    
+    // Remove commas and convert to double
+    final numberStr = parts.first.replaceAll(',', '');
+    return double.tryParse(numberStr) ?? 0.0;
+  }
+
+  // Extract available denominations from account balances
+  List<Denomination> _getAvailableDenominations() {
+    final Set<String> denomStrs = {};
+    
+    // Add denominations from securedNetBalancesByDenom
+    for (final balance in widget.senderAccount.balanceData.securedNetBalancesByDenom) {
+      final parts = balance.split(' ');
+      if (parts.length >= 2) {
+        denomStrs.add(parts.last);
+      }
+    }
+    
+    // Add default denomination
+    denomStrs.add(widget.senderAccount.defaultDenom);
+    
+    // Convert to Denomination enum values
+    return denomStrs.map((denomStr) {
+      return Denomination.values.firstWhere(
+        (d) => d.toString().split('.').last == denomStr,
+        orElse: () => Denomination.USD,
+      );
+    }).toList();
   }
 
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
+    _availableDenominations = _getAvailableDenominations();
     _selectedDenomination = Denomination.values.firstWhere(
       (d) => d.toString().split('.').last == widget.senderAccount.defaultDenom,
       orElse: () => Denomination.USD,
@@ -117,6 +173,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     if (newValue != null && newValue != _selectedDenomination) {
       setState(() {
         _selectedDenomination = newValue;
+        // Update amount format based on new denomination's decimal places
         if (_amountController.text.isNotEmpty && !_isAmountFirstEdit) {
           final amount = double.tryParse(_amountController.text) ?? 0.0;
           _amountController.text = amount.toStringAsFixed(_decimalPlaces);
@@ -565,7 +622,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                               decimal: true),
                           style: const TextStyle(color: AppColors.textPrimary),
                           decoration: InputDecoration(
-                            labelText: 'Amount',
+                            labelText: 'Amount (${_selectedDenomination.toString().split('.').last})',
                             labelStyle:
                                 const TextStyle(color: AppColors.textSecondary),
                             filled: true,
@@ -617,7 +674,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
-                          items: Denomination.values.map((denomination) {
+                          items: _availableDenominations.map((denomination) {
                             return DropdownMenuItem(
                               value: denomination,
                               child: Text(
