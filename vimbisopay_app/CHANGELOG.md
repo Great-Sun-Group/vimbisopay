@@ -129,3 +129,6 @@ Example entry format:
 ## [1.0.0+40] - 2025-03-12
 - 
 - more sample vendors and products 
+-e 
+## [1.0.0+41] - 2025-03-12
+- Removed database migrationindex creation for db version 9
