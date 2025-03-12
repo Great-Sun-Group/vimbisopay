@@ -139,6 +139,16 @@ abstract class MarketplaceRepository {
     String? notes,
     DateTime? paidAt,
   });
+  
+  /// Creates a Credex offer for an invoice payment.
+  ///
+  /// Returns the updated [Invoice] if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, Invoice>> createCredexOffer({
+    required String invoiceId,
+    required String accountId,
+    required int amount,
+    String? note,
+  });
 
   /// Gets an asset marker by ID.
   ///

@@ -21,6 +21,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/vendor_sales_tab_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
@@ -333,6 +334,33 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (context) => VendorSalesTabScreen(
                 vendorId: args['vendorId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Buyer invoice detail screen route
+        if (settings.name == '/buyer-invoice-detail') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('invoiceId')) {
+              Logger.error('No invoice ID provided for buyer-invoice-detail route');
+              return MaterialPageRoute(
+                builder: (context) => const MarketplaceScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => BuyerInvoiceDetailScreen(
+                invoiceId: args['invoiceId'] as String,
               ),
               settings: settings,
             );

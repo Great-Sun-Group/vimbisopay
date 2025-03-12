@@ -10,6 +10,8 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 
 /// Marketplace screen for the VimbisoPay app.
 ///
@@ -341,6 +343,54 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
   }
   
+  Future<void> _scanInvoiceQR() async {
+    try {
+      // Navigate to the QR scanner screen
+      final result = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (context) => const ScanQRScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+      
+      if (result != null && mounted) {
+        // Check if the QR code is a valid invoice QR code
+        if (result.startsWith('vimbisopay://invoice/')) {
+          // Extract the invoice ID from the QR code
+          final invoiceId = result.substring('vimbisopay://invoice/'.length);
+          
+          // Navigate to the buyer invoice detail screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BuyerInvoiceDetailScreen(
+                invoiceId: invoiceId,
+              ),
+            ),
+          );
+        } else {
+          // Show error message for invalid QR code
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid invoice QR code'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      Logger.error('Error scanning invoice QR code', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error scanning QR code: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    }
+  }
+  
   void _showVendorActionSheet() {
     showModalBottomSheet(
       context: context,
@@ -473,6 +523,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         actions: [
+          // Scan Invoice QR Code button
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Scan Invoice',
+            onPressed: _scanInvoiceQR,
+          ),
           if (_isVendor)
             IconButton(
               icon: const Icon(Icons.storefront),

@@ -158,6 +158,77 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       createdAt: DateTime.now().subtract(const Duration(days: 2)),
       updatedAt: DateTime.now().subtract(const Duration(days: 2)),
     ),
+    // Additional mock invoices for the buyer workflow simulation
+    Invoice(
+      id: 'face-to-face-1',
+      buyerId: '', // Empty because this is a face-to-face transaction where buyer isn't known yet
+      vendorId: 'v1',
+      lineItems: [
+        InvoiceLineItem(
+          productId: 'p1',
+          productName: 'Wireless Earbuds',
+          quantity: 1,
+          unitPrice: 9999,
+          totalPrice: 9999,
+        ),
+        InvoiceLineItem(
+          productId: 'p2',
+          productName: 'Smart Watch',
+          quantity: 1,
+          unitPrice: 14999,
+          totalPrice: 14999,
+        ),
+      ],
+      totalAmount: 24998,
+      currency: 'USD',
+      status: InvoiceStatus.pending,
+      paymentMethod: 'credex',
+      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+      updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+      notes: 'Face-to-face transaction at Tech Gadgets store',
+    ),
+    Invoice(
+      id: 'face-to-face-2',
+      buyerId: '', // Empty because this is a face-to-face transaction where buyer isn't known yet
+      vendorId: 'v2',
+      lineItems: [
+        InvoiceLineItem(
+          productId: 'p3',
+          productName: 'Handmade Vase',
+          quantity: 1,
+          unitPrice: 3999,
+          totalPrice: 3999,
+        ),
+      ],
+      totalAmount: 3999,
+      currency: 'USD',
+      status: InvoiceStatus.pending,
+      paymentMethod: 'credex',
+      createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
+      updatedAt: DateTime.now().subtract(const Duration(minutes: 30)),
+      notes: 'Face-to-face transaction at Handmade Crafts store',
+    ),
+    Invoice(
+      id: 'face-to-face-3',
+      buyerId: '', // Empty because this is a face-to-face transaction where buyer isn't known yet
+      vendorId: 'v1',
+      lineItems: [
+        InvoiceLineItem(
+          productId: 'p2',
+          productName: 'Smart Watch',
+          quantity: 1,
+          unitPrice: 14999,
+          totalPrice: 14999,
+        ),
+      ],
+      totalAmount: 14999,
+      currency: 'USD',
+      status: InvoiceStatus.pending,
+      paymentMethod: 'credex',
+      createdAt: DateTime.now().subtract(const Duration(minutes: 15)),
+      updatedAt: DateTime.now().subtract(const Duration(minutes: 15)),
+      notes: 'Face-to-face transaction at Tech Gadgets store',
+    ),
   ];
 
   /// Mock asset markers for testing.
@@ -793,6 +864,62 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     } catch (e) {
       Logger.error('Error transferring asset marker', e);
       return Left(ServerFailure('Failed to transfer asset marker: $e'));
+    }
+  }
+  
+  @override
+  Future<Either<Failure, Invoice>> createCredexOffer({
+    required String invoiceId,
+    required String accountId,
+    required int amount,
+    String? note,
+  }) async {
+    try {
+      Logger.data('Creating Credex offer for invoice ID: $invoiceId from account ID: $accountId');
+      
+      // Find the invoice
+      final invoiceIndex = _mockInvoices.indexWhere((i) => i.id == invoiceId);
+      if (invoiceIndex == -1) {
+        throw NotFoundException('Invoice not found');
+      }
+      
+      // Get the existing invoice
+      final existingInvoice = _mockInvoices[invoiceIndex];
+      
+      // Check if the invoice is already paid
+      if (existingInvoice.status != InvoiceStatus.pending) {
+        throw const ServerException('Invoice is not in pending status');
+      }
+      
+      // Check if the amount matches the invoice total
+      if (amount != existingInvoice.totalAmount) {
+        throw const ServerException('Payment amount does not match invoice total');
+      }
+      
+      // Create updated invoice with paid status
+      final updatedInvoice = existingInvoice.copyWith(
+        status: InvoiceStatus.paid,
+        notes: note != null ? (existingInvoice.notes != null ? '${existingInvoice.notes}\n$note' : note) : existingInvoice.notes,
+        paidAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      // Update the invoice in the list
+      _mockInvoices[invoiceIndex] = updatedInvoice;
+      
+      // Create asset markers for the purchased products (in a real implementation)
+      // This would involve creating asset markers for each line item in the invoice
+      
+      return Right(updatedInvoice);
+    } on NotFoundException catch (e) {
+      Logger.error('Invoice not found for payment', e);
+      return Left(NotFoundFailure(e.message));
+    } on ServerException catch (e) {
+      Logger.error('Error processing payment', e);
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      Logger.error('Error creating Credex offer', e);
+      return Left(ServerFailure('Failed to create Credex offer: $e'));
     }
   }
 }
