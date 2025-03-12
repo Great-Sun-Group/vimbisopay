@@ -6,11 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_filter.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:http/http.dart' as http;
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
+  final _accountRepository = ServiceLocator.accountRepository;
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final player = AudioPlayer();
@@ -324,51 +327,27 @@ Current notification settings:
   }
 
   Future<void> _registerToken(String token) async {
-    final platform = Platform.isIOS ? 'ios' : 'android';
-    const url = '${ApiConfig.baseUrl}/api/notifications/register-token';
-    final body = {
-      'token': token,
-      'platform': platform,
-    };
-
-    Logger.data('''
-Registering notification token:
-- Platform: $platform
-- URL: $url
-- Token Length: ${token.length}
-- Request Body: $body
-''');
-
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        body: body,
-      );
-
-      if (response.statusCode == 200) {
-        Logger.data('''
-Successfully registered notification token:
-- Status code: ${response.statusCode}
-- Response body: ${response.body}
-- Headers: ${response.headers}
-''');
-      } else {
-        Logger.error('''
+      Logger.data('Registering notification token with length: ${token.length}');
+      
+      final result = await _accountRepository.registerNotificationToken(token);
+      
+      result.fold(
+        (failure) {
+          Logger.error('''
 Failed to register notification token:
-- Status code: ${response.statusCode}
-- Response body: ${response.body}
-- Headers: ${response.headers}
-- Request URL: $url
-- Request body: $body
+- Error: ${failure.message}
 ''');
-      }
+        },
+        (success) {
+          Logger.data('Successfully registered notification token');
+        },
+      );
     } catch (e, stackTrace) {
       Logger.error('''
 Error registering notification token:
 - Error: $e
 - Stack trace: $stackTrace
-- Request URL: $url
-- Request body: $body
 ''');
     }
   }

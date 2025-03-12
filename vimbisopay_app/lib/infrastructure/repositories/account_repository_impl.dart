@@ -1027,7 +1027,7 @@ class AccountRepositoryImpl implements AccountRepository {
   Future<Either<Failure, bool>> registerNotificationToken(String token) async {
     return _executeAuthenticatedRequest(
       request: (authToken) async {
-        final url = '$baseUrl/notifications/register-token';
+        final url = '$baseUrl/api/notifications/register-token';
         final headers = _authHeaders(authToken);
         final body = {
           'token': token,
