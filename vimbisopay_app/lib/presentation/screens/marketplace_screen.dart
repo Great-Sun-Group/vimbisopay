@@ -178,10 +178,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please log in to become a vendor'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           action: SnackBarAction(
             label: 'Login',
-            textColor: Colors.white,
+            textColor: AppColors.white,
             onPressed: () {
               // Navigate to login screen
               Navigator.pushNamed(context, '/login');
@@ -435,7 +435,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Test vendor values set'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: AppColors.success,
                 ),
               );
             },
@@ -454,7 +454,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Debug values reset'),
-                  backgroundColor: Colors.orange,
+                  backgroundColor: AppColors.yellowPrimary,
                 ),
               );
             },
@@ -568,17 +568,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.error_outline,
                         size: 48,
-                        color: Colors.red,
+                        color: AppColors.error,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         _errorMessage,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          color: Colors.red,
+                          color: AppColors.error,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -738,11 +738,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ),
               if (_memberId == null) ...[
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'You need to be logged in to become a vendor.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.red,
+                    color: AppColors.error,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -759,11 +759,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     if (product.imageUrls.isEmpty || product.imageUrls.first == 'https://example.com/product_placeholder.jpg') {
       // Show placeholder if no image
       return Container(
-        color: Colors.grey[300],
-        child: const Center(
+        color: AppColors.textGray.withOpacity(0.3),
+        child: Center(
           child: Icon(
             Icons.image,
-            color: Colors.grey,
+            color: AppColors.textGray,
           ),
         ),
       );
@@ -780,11 +780,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         errorBuilder: (context, error, stackTrace) {
           Logger.error('Error loading local image: $filePath', error);
           return Container(
-            color: Colors.grey[300],
-            child: const Center(
+            color: AppColors.textGray.withOpacity(0.3),
+            child: Center(
               child: Icon(
                 Icons.image_not_supported,
-                color: Colors.grey,
+                color: AppColors.textGray,
               ),
             ),
           );
@@ -796,17 +796,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         placeholder: (context, url) => Container(
-          color: Colors.grey[200],
+          color: AppColors.textGray.withOpacity(0.2),
           child: const Center(
             child: CircularProgressIndicator(),
           ),
         ),
         errorWidget: (context, url, error) => Container(
-          color: Colors.grey[300],
-          child: const Center(
+          color: AppColors.textGray.withOpacity(0.3),
+          child: Center(
             child: Icon(
               Icons.image_not_supported,
-              color: Colors.grey,
+              color: AppColors.textGray,
             ),
           ),
         ),
@@ -830,7 +830,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(failure.message ?? 'Failed to load vendor'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                 ),
               );
             },
@@ -892,8 +892,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                 : Icons.cancel,
                             size: 16,
                             color: product.isAvailable
-                                ? Colors.green
-                                : Colors.red,
+                                ? AppColors.success
+                                : AppColors.error,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -904,8 +904,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: product.isAvailable
-                                    ? Colors.green
-                                    : Colors.red,
+                                    ? AppColors.success
+                                    : AppColors.error,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

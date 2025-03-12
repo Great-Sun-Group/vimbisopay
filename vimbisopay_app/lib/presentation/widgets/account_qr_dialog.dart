@@ -56,7 +56,7 @@ class _AccountQRDialogState extends State<AccountQRDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor: AppColors.transparent,
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.close, color: AppColors.textSecondary),
@@ -102,11 +102,11 @@ class _AccountQRDialogState extends State<AccountQRDialog> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: AppColors.black.withOpacity(0.1),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -116,7 +116,7 @@ class _AccountQRDialogState extends State<AccountQRDialog> {
                       data: '${widget.account.accountHandle}#${widget.account.accountID}',
                       version: QrVersions.auto,
                       size: 200,
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.white,
                     ),
                   ),
                   const SizedBox(height: 24),

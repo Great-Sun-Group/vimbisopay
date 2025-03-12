@@ -122,7 +122,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.red,
+              color: AppColors.errorRed,
             ),
             const SizedBox(height: 16),
             Text(
@@ -130,7 +130,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.red,
+                color: AppColors.errorRed,
               ),
             ),
             const SizedBox(height: 24),
@@ -206,8 +206,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.7),
+                      AppColors.transparent,
+                      AppColors.black.withOpacity(0.7),
                     ],
                     stops: const [0.6, 1.0],
                   ),
@@ -220,7 +220,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               bottom: 16,
               child: CircleAvatar(
                 radius: 40,
-                backgroundColor: Colors.white,
+                backgroundColor: AppColors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(2.0),
                   child: ClipOval(
@@ -236,7 +236,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                                   child: Icon(
                                     Icons.storefront,
                                     size: 38,
-                                    color: Colors.white,
+                                    color: AppColors.white,
                                   ),
                                 ),
                               ),
@@ -247,7 +247,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                                 child: Icon(
                                   Icons.storefront,
                                   size: 38,
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                 ),
                               ),
                             ),
@@ -267,14 +267,14 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                   Text(
                     vendor.businessName,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       shadows: [
                         Shadow(
                           offset: Offset(1, 1),
                           blurRadius: 3,
-                          color: Colors.black45,
+                          color: AppColors.black45,
                         ),
                       ],
                     ),
@@ -286,20 +286,20 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     children: [
                       const Icon(
                         Icons.star,
-                        color: Colors.amber,
+                        color: AppColors.amber,
                         size: 18,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         vendor.ratingDisplay,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.white,
                           fontSize: 14,
                           shadows: [
                             Shadow(
                               offset: Offset(1, 1),
                               blurRadius: 2,
-                              color: Colors.black45,
+                              color: AppColors.black45,
                             ),
                           ],
                         ),
@@ -392,14 +392,14 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: vendor.isActive
-                            ? Colors.green.withOpacity(0.2)
-                            : Colors.red.withOpacity(0.2),
+                            ? AppColors.successGreen.withOpacity(0.2)
+                            : AppColors.errorRed.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         vendor.isActive ? 'Active' : 'Inactive',
                         style: TextStyle(
-                          color: vendor.isActive ? Colors.green : Colors.red,
+                          color: vendor.isActive ? AppColors.successGreen : AppColors.errorRed,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -498,9 +498,24 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                         vendorId: widget.vendorId,
                       ),
                     ),
-                  ).then((_) {
+                  ).then((result) {
+                    // Check if we got a success result
+                    if (result != null && result is Map && result['success'] == true) {
+                      // Show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'SKU added successfully'),
+                            backgroundColor: AppColors.successGreen,
+                          ),
+                        );
+                      }
+                    }
+                    
                     // Refresh the product list when returning from add SKU screen
-                    _loadVendorData();
+                    if (mounted) {
+                      _loadVendorData();
+                    }
                   });
                 },
               ),
@@ -540,8 +555,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             if (widget.isOwner) ...[
               const SizedBox(height: 24),
               FilledButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('Add Your First SKU'),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -550,11 +563,28 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                         vendorId: widget.vendorId,
                       ),
                     ),
-                  ).then((_) {
+                  ).then((result) {
+                    // Check if we got a success result
+                    if (result != null && result is Map && result['success'] == true) {
+                      // Show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'SKU added successfully'),
+                            backgroundColor: AppColors.successGreen,
+                          ),
+                        );
+                      }
+                    }
+                    
                     // Refresh the product list when returning from add SKU screen
-                    _loadVendorData();
+                    if (mounted) {
+                      _loadVendorData();
+                    }
                   });
                 },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Your First SKU'),
               ),
             ],
           ],
@@ -586,11 +616,11 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     if (product.imageUrls.isEmpty || product.imageUrls.first == 'https://example.com/product_placeholder.jpg') {
       // Show placeholder if no image
       return Container(
-        color: Colors.grey[300],
+        color: AppColors.grey300,
         child: const Center(
           child: Icon(
             Icons.image,
-            color: Colors.grey,
+            color: AppColors.grey,
           ),
         ),
       );
@@ -607,11 +637,11 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         errorBuilder: (context, error, stackTrace) {
           Logger.error('Error loading local image: $filePath', error);
           return Container(
-            color: Colors.grey[300],
+            color: AppColors.grey300,
             child: const Center(
               child: Icon(
                 Icons.image_not_supported,
-                color: Colors.grey,
+                color: AppColors.grey,
               ),
             ),
           );
@@ -623,17 +653,17 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         placeholder: (context, url) => Container(
-          color: Colors.grey[200],
+          color: AppColors.grey200,
           child: const Center(
             child: CircularProgressIndicator(),
           ),
         ),
         errorWidget: (context, url, error) => Container(
-          color: Colors.grey[300],
+          color: AppColors.grey300,
           child: const Center(
             child: Icon(
               Icons.image_not_supported,
-              color: Colors.grey,
+              color: AppColors.grey,
             ),
           ),
         ),
@@ -644,7 +674,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
   /// Builds an image widget from a URL, handling both local and remote URLs.
   Widget _buildImageFromUrl(String? imageUrl, {Widget? placeholder}) {
     if (imageUrl == null) {
-      return placeholder ?? Container(color: Colors.grey[300]);
+      return placeholder ?? Container(color: AppColors.grey300);
     }
     
     if (imageUrl.startsWith('file://')) {
@@ -655,7 +685,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           Logger.error('Error loading local image: $filePath', error);
-          return placeholder ?? Container(color: Colors.grey[300]);
+          return placeholder ?? Container(color: AppColors.grey300);
         },
       );
     } else {
@@ -664,10 +694,10 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         placeholder: (context, url) => placeholder ?? Container(
-          color: Colors.grey[200],
+          color: AppColors.grey200,
           child: const Center(child: CircularProgressIndicator()),
         ),
-        errorWidget: (context, url, error) => placeholder ?? Container(color: Colors.grey[300]),
+        errorWidget: (context, url, error) => placeholder ?? Container(color: AppColors.grey300),
       );
     }
   }
@@ -733,8 +763,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                                 : Icons.cancel,
                             size: 16,
                             color: product.isAvailable
-                                ? Colors.green
-                                : Colors.red,
+                                ? AppColors.successGreen
+                                : AppColors.errorRed,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -745,8 +775,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: product.isAvailable
-                                    ? Colors.green
-                                    : Colors.red,
+                                    ? AppColors.successGreen
+                                    : AppColors.errorRed,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

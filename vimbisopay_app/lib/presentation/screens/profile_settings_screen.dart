@@ -182,7 +182,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(failure.message ?? 'Failed to load vendor profile'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.errorRed,
             ),
           );
         },
@@ -205,7 +205,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('An error occurred: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.errorRed,
         ),
       );
     }

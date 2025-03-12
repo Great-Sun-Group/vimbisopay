@@ -372,7 +372,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
                   child: const Text(
                     'Change Password',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

@@ -230,20 +230,17 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
 
         result.fold(
           (failure) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = failure.message ?? 'Failed to update SKU';
-            });
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = failure.message ?? 'Failed to update SKU';
+              });
+            }
           },
           (product) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('SKU updated successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              Navigator.pop(context, true); // Return true to indicate success
+              // First pop the context, then let the parent handle the success message
+              Navigator.pop(context, {'success': true, 'message': 'SKU updated successfully'});
             }
           },
         );
@@ -264,20 +261,17 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
 
         result.fold(
           (failure) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = failure.message ?? 'Failed to create SKU';
-            });
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = failure.message ?? 'Failed to create SKU';
+              });
+            }
           },
           (product) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('SKU created successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              Navigator.pop(context, true); // Return true to indicate success
+              // First pop the context, then let the parent handle the success message
+              Navigator.pop(context, {'success': true, 'message': 'SKU created successfully'});
             }
           },
         );
@@ -312,13 +306,13 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: AppColors.errorRed.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4.0),
-                border: Border.all(color: Colors.red),
+                border: Border.all(color: AppColors.errorRed),
               ),
               child: Text(
                 _errorMessage!,
-                style: const TextStyle(color: Colors.red),
+                style: const TextStyle(color: AppColors.errorRed),
               ),
             ),
             const SizedBox(height: 16.0),
@@ -375,10 +369,10 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                 if (_selectedImage != null || _existingImageUrl != null)
                   OutlinedButton.icon(
                     onPressed: _removeImage,
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    label: const Text('Remove', style: TextStyle(color: Colors.red)),
+                    icon: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+                    label: const Text('Remove', style: TextStyle(color: AppColors.errorRed)),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
+                      side: const BorderSide(color: AppColors.errorRed),
                     ),
                   ),
               ],
@@ -429,7 +423,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                 height: 200,
                 color: Colors.grey[300],
                 child: const Center(
-                  child: Icon(Icons.error, size: 50, color: Colors.red),
+                  child: Icon(Icons.error, size: 50, color: AppColors.errorRed),
                 ),
               );
             },
@@ -454,7 +448,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
               width: 200,
               height: 200,
               color: Colors.grey[300],
-              child: const Icon(Icons.error, size: 50, color: Colors.red),
+              child: const Icon(Icons.error, size: 50, color: AppColors.errorRed),
             ),
           ),
         );

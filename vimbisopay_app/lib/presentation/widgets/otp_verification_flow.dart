@@ -80,7 +80,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: 'Verifying code...',
@@ -220,7 +220,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow>
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: 'Resending verification code...',

@@ -69,14 +69,14 @@ class ProductSelectionCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.shopping_basket,
-                              color: Colors.white,
+                              color: AppColors.white,
                               size: 16,
                             ),
                             SizedBox(width: 4),
                             Text(
                               'In Basket',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppColors.white,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -89,12 +89,12 @@ class ProductSelectionCard extends StatelessWidget {
                   if (!product.isAvailable)
                     Positioned.fill(
                       child: Container(
-                        color: Colors.black.withOpacity(0.6),
+                        color: AppColors.black.withOpacity(0.6),
                         child: const Center(
                           child: Text(
                             'Unavailable',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

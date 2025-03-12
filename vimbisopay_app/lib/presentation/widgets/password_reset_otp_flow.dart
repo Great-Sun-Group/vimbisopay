@@ -76,7 +76,7 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow>
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: 'Verifying code...',
@@ -150,7 +150,7 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow>
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: _isResending ? 'Resending verification code...' : 'Sending verification code...',

@@ -220,7 +220,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     unawaited(showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       useSafeArea: false,
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {

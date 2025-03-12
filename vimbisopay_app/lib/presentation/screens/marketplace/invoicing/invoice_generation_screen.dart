@@ -133,13 +133,13 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
             Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: AppColors.errorRed.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4.0),
-                border: Border.all(color: Colors.red),
+                border: Border.all(color: AppColors.errorRed),
               ),
               child: Text(
                 _errorMessage!,
-                style: const TextStyle(color: Colors.red),
+                style: const TextStyle(color: AppColors.errorRed),
               ),
             ),
             const SizedBox(height: 16.0),
@@ -158,7 +158,7 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
                     ),
                   )
                 : const Text('Generate Invoice'),
@@ -383,7 +383,7 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
           children: [
             const Icon(
               Icons.check_circle,
-              color: Colors.green,
+              color: AppColors.successGreen,
               size: 64,
             ),
             const SizedBox(height: 16),
@@ -415,11 +415,11 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.white,
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: AppColors.black.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -429,12 +429,12 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
                 data: _invoiceQrData!,
                 version: QrVersions.auto,
                 size: 200,
-                backgroundColor: Colors.white,
+                backgroundColor: AppColors.white,
                 errorStateBuilder: (context, error) {
                   return const Center(
                     child: Text(
                       'Error generating QR code',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: AppColors.errorRed),
                     ),
                   );
                 },

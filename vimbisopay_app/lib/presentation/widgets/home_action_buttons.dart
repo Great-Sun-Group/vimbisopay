@@ -58,7 +58,7 @@ class HomeActionButtons extends StatelessWidget {
       Logger.interaction('Showing account selection for send');
       showModalBottomSheet(
         context: context,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.transparent,
         isScrollControlled: true,
           builder: (context) => AccountSelectionBottomSheet(
             accounts: accounts!,
@@ -99,7 +99,7 @@ class HomeActionButtons extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.9,
         decoration: const BoxDecoration(
@@ -116,7 +116,7 @@ class HomeActionButtons extends StatelessWidget {
   void _showAccountSelection(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       isScrollControlled: true,
           builder: (context) => AccountSelectionBottomSheet(
             accounts: accounts!,

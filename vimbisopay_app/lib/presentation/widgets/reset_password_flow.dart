@@ -114,7 +114,7 @@ class _ResetPasswordFlowState extends State<ResetPasswordFlow>
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: 'Resetting password...',

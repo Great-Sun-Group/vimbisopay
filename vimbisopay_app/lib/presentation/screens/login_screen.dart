@@ -259,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
         spinController: _spinController,
         message: 'Verifying phone number...',
@@ -335,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     unawaited(showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       useSafeArea: false,
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {

@@ -76,24 +76,30 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
           
           if (!mounted) return;
           
-          // Show success message
+          // First show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Vendor profile created successfully'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 2),
             ),
           );
           
-          // Navigate to vendor profile screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => VendorProfileScreen(
-                vendorId: vendor.id,
-                isOwner: true,
-              ),
-            ),
-          );
+          // Wait for the snackbar to be visible before navigating
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              // Navigate to vendor profile screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VendorProfileScreen(
+                    vendorId: vendor.id,
+                    isOwner: true,
+                  ),
+                ),
+              );
+            }
+          });
         },
       );
     } catch (e) {
@@ -148,22 +154,22 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: AppColors.error.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red),
+                            border: Border.all(color: AppColors.error),
                           ),
                           child: Row(
                             children: [
                               const Icon(
                                 Icons.error_outline,
-                                color: Colors.red,
+                                color: AppColors.error,
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
                                   style: const TextStyle(
-                                    color: Colors.red,
+                                    color: AppColors.error,
                                   ),
                                 ),
                               ),

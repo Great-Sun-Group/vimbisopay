@@ -124,12 +124,12 @@ class _TransactionsListState extends State<TransactionsList> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
                       ),
                     )
                   : Text(
                       'Confirm ${_selectedTransactions.length} Transactions',
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: AppColors.white),
                     ),
             ),
           ),
@@ -255,7 +255,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   Text(
                     offer.formattedInitialAmount,
                     style: TextStyle(
-                      color: isIncoming ? AppColors.success : Colors.white,
+                      color: isIncoming ? AppColors.success : AppColors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -278,13 +278,13 @@ class _TransactionsListState extends State<TransactionsList> {
                                 width: 15,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
                                 ),
                               )
                             : const Text(
                                 'Confirm',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               ),
@@ -305,14 +305,14 @@ class _TransactionsListState extends State<TransactionsList> {
                             ? const Text(
                                 'Processing...',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               )
                             : const Text(
                                 'Cancel',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               ),
@@ -347,7 +347,7 @@ class _TransactionsListState extends State<TransactionsList> {
               padding: const EdgeInsets.only(right: 20.0),
               child: const Icon(
                 Icons.cancel,
-                color: Colors.white,
+                color: AppColors.white,
                 size: 28,
               ),
             ),
@@ -415,7 +415,7 @@ class _TransactionsListState extends State<TransactionsList> {
               style: TextStyle(
                 color: transaction.amount >= 0
                     ? AppColors.success
-                    : Colors.white,
+                    : AppColors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),

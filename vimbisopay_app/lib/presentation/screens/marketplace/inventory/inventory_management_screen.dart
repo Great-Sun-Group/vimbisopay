@@ -90,8 +90,18 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
       ),
     );
     
-    if (result == true) {
-      // Refresh the SKU list if a new SKU was added
+    if (result != null && result is Map && result['success'] == true) {
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'SKU added successfully'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
+      
+      // Refresh the SKU list
       _loadSkus();
     }
   }
@@ -107,8 +117,18 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
       ),
     );
     
-    if (result == true) {
-      // Refresh the SKU list if a SKU was edited
+    if (result != null && result is Map && result['success'] == true) {
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'SKU updated successfully'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
+      
+      // Refresh the SKU list
       _loadSkus();
     }
   }
@@ -170,7 +190,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                   const SizedBox(height: 8),
                   Text(
                     errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                    style: const TextStyle(color: AppColors.errorRed),
                   ),
                 ],
               ],
@@ -239,7 +259,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
         },
       ),
     ).then((result) {
-      if (result != null) {
+      if (result != null && mounted) {
         // Update the local state
         setState(() {
           if (result['isAdding']) {
@@ -257,7 +277,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                   ? 'Added ${result['quantity']} to inventory'
                   : 'Removed ${result['quantity']} from inventory',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.successGreen,
           ),
         );
       }
@@ -326,10 +346,10 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                     
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: isAdd ? Colors.green : Colors.red,
+                        backgroundColor: isAdd ? AppColors.successGreen : AppColors.errorRed,
                         child: Icon(
                           isAdd ? Icons.add : Icons.remove,
-                          color: Colors.white,
+                          color: AppColors.white,
                         ),
                       ),
                       title: Text(
@@ -392,7 +412,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.red,
+              color: AppColors.errorRed,
             ),
             const SizedBox(height: 16),
             Text(
@@ -400,7 +420,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.red,
+                color: AppColors.errorRed,
               ),
             ),
             const SizedBox(height: 24),
@@ -474,8 +494,8 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                 ),
                 subtitle: Text(sku['description']),
                 trailing: sku['isAvailable']
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : const Icon(Icons.cancel, color: Colors.red),
+                    ? const Icon(Icons.check_circle, color: AppColors.successGreen)
+                    : const Icon(Icons.cancel, color: AppColors.errorRed),
               ),
               const Divider(),
               Padding(
@@ -541,8 +561,8 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: sku['inventory'] > 0
-                                  ? Colors.green
-                                  : Colors.red,
+                                  ? AppColors.successGreen
+                                  : AppColors.errorRed,
                             ),
                           ),
                         ],

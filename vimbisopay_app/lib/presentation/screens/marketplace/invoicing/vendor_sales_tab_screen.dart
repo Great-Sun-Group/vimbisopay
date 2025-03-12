@@ -175,7 +175,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invoice generated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.successGreen,
           ),
         );
       }
@@ -229,7 +229,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.red,
+              color: AppColors.errorRed,
             ),
             const SizedBox(height: 16),
             Text(
@@ -237,7 +237,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.red,
+                color: AppColors.errorRed,
               ),
             ),
             const SizedBox(height: 24),
@@ -439,7 +439,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
                 label: const Text('Clear Basket'),
                 onPressed: _clearBasket,
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.red,
+                  foregroundColor: AppColors.errorRed,
                 ),
               ),
             ],
@@ -475,7 +475,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: AppColors.black.withOpacity(0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

@@ -262,8 +262,8 @@ Received at: ${DateTime.now()}
                           style: TextStyle(
                             fontSize: 14,
                             color: _marketplaceEnabled
-                                ? Colors.green
-                                : Colors.red,
+                                ? AppColors.success
+                                : AppColors.error,
                           ),
                         ),
                         if (_hasLocalOverride) ...[
@@ -274,10 +274,10 @@ Received at: ${DateTime.now()}
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
+                              color: AppColors.yellowPrimary.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                color: Colors.orange,
+                                color: AppColors.yellowPrimary,
                                 width: 1,
                               ),
                             ),
@@ -285,7 +285,7 @@ Received at: ${DateTime.now()}
                               'Local Override',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.orange,
+                                color: AppColors.yellowPrimary,
                               ),
                             ),
                           ),
@@ -327,7 +327,7 @@ Received at: ${DateTime.now()}
                           }
                         },
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.orange,
+                          foregroundColor: AppColors.yellowPrimary,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 4,
@@ -367,9 +367,9 @@ Received at: ${DateTime.now()}
                   style: TextStyle(
                     fontSize: 16,
                     color: _statusMessage.contains('successfully')
-                        ? Colors.green
+                        ? AppColors.success
                         : _statusMessage.contains('Failed') || _statusMessage.contains('Error')
-                            ? Colors.red
+                            ? AppColors.error
                             : AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
@@ -430,7 +430,7 @@ Received at: ${DateTime.now()}
                         'Local Override: ${_localOverrideValue! ? 'Enabled' : 'Disabled'}',
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.orange,
+                          color: AppColors.yellowPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -467,7 +467,7 @@ Received at: ${DateTime.now()}
                           'Initialized',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.green,
+                            color: AppColors.success,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -514,7 +514,7 @@ Received at: ${DateTime.now()}
             decoration: BoxDecoration(
               color: AppColors.surface,
               border: Border.all(
-                color: _isInitialized ? Colors.grey : Colors.red,
+                color: _isInitialized ? AppColors.textGray : AppColors.error,
               ),
               borderRadius: BorderRadius.circular(4),
             ),
@@ -524,7 +524,7 @@ Received at: ${DateTime.now()}
                 Text(
                   'Initialization Status: $_initializationStatus',
                   style: TextStyle(
-                    color: _isInitialized ? Colors.green : Colors.red,
+                    color: _isInitialized ? AppColors.success : AppColors.error,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -548,7 +548,7 @@ Received at: ${DateTime.now()}
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              border: Border.all(color: Colors.grey),
+              border: Border.all(color: AppColors.textGray),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(_fcmToken),
@@ -568,7 +568,7 @@ Received at: ${DateTime.now()}
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              border: Border.all(color: Colors.grey),
+              border: Border.all(color: AppColors.textGray),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(_lastNotification),
@@ -599,7 +599,7 @@ Received at: ${DateTime.now()}
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('NotificationService not initialized'),
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: AppColors.error,
                                 ),
                               );
                             }
@@ -687,7 +687,7 @@ Received at: ${DateTime.now()}
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('NotificationService not initialized'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.error,
                           ),
                         );
                       }
@@ -715,8 +715,8 @@ Received at: ${DateTime.now()}
                 icon: const Icon(Icons.notifications_active),
                 label: const Text('Test Background Handler'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.yellowPrimary,
+                  foregroundColor: AppColors.white,
                 ),
               ),
             ],

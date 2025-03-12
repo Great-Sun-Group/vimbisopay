@@ -152,7 +152,7 @@ class BasketItemCard extends StatelessWidget {
                     label: const Text('Remove'),
                     onPressed: onRemove,
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
+                      foregroundColor: AppColors.errorRed,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 0,

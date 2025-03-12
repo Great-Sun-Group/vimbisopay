@@ -199,7 +199,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                               final result = await showModalBottomSheet<bool>(
                                 context: context,
                                 isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
+                                backgroundColor: AppColors.transparent,
                                 builder: (context) => ChangePinBottomSheet(
                                 isChangingPin: _hasPin,
                               ),
@@ -229,7 +229,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                               final result = await showModalBottomSheet<bool>(
                                 context: context,
                                 isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
+                                backgroundColor: AppColors.transparent,
                                 builder: (context) => const ChangePasswordBottomSheet(),
                               );
                               

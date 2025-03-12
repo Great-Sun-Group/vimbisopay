@@ -238,7 +238,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       unawaited(showDialog(
         context: context,
         barrierDismissible: false,
-        barrierColor: Colors.black26,
+        barrierColor: AppColors.barrierColor,
         useSafeArea: false,
         routeSettings: const RouteSettings(name: 'loading_dialog'),
         builder: (context) {
@@ -686,7 +686,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                 color: AppColors.surface,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: AppColors.black.withOpacity(0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),

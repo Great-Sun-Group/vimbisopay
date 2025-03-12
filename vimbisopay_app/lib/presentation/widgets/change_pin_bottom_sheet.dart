@@ -204,7 +204,7 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
                                 child: Text(
                                   _error!,
                                   style: const TextStyle(
-                                    color: Color(0xFFB71C1C), // Darker red for better contrast
+                                    color: AppColors.darkRed, // Darker red for better contrast
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     height: 1.3,
@@ -310,7 +310,7 @@ class _ChangePinBottomSheetState extends State<ChangePinBottomSheet> {
                       child: Text(
                         widget.isChangingPin ? 'Change PIN' : 'Set PIN',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

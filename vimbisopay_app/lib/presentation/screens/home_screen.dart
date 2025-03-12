@@ -128,7 +128,7 @@ Error in refresh subscription:
                         children: [
                           const Icon(
                             Icons.check_circle,
-                            color: Colors.white,
+                            color: AppColors.white,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -141,7 +141,7 @@ Error in refresh subscription:
                                     message.notification!.title!,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: AppColors.white,
                                       fontSize: 16,
                                     ),
                                   ),
@@ -149,7 +149,7 @@ Error in refresh subscription:
                                   Text(
                                     message.notification!.body!,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: AppColors.white,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -186,7 +186,7 @@ Error in refresh subscription:
                           angle: 180 * (3.14159 / 180), // Rotate 180 degrees to show incoming
                           child: const Icon(
                             Icons.payments,
-                            color: Colors.white,
+                            color: AppColors.white,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -199,7 +199,7 @@ Error in refresh subscription:
                                 'New Incoming Offer',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 16,
                                 ),
                               ),
@@ -207,7 +207,7 @@ Error in refresh subscription:
                                 Text(
                                   message.notification!.body!,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.white,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -227,7 +227,7 @@ Error in refresh subscription:
                   ),
                   action: SnackBarAction(
                     label: 'DISMISS',
-                    textColor: Colors.white,
+                    textColor: AppColors.white,
                     onPressed: () {
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     },
@@ -252,7 +252,7 @@ Error in refresh subscription:
                           message.notification!.title!,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.white,
                             fontSize: 16,
                           ),
                         ),
@@ -262,7 +262,7 @@ Error in refresh subscription:
                         Text(
                           message.notification!.body!,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.white,
                             fontSize: 14,
                           ),
                         ),
@@ -279,7 +279,7 @@ Error in refresh subscription:
                 ),
                 action: SnackBarAction(
                   label: 'DISMISS',
-                  textColor: Colors.white,
+                  textColor: AppColors.white,
                   onPressed: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   },
@@ -437,7 +437,7 @@ Error reinitializing notification listeners:
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (context) => BlocProvider.value(
         value: _homeBloc,
         child: BlocListener<HomeBloc, HomeState>(
@@ -757,7 +757,7 @@ Error reinitializing notification listeners:
                 duration: const Duration(seconds: 4),
                 action: SnackBarAction(
                   label: 'DISMISS',
-                  textColor: Colors.white,
+                  textColor: AppColors.white,
                   onPressed: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   },
@@ -779,7 +779,7 @@ Error reinitializing notification listeners:
                 duration: const Duration(seconds: 5),
                 action: SnackBarAction(
                   label: 'DISMISS',
-                  textColor: Colors.white,
+                  textColor: AppColors.white,
                   onPressed: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   },
@@ -800,7 +800,7 @@ Error reinitializing notification listeners:
           }
 
           return Scaffold(
-            backgroundColor: Colors.transparent,
+            backgroundColor: AppColors.transparent,
             appBar: _buildAppBar(state),
             body: SafeArea(
               child: _buildScrollableContent(state),

@@ -89,7 +89,7 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                     onPressed: isLoading ? null : onConfirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppColors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -102,7 +102,7 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                  AlwaysStoppedAnimation<Color>(AppColors.white),
                             ),
                           )
                         : const Center(
