@@ -125,3 +125,7 @@ Example entry format:
 -e 
 ## [1.0.0+39] - 2025-03-10
 - WIP market place
+-e 
+## [1.0.0+40] - 2025-03-12
+- 
+- more sample vendors and products 
