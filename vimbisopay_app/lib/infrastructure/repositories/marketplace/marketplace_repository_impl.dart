@@ -29,11 +29,11 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       id: 'v1',
       memberId: 'm1',
       businessName: 'Tech Gadgets',
-      description: 'The latest tech gadgets at affordable prices.',
+      description: 'The latest tech gadgets at affordable prices. We offer a curated selection of high-quality electronics and accessories.',
       email: 'contact@techgadgets.com',
       phone: '+1234567890',
-      profileImageUrl: 'https://example.com/vendor1.jpg',
-      bannerImageUrl: 'https://example.com/banner1.jpg',
+      profileImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800', // Modern store interior
+      bannerImageUrl: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1600', // Tech gadgets display
       rating: 4.5,
       ratingCount: 42,
       isActive: true,
@@ -44,34 +44,51 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       id: 'v2',
       memberId: 'm2',
       businessName: 'Handmade Crafts',
-      description: 'Unique handmade crafts for your home.',
+      description: 'Unique handmade crafts for your home. Each piece is carefully crafted with attention to detail and quality materials.',
       email: 'info@handmadecrafts.com',
       phone: '+1987654321',
-      profileImageUrl: 'https://example.com/vendor2.jpg',
-      bannerImageUrl: 'https://example.com/banner2.jpg',
+      profileImageUrl: 'https://images.unsplash.com/photo-1452860606245-08befc0ff44b?w=800', // Artisan workshop
+      bannerImageUrl: 'https://images.unsplash.com/photo-1464316325666-63beaf639dbb?w=1600', // Handmade crafts display
       rating: 4.8,
       ratingCount: 36,
       isActive: true,
       createdAt: DateTime.now().subtract(const Duration(days: 60)),
       updatedAt: DateTime.now().subtract(const Duration(days: 2)),
     ),
+    Vendor(
+      id: 'v3',
+      memberId: 'm3',
+      businessName: 'Artisanal Delights',
+      description: 'Premium artisanal food products made with the finest ingredients. From specialty coffee to handcrafted chocolates, we bring you gourmet experiences.',
+      email: 'taste@artisanaldelights.com',
+      phone: '+1765432109',
+      profileImageUrl: 'https://images.unsplash.com/photo-1556740758-90de374c12ad?w=800', // Artisanal food shop
+      bannerImageUrl: 'https://images.unsplash.com/photo-1495147466023-ac5c588e2e94?w=1600', // Gourmet food display
+      rating: 4.9,
+      ratingCount: 28,
+      isActive: true,
+      createdAt: DateTime.now().subtract(const Duration(days: 45)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+    ),
   ];
 
   /// Mock products for testing.
   final List<Product> _mockProducts = [
+    // Tech Gadgets Store Products
     Product(
       id: 'p1',
       vendorId: 'v1',
-      name: 'Wireless Earbuds',
-      description: 'High-quality wireless earbuds with noise cancellation.',
+      name: 'Wireless Earbuds Pro',
+      description: 'High-quality wireless earbuds with active noise cancellation, touch controls, and premium sound quality. Perfect for music lovers and professionals.',
       price: 9999, // $99.99
       currency: 'USD',
       imageUrls: [
-        'https://example.com/earbuds1.jpg',
-        'https://example.com/earbuds2.jpg',
+        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800', // Earbuds in case
+        'https://images.unsplash.com/photo-1631867675167-1bb40de8f57f?w=800', // Close-up of earbuds
+        'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=800', // Lifestyle shot
       ],
       category: 'Electronics',
-      tags: ['audio', 'wireless', 'earbuds'],
+      tags: ['audio', 'wireless', 'earbuds', 'noise cancellation'],
       isAvailable: true,
       inventory: 50,
       createdAt: DateTime.now().subtract(const Duration(days: 20)),
@@ -80,38 +97,281 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     Product(
       id: 'p2',
       vendorId: 'v1',
-      name: 'Smart Watch',
-      description: 'Feature-packed smart watch with health tracking.',
+      name: 'SmartFit Watch X1',
+      description: 'Advanced smartwatch with health tracking, heart rate monitoring, sleep analysis, and workout modes. Stay connected and healthy.',
       price: 14999, // $149.99
       currency: 'USD',
       imageUrls: [
-        'https://example.com/watch1.jpg',
-        'https://example.com/watch2.jpg',
+        'https://images.unsplash.com/photo-1617043786394-f977fa12eddf?w=800', // Main product shot
+        'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=800', // On wrist
+        'https://images.unsplash.com/photo-1544117519-31a4b719223d?w=800', // Features display
       ],
       category: 'Electronics',
-      tags: ['wearable', 'smart watch', 'fitness'],
+      tags: ['wearable', 'smart watch', 'fitness', 'health'],
       isAvailable: true,
       inventory: 25,
       createdAt: DateTime.now().subtract(const Duration(days: 15)),
       updatedAt: DateTime.now().subtract(const Duration(days: 3)),
     ),
+    // Tech Gadgets Store Products (continued)
+    Product(
+      id: 'p4',
+      vendorId: 'v1',
+      name: 'Portable Power Bank 20000mAh',
+      description: 'High-capacity power bank with fast charging support, dual USB ports, and LED display. Never run out of battery again.',
+      price: 4999, // $49.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1544866092-1935c5ef2a8f?w=800', // Main product shot
+        'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=800', // LED display view
+      ],
+      category: 'Electronics',
+      tags: ['power bank', 'charger', 'portable', 'accessories'],
+      isAvailable: true,
+      inventory: 100,
+      createdAt: DateTime.now().subtract(const Duration(days: 5)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 5)),
+    ),
+    Product(
+      id: 'p5',
+      vendorId: 'v1',
+      name: 'Wireless Charging Pad',
+      description: 'Sleek wireless charging pad compatible with all Qi-enabled devices. Features LED indicator and fast charging support.',
+      price: 2999, // $29.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1615526675159-e248c3021d3f?w=800', // Product shot
+        'https://images.unsplash.com/photo-1612086636303-92244b5c4ccd?w=800', // In use with phone
+      ],
+      category: 'Electronics',
+      tags: ['wireless charging', 'charger', 'accessories'],
+      isAvailable: true,
+      inventory: 75,
+      createdAt: DateTime.now().subtract(const Duration(days: 8)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 8)),
+    ),
+    
+    // Handmade Crafts Store Products
     Product(
       id: 'p3',
       vendorId: 'v2',
-      name: 'Handmade Vase',
-      description: 'Beautiful handmade ceramic vase for your home.',
+      name: 'Artisan Ceramic Vase',
+      description: 'Handcrafted ceramic vase with unique glazing pattern. Each piece is one-of-a-kind and perfect for modern home decor.',
       price: 3999, // $39.99
       currency: 'USD',
       imageUrls: [
-        'https://example.com/vase1.jpg',
-        'https://example.com/vase2.jpg',
+        'https://images.unsplash.com/photo-1578500351865-d6c3706f46bc?w=800', // Main product shot
+        'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?w=800', // With flowers
+        'https://images.unsplash.com/photo-1581783342308-f792d22116c7?w=800', // Detail shot
       ],
       category: 'Home Decor',
-      tags: ['handmade', 'ceramic', 'vase'],
+      tags: ['handmade', 'ceramic', 'vase', 'pottery'],
       isAvailable: true,
       inventory: 10,
       createdAt: DateTime.now().subtract(const Duration(days: 10)),
       updatedAt: DateTime.now().subtract(const Duration(days: 10)),
+    ),
+    Product(
+      id: 'p6',
+      vendorId: 'v2',
+      name: 'Macrame Wall Hanging',
+      description: 'Beautiful handwoven macrame wall hanging made from 100% cotton rope. Adds texture and bohemian charm to any room.',
+      price: 4999, // $49.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1595408076683-5d0c866c96db?w=800', // Full view
+        'https://images.unsplash.com/photo-1594040226829-7f251ab46d80?w=800', // Detail shot
+      ],
+      category: 'Home Decor',
+      tags: ['handmade', 'macrame', 'wall decor', 'boho'],
+      isAvailable: true,
+      inventory: 8,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+    Product(
+      id: 'p7',
+      vendorId: 'v2',
+      name: 'Handwoven Table Runner',
+      description: 'Elegant table runner handwoven with natural fibers and subtle patterns. Perfect for dining table or console decoration.',
+      price: 3499, // $34.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1619911013257-8f1fbc919fc9?w=800', // Full view
+        'https://images.unsplash.com/photo-1619911013146-5f6e64d991d7?w=800', // Styled shot
+      ],
+      category: 'Home Decor',
+      tags: ['handmade', 'textile', 'table decor', 'woven'],
+      isAvailable: true,
+      inventory: 15,
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 7)),
+    ),
+    Product(
+      id: 'p8',
+      vendorId: 'v2',
+      name: 'Ceramic Plant Pots Set',
+      description: 'Set of 3 handmade ceramic plant pots in varying sizes. Features drainage holes and modern minimalist design.',
+      price: 5999, // $59.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800', // Set display
+        'https://images.unsplash.com/photo-1602662954993-a53d7c2f6e18?w=800', // With plants
+      ],
+      category: 'Home Decor',
+      tags: ['handmade', 'ceramic', 'planters', 'pottery'],
+      isAvailable: true,
+      inventory: 12,
+      createdAt: DateTime.now().subtract(const Duration(days: 4)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 4)),
+    ),
+    
+    // Fashion & Accessories
+    Product(
+      id: 'p9',
+      vendorId: 'v2',
+      name: 'Handmade Leather Wallet',
+      description: 'Premium handcrafted leather wallet with multiple card slots and coin pocket. Made from genuine leather with expert stitching.',
+      price: 4499, // $44.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800', // Main product
+        'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800', // Detail view
+      ],
+      category: 'Fashion',
+      tags: ['leather', 'wallet', 'accessories', 'handmade'],
+      isAvailable: true,
+      inventory: 20,
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    ),
+    Product(
+      id: 'p10',
+      vendorId: 'v2',
+      name: 'Woven Tote Bag',
+      description: 'Spacious handwoven tote bag perfect for daily use. Features strong handles and inner pocket.',
+      price: 5999, // $59.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1591561954557-26941169b49e?w=800', // Full view
+        'https://images.unsplash.com/photo-1591561954555-5c7a1f2e0e52?w=800', // Detail shot
+      ],
+      category: 'Fashion',
+      tags: ['bag', 'tote', 'handwoven', 'accessories'],
+      isAvailable: true,
+      inventory: 15,
+      createdAt: DateTime.now().subtract(const Duration(days: 6)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 6)),
+    ),
+    
+    // Food & Beverages
+    Product(
+      id: 'p11',
+      vendorId: 'v3',
+      name: 'Artisanal Coffee Beans',
+      description: 'Freshly roasted specialty coffee beans with notes of chocolate and caramel. Medium roast, perfect for espresso or filter coffee.',
+      price: 1899, // $18.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1587734005433-8a2fb6a6dd52?w=800', // Beans close-up
+        'https://images.unsplash.com/photo-1587734005433-8a2fb6a6dd52?w=800', // Packaging
+      ],
+      category: 'Food & Beverages',
+      tags: ['coffee', 'beans', 'artisanal', 'specialty'],
+      isAvailable: true,
+      inventory: 50,
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+    ),
+    Product(
+      id: 'p12',
+      vendorId: 'v3',
+      name: 'Handmade Chocolate Box',
+      description: 'Assorted artisanal chocolates in an elegant gift box. Includes dark, milk, and white chocolate varieties with unique fillings.',
+      price: 2999, // $29.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=800', // Box view
+        'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=800', // Chocolates detail
+      ],
+      category: 'Food & Beverages',
+      tags: ['chocolate', 'handmade', 'gift', 'artisanal'],
+      isAvailable: true,
+      inventory: 30,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+    Product(
+      id: 'p13',
+      vendorId: 'v3',
+      name: 'Gourmet Spice Set',
+      description: 'Collection of premium hand-blended spices in beautiful glass jars. Perfect for elevating your cooking.',
+      price: 3499, // $34.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800', // Set display
+        'https://images.unsplash.com/photo-1505714197102-6ae95091ed70?w=800', // Individual jars
+      ],
+      category: 'Food & Beverages',
+      tags: ['spices', 'gourmet', 'cooking', 'gift set'],
+      isAvailable: true,
+      inventory: 25,
+      createdAt: DateTime.now().subtract(const Duration(days: 5)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 5)),
+    ),
+    Product(
+      id: 'p14',
+      vendorId: 'v3',
+      name: 'Local Honey Collection',
+      description: 'Pure, raw honey sourced from local beekeepers. Set includes three varieties: wildflower, clover, and orange blossom.',
+      price: 2499, // $24.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800', // Honey jars
+        'https://images.unsplash.com/photo-1587049352847-de8f3b2b6154?w=800', // Dripping honey
+      ],
+      category: 'Food & Beverages',
+      tags: ['honey', 'natural', 'local', 'organic'],
+      isAvailable: true,
+      inventory: 40,
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    ),
+    Product(
+      id: 'p15',
+      vendorId: 'v3',
+      name: 'Artisanal Tea Collection',
+      description: 'Curated selection of premium loose-leaf teas including green, black, and herbal blends. Each tin contains 50g of tea.',
+      price: 3999, // $39.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=800', // Tea collection
+        'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=800', // Loose tea leaves
+      ],
+      category: 'Food & Beverages',
+      tags: ['tea', 'organic', 'loose leaf', 'gift set'],
+      isAvailable: true,
+      inventory: 35,
+      createdAt: DateTime.now().subtract(const Duration(days: 4)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 4)),
+    ),
+    Product(
+      id: 'p16',
+      vendorId: 'v3',
+      name: 'Artisanal Jam Set',
+      description: 'Handcrafted fruit preserves made in small batches. Set includes strawberry, raspberry, and blueberry jams.',
+      price: 2799, // $27.99
+      currency: 'USD',
+      imageUrls: [
+        'https://images.unsplash.com/photo-1622484211817-4f764a714eee?w=800', // Jam jars
+        'https://images.unsplash.com/photo-1622484211817-4f764a714eee?w=800', // Close-up of jam
+      ],
+      category: 'Food & Beverages',
+      tags: ['jam', 'preserves', 'handmade', 'fruit'],
+      isAvailable: true,
+      inventory: 45,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
     ),
   ];
 
