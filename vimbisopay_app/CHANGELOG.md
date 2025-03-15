@@ -132,3 +132,6 @@ Example entry format:
 -e 
 ## [1.0.0+41] - 2025-03-12
 - Removed database migrationindex creation for db version 9
+-e 
+## [1.0.0+42] - 2025-03-15
+- Added a new product search screen
