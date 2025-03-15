@@ -42,7 +42,50 @@ The Vimbiso Market system uses different types of accounts to track various aspe
 
 ### Account-Based Inventory System
 
-The marketplace inventory system is built on top of the existing account infrastructure, leveraging internal accounts to represent products (SKUs) and their inventory. This approach provides several benefits:
+The marketplace inventory system implements a double-entry accounting approach for tracking products and their value. This system treats each product as an account, enabling precise tracking of both quantity and value while maintaining consistency with accounting principles.
+
+#### Double-Entry Accounting Paradigm
+
+The system follows these key accounting principles:
+
+1. **Product Accounts**
+   - Each product (SKU) is represented as an account
+   - Initial stock creates a positive balance (debit)
+   - Sales create a negative balance (credit)
+   - Account balance represents both quantity and value
+
+2. **Value Addition Flow**
+   ```
+   Raw Materials Account    -$100 (credit)
+   Processing Costs        -$50  (credit)
+   Finished Product        +$150 (debit)
+   ```
+
+3. **Sales Flow**
+   ```
+   Product Account         -$120 (credit)
+   Credex Account         +$120 (debit)
+   ```
+
+4. **Inventory Adjustments**
+   - Spoilage:
+     ```
+     Product Account       -$30 (credit)
+     Loss Account         +$30 (debit)
+     ```
+   - Damage:
+     ```
+     Product Account       -$25 (credit)
+     Damage Account       +$25 (debit)
+     ```
+
+5. **Value Chain Tracking**
+   - Raw materials → Processing → Finished goods
+   - Each transformation creates corresponding debits and credits
+   - Full audit trail of value addition process
+
+#### Benefits of This Approach
+
 
 1. **Unified Accounting**: Products and inventory are integrated directly into the accounting system
 2. **Consistent Transactions**: Inventory movements use the same transaction mechanisms as financial transactions

@@ -14,7 +14,7 @@ class PasswordValidator {
            '• At least one uppercase letter\n'
            '• At least one lowercase letter\n'
            '• At least one number\n'
-           '• At least one special character';
+           '• At least one special character\n';
   }
 
   static PasswordValidationResult validatePassword(String password, [bool showRequirements = false]) {
@@ -53,7 +53,7 @@ class PasswordValidator {
       );
     }
 
-    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>[\]]'))) {
       return const PasswordValidationResult(
         isValid: false,
         error: 'Password must contain at least one special character',
@@ -80,7 +80,7 @@ class PasswordValidator {
     if (password.contains(RegExp(r'[A-Z]'))) strength += 0.1;
     if (password.contains(RegExp(r'[a-z]'))) strength += 0.1;
     if (password.contains(RegExp(r'[0-9]'))) strength += 0.1;
-    if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) strength += 0.1;
+    if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>[\]]'))) strength += 0.1;
     
     // Pattern variety contribution (up to 0.3)
     final hasAlternatingTypes = password.contains(
@@ -89,7 +89,7 @@ class PasswordValidator {
     if (hasAlternatingTypes) strength += 0.15;
     
     final hasMultipleSpecialChars = password.contains(
-      RegExp(r'[!@#$%^&*(),.?":{}|<>].*[!@#$%^&*(),.?":{}|<>]')
+      RegExp(r'[!@#$%^&*(),.?":{}|<>[\]].*[!@#$%^&*(),.?":{}|<>[\]]')
     );
     if (hasMultipleSpecialChars) strength += 0.15;
     

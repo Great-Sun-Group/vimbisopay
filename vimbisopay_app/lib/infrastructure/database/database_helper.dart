@@ -20,7 +20,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 13,
+      version: 14,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -131,10 +131,6 @@ class DatabaseHelper {
     }
     
     // Rest of the previous upgrade code remains unchanged
-    if (oldVersion < 9) {
-      await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
-    }
-    
     if (oldVersion < 8) {
       // Previous password columns migration code remains unchanged
     }
@@ -230,7 +226,13 @@ class DatabaseHelper {
       )
     ''');
     
-    await db.execute('CREATE INDEX idx_ledger_timestamp ON ledger_entries(timestamp)');
+    try {
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_ledger_timestamp ON ledger_entries(timestamp)');
+      Logger.data('Created ledger timestamp index successfully');
+    } catch (e) {
+      Logger.error('Failed to create ledger timestamp index', e);
+      // Don't throw here as the index might already exist
+    }
     
     await db.execute('''
       CREATE TABLE pending_transactions(
