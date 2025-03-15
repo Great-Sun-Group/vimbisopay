@@ -22,6 +22,8 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_s
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/vendor_sales_tab_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
@@ -262,6 +264,37 @@ class MyApp extends StatelessWidget {
               builder: (context) => const HomeScreen(),
             );
           }
+        }
+
+        // Search results screen
+        if (settings.name == '/search-results') {
+          if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+          }
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => SearchResultsScreen(
+              initialQuery: args?['query'] as String?,
+              initialCategory: args?['category'] as String?,
+            ),
+          );
+        }
+
+        // Product detail screen
+        if (settings.name == '/product-detail') {
+          if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+          }
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args == null || !args.containsKey('productId')) {
+            Logger.error('No product ID provided for product-detail route');
+            return MaterialPageRoute(builder: (context) => const MarketplaceScreen());
+          }
+          return MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              productId: args['productId'] as String,
+            ),
+          );
         }
         
         // Vendor profile screen route

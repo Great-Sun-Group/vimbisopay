@@ -12,6 +12,7 @@ import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 
 /// Marketplace screen for the VimbisoPay app.
 ///
@@ -306,41 +307,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _selectCategory(String? category) {
-    setState(() {
-      _selectedCategory = category;
-    });
-    _loadProducts();
+    Navigator.pushNamed(
+      context,
+      '/search-results',
+      arguments: {
+        'category': category,
+      },
+    );
   }
 
-  void _searchProducts(String query) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      final result = await _marketplaceRepository.searchProducts(query);
-
-      result.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to search products';
-          });
-        },
-        (products) {
-          setState(() {
-            _isLoading = false;
-            _products = products;
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'An unexpected error occurred: $e';
-      });
-    }
+  void _searchProducts(String query) {
+    Navigator.pushNamed(
+      context,
+      '/search-results',
+      arguments: {
+        'query': query,
+      },
+    );
   }
   
   Future<void> _scanInvoiceQR() async {
@@ -877,30 +860,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         borderRadius: BorderRadius.circular(8.0),
       ),
       child: InkWell(
-        onTap: () async {
-          // Get the vendor for this product
-          final vendorResult = await _marketplaceRepository.getVendor(product.vendorId);
-          
-          vendorResult.fold(
-            (failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(failure.message ?? 'Failed to load vendor'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            },
-            (vendor) {
-              // Navigate to vendor profile screen
-              Navigator.pushNamed(
-                context,
-                '/vendor-profile',
-                arguments: {
-                  'vendorId': vendor.id,
-                  'isOwner': false,
-                },
-              );
-            },
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProductDetailScreen(
+                productId: product.id,
+              ),
+            ),
           );
         },
         child: Column(
