@@ -22,8 +22,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -51,11 +50,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     _loadSavedUser();
   }
 
@@ -75,9 +69,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    if (!_isLoading) {
-      _spinController.dispose();
-    }
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -136,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
           SizedBox(height: 16),
           Text(
-            'Welcome Back!',
+            'VimbisoPay',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -146,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
           SizedBox(height: 8),
           Text(
-            'Log in to your VimbisoPay account to send money, check balances, and manage your transactions securely.',
+            'Log in to grow your business and manage your wealth.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -255,13 +246,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   Future<void> _doV1Login(String phoneNumber) async {
-    _spinController.repeat();
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
-        spinController: _spinController,
         message: 'Verifying phone number...',
       ),
     );
@@ -272,7 +261,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     if (!mounted) return;
     Navigator.pop(context); // Pop loading dialog
-    _spinController.stop();
 
     v1Result.fold(
       (v1Failure) {
@@ -329,7 +317,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _isLoading = true;
     });
 
-    _spinController.repeat();
 
     // Show loading dialog
     unawaited(showDialog(
@@ -341,7 +328,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       builder: (context) {
         Logger.interaction('[Login] Building loading dialog');
         return LoadingDialog(
-          spinController: _spinController,
           message: 'Logging you in...',
         );
       },
@@ -368,7 +354,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
-          _spinController.stop();
         });
       }
     }
@@ -381,13 +366,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         // Check if this is a PASSWORD_REQUIRED error
         if (failure is AuthFailure && failure.isPasswordRequired) {
           // Show loading while doing v1 login
-          _spinController.repeat();
-          showDialog(
+                showDialog(
             context: context,
             barrierDismissible: false,
             builder: (context) => LoadingDialog(
-              spinController: _spinController,
-              message: 'Initializing verification...',
+                  message: 'Initializing verification...',
             ),
           );
 
@@ -396,7 +379,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
           if (!mounted) return;
           Navigator.pop(context); // Pop loading dialog
-          _spinController.stop();
           
           v1Result.fold(
             (v1Failure) {
@@ -404,13 +386,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             },
             (v1User) async {
               // Request OTP with loading dialog
-              _spinController.repeat();
-              showDialog(
+                  showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (context) => LoadingDialog(
-                  spinController: _spinController,
-                  message: 'Sending verification code...',
+                          message: 'Sending verification code...',
                 ),
               );
 
@@ -422,8 +402,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
               if (!mounted) return;
               Navigator.pop(context); // Pop loading dialog
-              _spinController.stop();
-
+    
               otpResult.fold(
                 (otpFailure) {
                   _showErrorDialog('Failed to send verification code.');
@@ -472,13 +451,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           cleanup();
           
           // Request OTP
-          _spinController.repeat();
           showDialog(
             context: context,
             barrierDismissible: false,
             builder: (context) => LoadingDialog(
-              spinController: _spinController,
-              message: 'Sending verification code...',
+                  message: 'Sending verification code...',
             ),
           );
 
@@ -490,7 +467,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
           if (!mounted) return;
           Navigator.pop(context); // Pop loading dialog
-          _spinController.stop();
 
           otpResult.fold(
             (otpFailure) {
@@ -591,6 +567,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               _formKey.currentState?.validate();
                             });
                           },
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context).nextFocus();
+                          },
                           validator: (_) => _getFieldError('phone'),
                         ),
                       ),
@@ -631,6 +610,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               _validateForm();
                               _formKey.currentState?.validate();
                             });
+                          },
+                          onFieldSubmitted: (_) {
+                            if (_isFormValid && !_isLoading) {
+                              _handleLogin();
+                            }
                           },
                           validator: (_) => _getFieldError('password'),
                         ),
@@ -698,7 +682,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         child: Column(
                           children: [
                             const Text(
-                              'Don\'t have an account?',
+                              'Not a Member Yet?',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,

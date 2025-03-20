@@ -47,6 +47,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _refreshSubscription;
   StreamSubscription? _notificationSubscription;
 
+  void _showUpgradeBottomSheet(BuildContext context, String accountId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.transparent,
+      builder: (context) => BlocProvider.value(
+        value: _homeBloc,
+        child: BlocListener<HomeBloc, HomeState>(
+          listenWhen: (previous, current) => 
+            previous.status != current.status && 
+            (current.status == HomeStatus.upgradingTier || 
+             current.status == HomeStatus.success || 
+             current.status == HomeStatus.error),
+          listener: (context, state) {
+            if (state.status == HomeStatus.upgradingTier) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const LoadingDialog(
+                  message: 'Upgrading your account...',
+                ),
+              );
+            } else {
+              // Close loading dialog on success or error
+              Navigator.of(context).pop(); // Pop loading dialog
+              Navigator.of(context).pop(); // Pop bottom sheet
+            }
+          },
+          child: UpgradeTierBottomSheet(
+            onConfirm: () {
+              _homeBloc.add(HomeUpgradeTierStarted(accountId));
+            },
+            onCancel: () => Navigator.pop(context),
+            isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _setupNotificationListeners() async {
     if (!mounted || _isDisposed) {
       Logger.error('Cannot setup listeners - widget is disposed or unmounted');
@@ -432,54 +472,6 @@ Error reinitializing notification listeners:
     super.dispose();
   }
 
-  void _showUpgradeBottomSheet(BuildContext context, String accountId) {
-    late AnimationController spinController;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.transparent,
-      builder: (context) => BlocProvider.value(
-        value: _homeBloc,
-        child: BlocListener<HomeBloc, HomeState>(
-          listenWhen: (previous, current) => 
-            previous.status != current.status && 
-            (current.status == HomeStatus.upgradingTier || 
-             current.status == HomeStatus.success || 
-             current.status == HomeStatus.error),
-          listener: (context, state) {
-            if (state.status == HomeStatus.upgradingTier) {
-              spinController = AnimationController(
-                duration: const Duration(seconds: 2),
-                vsync: Navigator.of(context),
-              )..repeat();
-              
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => LoadingDialog(
-                  spinController: spinController,
-                  message: 'Upgrading your account...',
-                ),
-              );
-            } else {
-              // Close loading dialog on success or error
-              Navigator.of(context).pop(); // Pop loading dialog
-              spinController.dispose();
-              Navigator.of(context).pop(); // Pop bottom sheet
-            }
-          },
-          child: UpgradeTierBottomSheet(
-            onConfirm: () {
-              _homeBloc.add(HomeUpgradeTierStarted(accountId));
-            },
-            onCancel: () => Navigator.pop(context),
-            isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildUserAvatar(HomeState state) {
     return Padding(
       padding: const EdgeInsets.only(
@@ -487,55 +479,37 @@ Error reinitializing notification listeners:
         top: 16.0,
         bottom: 16.0,
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          CircleAvatar(
-            radius: HomeConstants.avatarSize / 2,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            child: state.dashboard != null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.person,
-                        color: AppColors.primary,
-                        size: HomeConstants.avatarSize / 2,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        UIUtils.getInitials(
-                          state.dashboard!.firstname,
-                          state.dashboard!.lastname,
-                        ),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: HomeConstants.captionTextSize,
-                        ),
-                      ),
-                    ],
-                  )
-                : const Icon(
-                    Icons.person_outline,
+      child: CircleAvatar(
+        radius: HomeConstants.avatarSize / 2,
+        backgroundColor: AppColors.primary.withOpacity(0.1),
+        child: state.dashboard != null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.person,
                     color: AppColors.primary,
                     size: HomeConstants.avatarSize / 2,
                   ),
-          ),
-          if (state.dashboard?.memberTier != null)
-            Positioned(
-              right: -8,
-              bottom: -8,
-              child: MemberTierBadge(
-                tierType: state.dashboard!.memberTier.type,
-                onUpgrade: state.dashboard!.memberTier.type == MemberTierType.open &&
-                        state.dashboard!.accounts.isNotEmpty
-                    ? () => _showUpgradeBottomSheet(
-                        context, state.dashboard!.accounts[state.currentPage].accountID)
-                    : null,
+                  const SizedBox(height: 2),
+                  Text(
+                    UIUtils.getInitials(
+                      state.dashboard!.firstname,
+                      state.dashboard!.lastname,
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: HomeConstants.captionTextSize,
+                    ),
+                  ),
+                ],
+              )
+            : const Icon(
+                Icons.person_outline,
+                color: AppColors.primary,
+                size: HomeConstants.avatarSize / 2,
               ),
-            ),
-        ],
       ),
     );
   }
@@ -647,6 +621,10 @@ Error reinitializing notification listeners:
                   key: ValueKey('account_card_${state.dashboard!.accounts[index].accountID}_${state.dashboard!.accounts[index].balanceData.netCredexAssetsInDefaultDenom}'),
                   account: state.dashboard!.accounts[index],
                   memberTier: state.dashboard!.memberTier,
+                  onUpgrade: state.dashboard!.memberTier.type == MemberTierType.open
+                      ? () => _showUpgradeBottomSheet(
+                          context, state.dashboard!.accounts[index].accountID)
+                      : null,
                 ),
               );
             },

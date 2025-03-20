@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/empty_state.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 
 class TransactionsList extends StatefulWidget {
   const TransactionsList({super.key});
@@ -80,7 +81,7 @@ class _TransactionsListState extends State<TransactionsList> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Pending Transactions',
+                'Pending Credex',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -240,7 +241,7 @@ class _TransactionsListState extends State<TransactionsList> {
                     Text(
                       offer.secured ? 'Secured Credex' : 'Unsecured Credex',
                       style: TextStyle(
-                        color: offer.secured ? AppColors.success : AppColors.warning,
+                        color: offer.secured ? AppColors.techAzure : AppColors.warning,
                         fontSize: 13,
                       ),
                     ),
@@ -546,7 +547,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Text(
-                      'Transaction History',
+                      'Account Ledger',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -574,16 +575,14 @@ class _TransactionsListState extends State<TransactionsList> {
                 const Padding(
                   padding: EdgeInsets.all(24.0),
                   child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                    ),
+                    child: LoadingAnimation(size: 80),
                   ),
                 ),
               ] else if (state.combinedLedgerEntries.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Text(
-                    'Transaction History',
+                    'Account Ledger',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -609,9 +608,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
+                      child: LoadingAnimation(size: 50),
                     ),
                   ),
               ],
@@ -624,9 +621,7 @@ class _TransactionsListState extends State<TransactionsList> {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
+              child: LoadingAnimation(size: 80),
             ),
           );
         }
@@ -664,7 +659,7 @@ class _TransactionsListState extends State<TransactionsList> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Your transaction history will appear here once you start sending or receiving payments.',
+                  'Your Account Ledger will appear here once you start sending or receiving payments.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary,
@@ -683,7 +678,7 @@ class _TransactionsListState extends State<TransactionsList> {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Text(
-                'Transaction History',
+                'Account Ledger',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -709,9 +704,7 @@ class _TransactionsListState extends State<TransactionsList> {
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
+                  child: LoadingAnimation(size: 50),
                 ),
               ),
           ],

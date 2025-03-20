@@ -18,19 +18,7 @@ class CreateAccountScreen extends StatefulWidget {
   State<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
-
-  @override
-  void initState() {
-    super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
-  }
-
+class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -65,10 +53,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
 
   @override
   void dispose() {
-    // Only dispose the spin controller if we're not in the middle of account creation
-    if (!_isLoading) {
-      _spinController.dispose();
-    }
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
@@ -124,7 +108,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
       }
     });
   }
-
 
   void _showError(String message) {
     showDialog(
@@ -188,8 +171,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
     setState(() {
       _isLoading = true;
     });
-
-    _spinController.repeat();
     
     Logger.interaction('[CreateAccount] Set loading state to true');
     
@@ -219,7 +200,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
         Navigator.of(context).pop();
         setState(() {
           _isLoading = false;
-          _spinController.stop();
         });
       }
     }
@@ -244,7 +224,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
         builder: (context) {
           Logger.interaction('[CreateAccount] Building loading dialog');
           return LoadingDialog(
-            spinController: _spinController,
             message: 'Creating your account...',
             messageStream: messageController.stream,
           );
@@ -413,12 +392,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
-          'Create Account',
+          'Become a Member',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -486,6 +464,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                                 _formKey.currentState?.validate();
                               });
                             },
+                            onFieldSubmitted: (_) {
+                              FocusScope.of(context).nextFocus();
+                            },
                             validator: (_) => _getFieldError('firstName'),
                           ),
                         ),
@@ -512,6 +493,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                                 _validateForm();
                                 _formKey.currentState?.validate();
                               });
+                            },
+                            onFieldSubmitted: (_) {
+                              FocusScope.of(context).nextFocus();
                             },
                             validator: (_) => _getFieldError('lastName'),
                           ),
@@ -545,6 +529,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                                 _validateForm();
                                 _formKey.currentState?.validate();
                               });
+                            },
+                            onFieldSubmitted: (_) {
+                              FocusScope.of(context).nextFocus();
                             },
                             validator: (_) => _getFieldError('phone'),
                           ),
@@ -588,6 +575,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                                 _formKey.currentState?.validate();
                               });
                             },
+                            onFieldSubmitted: (_) {
+                              FocusScope.of(context).nextFocus();
+                            },
                             validator: (_) => _getFieldError('password'),
                           ),
                         ),
@@ -628,6 +618,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> with SingleTi
                                 _validateForm();
                                 _formKey.currentState?.validate();
                               });
+                            },
+                            onFieldSubmitted: (_) {
+                              if (_isFormValid && !_isLoading) {
+                                _handleCreateAccount();
+                              }
                             },
                             validator: (_) => _getFieldError('confirmPassword'),
                           ),

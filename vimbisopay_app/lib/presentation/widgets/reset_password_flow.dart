@@ -25,12 +25,10 @@ class ResetPasswordFlow extends StatefulWidget {
   State<ResetPasswordFlow> createState() => _ResetPasswordFlowState();
 }
 
-class _ResetPasswordFlowState extends State<ResetPasswordFlow>
-    with SingleTickerProviderStateMixin {
+class _ResetPasswordFlowState extends State<ResetPasswordFlow> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _repository = ServiceLocator.accountRepository;
-  late AnimationController _spinController;
   final _messageController = StreamController<String>.broadcast();
   String? _error;
   double _passwordStrength = 0.0;
@@ -41,18 +39,12 @@ class _ResetPasswordFlowState extends State<ResetPasswordFlow>
   void initState() {
     super.initState();
     _newPasswordController.addListener(_updatePasswordStrength);
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
   }
 
   @override
   void dispose() {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
-    _spinController.dispose();
     _messageController.close();
     super.dispose();
   }
@@ -110,13 +102,11 @@ class _ResetPasswordFlowState extends State<ResetPasswordFlow>
     final dialogContext = context;
 
     // Show loading dialog
-    _spinController.repeat();
     showDialog(
       context: dialogContext,
       barrierDismissible: false,
       barrierColor: AppColors.barrierColor,
       builder: (context) => LoadingDialog(
-        spinController: _spinController,
         message: 'Resetting password...',
         messageStream: _messageController.stream,
       ),
@@ -165,12 +155,11 @@ class _ResetPasswordFlowState extends State<ResetPasswordFlow>
             actions: [
               TextButton(
                 onPressed: () {
-// Inside the onPressed handler of the OK button in the success dialog
                   Logger.interaction(
                       '[ResetPassword] Success dialog OK pressed, navigating to login');
-// Pop the success dialog using its own context
+                  // Pop the success dialog using its own context
                   Navigator.pop(context);
-// Pop the reset password dialog using the root navigator context
+                  // Pop the reset password dialog using the root navigator context
                   Navigator.of(context, rootNavigator: true).pop();
                   widget.onResetComplete(); // Navigate to login
                 },
@@ -192,7 +181,6 @@ class _ResetPasswordFlowState extends State<ResetPasswordFlow>
         );
       } else {
         Navigator.pop(dialogContext); // Pop loading dialog
-        _spinController.stop();
         setState(() {
           _error = 'Failed to reset password';
         });

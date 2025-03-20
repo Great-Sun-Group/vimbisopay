@@ -22,29 +22,17 @@ class ProfileSettingsScreen extends StatefulWidget {
   State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
 }
 
-class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with SingleTickerProviderStateMixin {
+class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   bool _isLoading = true;
   String? _error;
   User? _user;
-  late final AnimationController _spinController;
-  
   bool _isVendor = false;
   bool _isCheckingVendorStatus = false;
 
   @override
   void initState() {
     super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
-    )..repeat();
     _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _spinController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -316,54 +304,85 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: MemberTierBadge(
-                          tierType: _user?.dashboard?.memberTier.type ?? MemberTierType.open,
-                          onUpgrade: _user?.dashboard?.memberTier.type == MemberTierType.open
-                              ? () async {
-                                  try {
-                                    final sourceAccountId = _user?.dashboard?.member.memberID;
-                                    if (sourceAccountId != null) {
-                                      // Show loading dialog
-                                      if (!context.mounted) return;
-                                      showDialog(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder: (context) => LoadingDialog(
-                                          spinController: _spinController,
-                                          message: 'Upgrading membership...',
-                                        ),
-                                      );
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          MemberTierBadge(
+                            tierType: _user?.dashboard?.memberTier.type ?? MemberTierType.open,
+                          ),
+                          if (_user?.dashboard?.memberTier.type == MemberTierType.open) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  final sourceAccountId = _user?.dashboard?.member.memberID;
+                                  if (sourceAccountId != null) {
+                                    // Show loading dialog
+                                    if (!context.mounted) return;
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (context) => const LoadingDialog(
+                                        message: 'Upgrading membership...',
+                                      ),
+                                    );
 
-                                      await context.read<UpgradeMemberTier>()(sourceAccountId);
-                                      
-                                      // Dismiss loading dialog
-                                      if (!context.mounted) return;
-                                      Navigator.pop(context);
-
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Membership upgrade initiated successfully'),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                      _loadUserData(); // Refresh to show updated status
-                                    }
-                                  } catch (e) {
+                                    await context.read<UpgradeMemberTier>()(sourceAccountId);
+                                    
                                     // Dismiss loading dialog
-                                    if (context.mounted) {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Failed to upgrade membership: ${e.toString()}'),
-                                          backgroundColor: AppColors.error,
-                                        ),
-                                      );
-                                    }
+                                    if (!context.mounted) return;
+                                    Navigator.pop(context);
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Membership upgrade initiated successfully'),
+                                        backgroundColor: AppColors.success,
+                                      ),
+                                    );
+                                    _loadUserData(); // Refresh to show updated status
+                                  }
+                                } catch (e) {
+                                  // Dismiss loading dialog
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to upgrade membership: ${e.toString()}'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
                                   }
                                 }
-                              : null,
-                        ),
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.upgrade,
+                                      size: 14,
+                                      color: AppColors.primary,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Upgrade',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 24),
                       if (_user?.dashboard?.memberTier.type == MemberTierType.open) ...[
@@ -496,26 +515,25 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> with Sing
     );
   }
 
-Widget _buildBenefitItem(IconData icon, String text, {bool isActive = false}) {
-  return Row(
-    children: [
-      Icon(
-        icon,
-        size: 20,
-        color: isActive ? AppColors.success : AppColors.primary,
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 14,
-            color: isActive ? AppColors.success : AppColors.textPrimary,
+  Widget _buildBenefitItem(IconData icon, String text, {bool isActive = false}) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: isActive ? AppColors.success : AppColors.primary,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              color: isActive ? AppColors.success : AppColors.textPrimary,
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 }

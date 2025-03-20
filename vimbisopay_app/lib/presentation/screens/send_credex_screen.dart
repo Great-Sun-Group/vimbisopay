@@ -476,7 +476,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('Send Credex'),
+          title: const Text('Offer Credex'),
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
           leading: IconButton(
@@ -711,7 +711,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                             ),
                           )
                         : const Text(
-                            'Send',
+                            'Sign Offer',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -741,7 +741,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
         return;
       }
 
-      _updateStatus('Creating Credex transaction...');
+      _updateStatus('Offering Secured Credex ...');
 
       final credexRequest = CredexRequest(
         issuerAccountID: widget.senderAccount.accountID,
@@ -817,15 +817,7 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          response.message,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 16,
-                          ),
-                        ),
+                        const SizedBox(height: 16),        
                         const SizedBox(height: 24),
                         Container(
                           padding: const EdgeInsets.all(16),

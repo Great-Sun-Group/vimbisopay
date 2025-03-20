@@ -73,7 +73,7 @@ class _IntroScreenState extends State<IntroScreen> {
             onPageChanged: (index) {
               // When user reaches the last page, show a button to complete
               if (index == 2) {
-                Future.delayed(const Duration(milliseconds: 500), () {
+                Future.delayed(const Duration(milliseconds: 1000), () {
                   widget.onComplete();
                 });
               }

@@ -33,7 +33,7 @@ class HomeActionButtons extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No accounts available to send from',
+            'No accounts available to offer from',
             style: TextStyle(color: AppColors.textPrimary),
           ),
           backgroundColor: AppColors.error,
@@ -149,7 +149,7 @@ class HomeActionButtons extends StatelessWidget {
           ),
           child: const Icon(Icons.payments_outlined),
         ),
-        label: 'Send',
+        label: 'Offer',
       ),
       BottomNavigationBarItem(
         icon: Container(

@@ -18,8 +18,7 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isFormValid = false;
@@ -42,20 +41,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
   @override
   void initState() {
     super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     Logger.lifecycle('ForgotPasswordScreen initialized');
   }
 
   @override
   void dispose() {
     Logger.lifecycle('ForgotPasswordScreen disposing');
-    if (!_isLoading) {
-      _spinController.dispose();
-    }
     _phoneController.dispose();
     super.dispose();
   }
@@ -131,14 +122,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     );
   }
 
-  void _showOtpVerification(String phone, String memberId) {
+  void _showOtpVerification(String phone, String memberId, String token) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => PasswordResetOTPFlow(
         phone: phone,
+        token: token,
         memberId: memberId,
-        onVerificationComplete: (response) {
+        onVerificationComplete: (OtpVerificationResponse response) {
           // Close OTP dialog
           Navigator.pop(context);
           
@@ -214,8 +206,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
       _isLoading = true;
     });
 
-    _spinController.repeat();
-
     // Show loading dialog
     unawaited(showDialog(
       context: context,
@@ -225,8 +215,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {
         Logger.interaction('[ForgotPassword] Building loading dialog');
-        return LoadingDialog(
-          spinController: _spinController,
+        return const LoadingDialog(
           message: 'Sending instructions...',
         );
       },
@@ -248,7 +237,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
           Navigator.of(context).pop(); // Pop loading dialog
           setState(() {
             _isLoading = false;
-            _spinController.stop();
           });
         }
       }
@@ -261,13 +249,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
         (response) {
           cleanup();
           final memberId = response['data']?['action']?['details']?['memberID'];
-          if (memberId == null) {
-            _showError('Failed to get member ID from response');
+          final token = response['data']?['action']?['details']?['token'];
+          if (memberId == null || token == null) {
+            _showError('Failed to get required information from response');
             return;
           }
-          Logger.data('[ForgotPassword] Got memberId from response: $memberId');
-          // Show OTP verification dialog with memberId
-          _showOtpVerification(sanitizedPhone, memberId);
+          Logger.data('[ForgotPassword] Got memberId and token from response');
+          // Show OTP verification dialog with memberId and token
+          _showOtpVerification(sanitizedPhone, memberId, token);
         },
       );
     } catch (e) {
@@ -276,7 +265,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
-          _spinController.stop();
         });
         _showError('Failed to send reset instructions. Please try again.');
       }

@@ -651,7 +651,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   });
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('Create Account'),
+                label: const Text('Become a Member'),
               ),
               const SizedBox(height: 16),
               TextButton(

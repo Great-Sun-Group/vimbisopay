@@ -13,8 +13,7 @@ class ChangePasswordDialog extends StatefulWidget {
   State<ChangePasswordDialog> createState() => _ChangePasswordDialogState();
 }
 
-class _ChangePasswordDialogState extends State<ChangePasswordDialog> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
   late final StreamController<String> _messageController;
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -32,11 +31,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> with Single
   void initState() {
     super.initState();
     _newPasswordController.addListener(_updatePasswordStrength);
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     _messageController = StreamController<String>.broadcast();
   }
 
@@ -45,7 +39,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> with Single
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
-    _spinController.dispose();
     _messageController.close();
     super.dispose();
   }
@@ -92,14 +85,12 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> with Single
     try {
       setState(() => _error = null);
 
-      // Start spinner and show loading dialog
-      _spinController.repeat();
+      // Show loading dialog
       final dialogContext = context;
       showDialog(
         context: dialogContext,
         barrierDismissible: false,
         builder: (context) => LoadingDialog(
-          spinController: _spinController,
           message: 'Updating password...',
           messageStream: _messageController.stream,
         ),
@@ -119,7 +110,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> with Single
       result.fold(
         (failure) {
           Navigator.pop(dialogContext); // Pop loading dialog
-          _spinController.stop();
           setState(() => _error = failure.message ?? 'Failed to change password');
         },
         (_) {

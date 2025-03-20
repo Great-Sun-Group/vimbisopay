@@ -659,7 +659,7 @@ class LoginSignupScreen extends StatelessWidget {
                     side: const BorderSide(color: AppColors.primary),
                   ),
                   child: const Text(
-                    'Create Account',
+                    'Become a Member',
                     style: TextStyle(fontSize: 18),
                   ),
                 ),
