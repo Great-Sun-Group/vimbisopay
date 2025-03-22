@@ -2,6 +2,30 @@
 
 All notable changes to this app will be documented in this file.
 
+## [1.0.0+42] - 2025-03-15
+- Added a new product search screen
+
+## [1.0.0+41] - 2025-03-12
+- Removed database migrationindex creation for db version 9
+
+## [1.0.0+40] - 2025-03-12
+- More sample vendors and products 
+
+## [1.0.0+39] - 2025-03-10
+- WIP market place
+
+## [1.0.0+38] - 2025-02-26
+- Minor update -- fixed push notification issue 
+
+## [1.0.0+37] - 2025-02-22
+- Onboarding phone verification / change password / reset password and pin
+
+## [1.0.0+36] - 2025-02-22
+- Onboarding verification and optimisations
+
+## [1.0.0+35] - 2025-02-03
+- Bug fixes and optimisations
+
 ## [1.0.0+34] - 2025-02-01
 - Added ledger entry caching for improved performance:
   - Implemented local caching of ledger entries
@@ -10,11 +34,11 @@ All notable changes to this app will be documented in this file.
   - Added offline support for viewing transaction history
   - Added documentation in docs/LEDGER_OPTIMIZATION_STEPS.md
 
-## [1.0.0+33] - 2025-01-30
-- member tier update workflow
+## [1.0.0+33] - 2025-03-22
+- UI cosmetic changes, hustler10k and app update ground work
 
 ## [1.0.0+32] - 2025-01-30
-- bug fixes and enhancements
+- Bug fixes and enhancements
 
 ## [1.0.0+31] - 2025-01-30
 - Miscellaneous bug fixes and enhancements 
@@ -55,7 +79,7 @@ All notable changes to this app will be documented in this file.
 - Transaction Confirmation and UI fixes
 
 ## [1.0.0+14] - 2024-12-20
-- dashboard changes
+- Dashboard changes
 
 ## [1.0.0+13] - 2024-12-20
 - Dashboard update
@@ -69,24 +93,24 @@ All notable changes to this app will be documented in this file.
 - Dashboad updates
 
 ## [1.0.0+7] - 2024-12-20
-- new dashboard changes
+- New dashboard changes
 
 ## [1.0.0+6] - 2024-12-18
 - We are now using the updated dashboard structure 
 
 ## [1.0.0+5] - 2024-12-18
-- fixed agressive pagination
+- Fixed agressive pagination
 
 ## [1.0.0+4] - 2024-12-18
-- fixed agrressive pagination
+- Fixed agrressive pagination
 
 ## [1.0.0+3] - 2024-12-18
-- trying to upload package
+- Trying to upload package
 
 ## [1.0.0+2] - 2024-12-18
 - First versioned build
 - First github packages push
-- bug fixes- trx list
+- Bug fixes- trx list
 
 ## [1.0.0+1] - Initial Version
 - Initial release for testing
@@ -110,28 +134,3 @@ Example entry format:
 - Added new feature X
 - Fixed bug in Y
 - Improved Z
--e 
-## [1.0.0+35] - 2025-02-03
-- Bug fixes and optimisations
--e 
-## [1.0.0+36] - 2025-02-22
-- onboarding verification and optimisations
--e 
-## [1.0.0+37] - 2025-02-22
-- Onboarding phone verification / change password / reset password and pin
--e 
-## [1.0.0+38] - 2025-02-26
-- Minor update -- fixed push notification issue 
--e 
-## [1.0.0+39] - 2025-03-10
-- WIP market place
--e 
-## [1.0.0+40] - 2025-03-12
-- 
-- more sample vendors and products 
--e 
-## [1.0.0+41] - 2025-03-12
-- Removed database migrationindex creation for db version 9
--e 
-## [1.0.0+42] - 2025-03-15
-- Added a new product search screen
