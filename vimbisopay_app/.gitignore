@@ -33,6 +33,14 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Platform-specific generated files
+**/linux/flutter/ephemeral/
+**/linux/flutter/generated_*
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.*
+**/macos/Flutter/Flutter-*.xcconfig
+**/macos/Flutter/flutter_export_environment.sh
+
 # Symbolication related
 app.*.symbols
 
