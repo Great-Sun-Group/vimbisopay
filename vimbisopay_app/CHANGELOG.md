@@ -134,3 +134,6 @@ Example entry format:
 - Added new feature X
 - Fixed bug in Y
 - Improved Z
+-e 
+## [1.0.0+43] - 2025-03-22
+- UI cosmetic enhancements, hustler10k and app update ground work
