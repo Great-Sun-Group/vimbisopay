@@ -5,7 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/marketplace/marketplace_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/config_manager.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/remote_config_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
@@ -25,6 +28,9 @@ class ServiceLocator {
   
   // Lazy-initialized services that require async initialization
   static FeatureFlagService? _featureFlagService;
+  static RemoteConfigService? _remoteConfigService;
+  static AppUpdateService? _appUpdateService;
+  static ConfigManager? _configManager;
   
   static final PasswordService _passwordService = PasswordService(
     securityService: _securityService,
@@ -63,6 +69,30 @@ class ServiceLocator {
     return _featureFlagService!;
   }
   
+  // Getter for RemoteConfigService with lazy initialization
+  static RemoteConfigService get remoteConfigService {
+    if (_remoteConfigService == null) {
+      throw Exception('RemoteConfigService not initialized. Call initializeConfigServices() first.');
+    }
+    return _remoteConfigService!;
+  }
+  
+  // Getter for AppUpdateService with lazy initialization
+  static AppUpdateService get appUpdateService {
+    if (_appUpdateService == null) {
+      throw Exception('AppUpdateService not initialized. Call initializeConfigServices() first.');
+    }
+    return _appUpdateService!;
+  }
+  
+  // Getter for ConfigManager with lazy initialization
+  static ConfigManager get configManager {
+    if (_configManager == null) {
+      throw Exception('ConfigManager not initialized. Call initializeConfigServices() first.');
+    }
+    return _configManager!;
+  }
+  
   // Initialize FeatureFlagService
   static Future<FeatureFlagService> initializeFeatureFlagService() async {
     if (_featureFlagService != null) {
@@ -72,6 +102,36 @@ class ServiceLocator {
     final prefs = await SharedPreferences.getInstance();
     _featureFlagService = FeatureFlagService(_remoteConfig, prefs);
     return _featureFlagService!;
+  }
+  
+  // Initialize all config services
+  static Future<ConfigManager> initializeConfigServices() async {
+    if (_configManager != null) {
+      return _configManager!;
+    }
+    
+    // Initialize FeatureFlagService if not already initialized
+    if (_featureFlagService == null) {
+      await initializeFeatureFlagService();
+    }
+    
+    // Initialize RemoteConfigService
+    final prefs = await SharedPreferences.getInstance();
+    _remoteConfigService = RemoteConfigService(_httpClient, prefs, _apiBaseUrl);
+    await _remoteConfigService!.initialize();
+    
+    // Initialize AppUpdateService
+    _appUpdateService = AppUpdateService(_httpClient, prefs, _apiBaseUrl);
+    
+    // Initialize ConfigManager
+    _configManager = ConfigManager(
+      _featureFlagService!,
+      _remoteConfigService!,
+      _appUpdateService!,
+    );
+    await _configManager!.initialize();
+    
+    return _configManager!;
   }
   
   // API configuration

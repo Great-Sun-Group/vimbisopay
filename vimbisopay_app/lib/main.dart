@@ -6,6 +6,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
+import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
@@ -129,22 +130,21 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('Background message handler set up');
     
-    // Initialize feature flag service
-    print('Initializing FeatureFlagService...');
-    final featureFlagService = await ServiceLocator.initializeFeatureFlagService();
-    final featureFlagsInitialized = await featureFlagService.initialize();
+    // Initialize config services
+    print('Initializing config services...');
+    final configManager = await ServiceLocator.initializeConfigServices();
     
-    if (featureFlagsInitialized) {
-      Logger.data('FeatureFlagService initialized successfully');
-      Logger.data('Marketplace feature enabled: ${featureFlagService.isMarketplaceEnabled()}');
-      
-      // Debug: Try to force refresh to ensure we have the latest values
-      print('Attempting to force refresh Remote Config...');
-      final refreshed = await featureFlagService.forceRefresh();
-      print('Force refresh result: $refreshed');
-      print('Marketplace feature enabled after refresh: ${featureFlagService.isMarketplaceEnabled()}');
+    Logger.data('ConfigManager initialized successfully');
+    Logger.data('Marketplace feature enabled: ${configManager.isFeatureEnabled('enable_marketplace')}');
+    
+    // Check for app updates
+    print('Checking for app updates...');
+    final updateInfo = await configManager.checkForUpdate();
+    if (updateInfo != null) {
+      Logger.data('Update available: ${updateInfo['latest_version']}');
+      Logger.data('Update required: ${updateInfo['update_required']}');
     } else {
-      Logger.error('Failed to initialize FeatureFlagService, using default values');
+      Logger.data('No updates available');
     }
     
     // Initialize NotificationService after Firebase is ready
@@ -494,16 +494,27 @@ class IntroWrapper extends StatefulWidget {
   State<IntroWrapper> createState() => _IntroWrapperState();
 }
 
-class _IntroWrapperState extends State<IntroWrapper> {
+class _IntroWrapperState extends State<IntroWrapper> with SingleTickerProviderStateMixin {
   bool _showIntro = true;
   bool _loading = true;
   bool _hasExistingUser = false;
   final _databaseHelper = ServiceLocator.databaseHelper;
   final _securityService = ServiceLocator.securityService;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    );
+    
+    // Start the animation and make it repeat
+    _animationController.repeat();
+    
     _checkInitialState();
   }
 
@@ -569,13 +580,23 @@ class _IntroWrapperState extends State<IntroWrapper> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          child: Lottie.asset(
+            'assets/animations/loading_anim.json',
+            width: 120,
+            height: 120,
+            fit: BoxFit.contain,
+            controller: _animationController,
           ),
         ),
       );

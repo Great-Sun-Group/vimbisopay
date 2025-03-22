@@ -1058,7 +1058,6 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  @override
   Future<Either<Failure, Map<String, dynamic>>> requestOtp({
     required String phone,
     required String purpose,
@@ -1071,6 +1070,7 @@ class AccountRepositoryImpl implements AccountRepository {
         'purpose': purpose,
       };
 
+      Logger.data('[REQUEST_OTP] Sending request for phone: $sanitizedPhone, purpose: $purpose');
       final response = await _loggedRequest(
         () => _httpClient.post(
           Uri.parse(url),
@@ -1084,13 +1084,29 @@ class AccountRepositoryImpl implements AccountRepository {
       );
 
       if (response.statusCode == 200) {
+        Logger.data('[REQUEST_OTP] Request successful');
         final jsonResponse = json.decode(response.body);
         return Right(jsonResponse);
       } else {
-        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to request OTP';
-        return Left(InfrastructureFailure(errorMessage));
+        final responseBody = json.decode(response.body);
+        final errorMessage = responseBody['message'] ?? 'Failed to request OTP';
+        
+        // Extract error code if available
+        String? errorCode;
+        if (responseBody.containsKey('data') && 
+            responseBody['data'].containsKey('action') &&
+            responseBody['data']['action'].containsKey('details')) {
+          errorCode = responseBody['data']['action']['details']['code'];
+          final reason = responseBody['data']['action']['details']['reason'];
+          Logger.error('[REQUEST_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+        } else {
+          Logger.error('[REQUEST_OTP] Request failed', errorMessage);
+        }
+        
+        return Left(InfrastructureFailure(errorMessage, errorCode));
       }
     } catch (e) {
+      Logger.error('[REQUEST_OTP] Exception occurred', e);
       return Left(InfrastructureFailure(e.toString()));
     }
   }
@@ -1139,10 +1155,25 @@ Response body: ${response.body}
         final jsonResponse = json.decode(response.body);
         return Right(OtpVerificationResponse.fromJson(jsonResponse));
       } else {
-        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify OTP';
-        return Left(InfrastructureFailure(errorMessage));
+        final responseBody = json.decode(response.body);
+        final errorMessage = responseBody['message'] ?? 'Failed to verify OTP';
+        
+        // Extract error code if available
+        String? errorCode;
+        if (responseBody.containsKey('data') && 
+            responseBody['data'].containsKey('action') &&
+            responseBody['data']['action'].containsKey('details')) {
+          errorCode = responseBody['data']['action']['details']['code'];
+          final reason = responseBody['data']['action']['details']['reason'];
+          Logger.error('[VERIFY_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+        } else {
+          Logger.error('[VERIFY_OTP] Request failed', errorMessage);
+        }
+        
+        return Left(InfrastructureFailure(errorMessage, errorCode));
       }
     } catch (e) {
+      Logger.error('[VERIFY_OTP] Exception occurred', e);
       return Left(InfrastructureFailure(e.toString()));
     }
   }
@@ -1347,6 +1378,59 @@ Future<bool> resetPassword({
     Logger.error('Error resetting password', e);
     return false;
   }
+}
+
+@override
+Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
+  Logger.data('[UPGRADE_TO_HUSTLER10K] Starting upgrade for account: $accountId');
+  
+  return _executeAuthenticatedRequest(
+    request: (token) async {
+      try {
+        final url = '$baseUrl/hustler10k';
+        final headers = _authHeaders(token);
+        final body = {'personalAccountID': accountId};
+
+        Logger.data('[UPGRADE_TO_HUSTLER10K] Sending request to $url');
+        final response = await _loggedRequest(
+          () => _httpClient.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          Logger.data('[UPGRADE_TO_HUSTLER10K] Upgrade successful');
+          return const Right(true);
+        } else {
+          final responseBody = json.decode(response.body);
+          final errorMessage = responseBody['message'] ?? 'Failed to upgrade to Hustler10k';
+          
+          // Extract error code if available
+          String? errorCode;
+          if (responseBody.containsKey('data') && 
+              responseBody['data'].containsKey('action') &&
+              responseBody['data']['action'].containsKey('details')) {
+            errorCode = responseBody['data']['action']['details']['code'];
+            Logger.error('[UPGRADE_TO_HUSTLER10K] Upgrade failed with code: $errorCode', errorMessage);
+          } else {
+            Logger.error('[UPGRADE_TO_HUSTLER10K] Upgrade failed', errorMessage);
+          }
+          
+          return Left(InfrastructureFailure(errorMessage, errorCode));
+        }
+      } catch (e, stackTrace) {
+        Logger.error('[UPGRADE_TO_HUSTLER10K] Error during upgrade', e, stackTrace);
+        return Left(InfrastructureFailure(
+            'Unexpected error during upgrade: ${e.toString()}'));
+      }
+    },
+  );
 }
 
   Future<Either<Failure, RecurringResponse>> createRecurring(

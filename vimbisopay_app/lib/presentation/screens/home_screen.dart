@@ -69,10 +69,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   message: 'Upgrading your account...',
                 ),
               );
-            } else {
-              // Close loading dialog on success or error
-              Navigator.of(context).pop(); // Pop loading dialog
-              Navigator.of(context).pop(); // Pop bottom sheet
+            } else if (state.status == HomeStatus.success || state.status == HomeStatus.error) {
+              try {
+                // Safely pop dialogs by wrapping in try-catch
+                // First try to pop the loading dialog
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+                
+                // Then try to pop the bottom sheet
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                Logger.error('Error while popping dialogs', e);
+                // If we can't pop normally, use a more aggressive approach
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             }
           },
           child: UpgradeTierBottomSheet(
@@ -146,8 +159,13 @@ Error in refresh subscription:
         (message) {
           if (!_isDisposed && mounted) {
             Logger.data('Showing notification SnackBar');
+            
             // Clear any existing SnackBars first
-            ScaffoldMessenger.of(context).clearSnackBars();
+            try {
+              ScaffoldMessenger.of(context).clearSnackBars();
+            } catch (e) {
+              Logger.error('Error clearing snackbars', e);
+            }
             
             final notificationType = message.data['type']?.toUpperCase();
             Logger.data('Processing notification type: $notificationType');
@@ -159,173 +177,206 @@ Error in refresh subscription:
                 Logger.data('Received OFFER_ACCEPTED for credexId: $credexId');
                 _homeBloc.add(HomeOfferAccepted(credexId));
                 
-                // Show status change snackbar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: AppColors.white,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                // Use post-frame callback to ensure widget tree is stable
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    try {
+                      // Show status change snackbar
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
                               children: [
-                                if (message.notification?.title != null)
-                                  Text(
-                                    message.notification!.title!,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.white,
-                                      fontSize: 16,
-                                    ),
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: AppColors.white,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (message.notification?.title != null)
+                                        Text(
+                                          message.notification!.title!,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      if (message.notification?.body != null)
+                                        Text(
+                                          message.notification!.body!,
+                                          style: const TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                if (message.notification?.body != null)
-                                  Text(
-                                    message.notification!.body!,
-                                    style: const TextStyle(
-                                      color: AppColors.white,
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 4),
-                    margin: const EdgeInsets.all(8),
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                );
+                          backgroundColor: AppColors.success,
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 4),
+                          margin: const EdgeInsets.all(8),
+                          elevation: 6,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      Logger.error('Error showing OFFER_ACCEPTED snackbar', e);
+                    }
+                  }
+                });
+                return;
               }
-              return;
             }
             
             // Special handling for OFFER_CREATED
             if (notificationType == 'OFFER_CREATED') {
               Logger.data('Showing OFFER_CREATED notification');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Transform.rotate(
-                          angle: 180 * (3.14159 / 180), // Rotate 180 degrees to show incoming
-                          child: const Icon(
-                            Icons.payments,
-                            color: AppColors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              
+              // Use post-frame callback to ensure widget tree is stable
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  try {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
                             children: [
-                              const Text(
-                                'New Incoming Offer',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
+                              Transform.rotate(
+                                angle: 180 * (3.14159 / 180), // Rotate 180 degrees to show incoming
+                                child: const Icon(
+                                  Icons.payments,
                                   color: AppColors.white,
-                                  fontSize: 16,
                                 ),
                               ),
-                              if (message.notification?.body != null)
-                                Text(
-                                  message.notification!.body!,
-                                  style: const TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 14,
-                                  ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'New Incoming Offer',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.white,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    if (message.notification?.body != null)
+                                      Text(
+                                        message.notification!.body!,
+                                        style: const TextStyle(
+                                          color: AppColors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                  ],
                                 ),
+                              ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  backgroundColor: AppColors.primary,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 4),
-                  margin: const EdgeInsets.all(8),
-                  elevation: 6,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  action: SnackBarAction(
-                    label: 'DISMISS',
-                    textColor: AppColors.white,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    },
-                  ),
-                ),
-              );
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 4),
+                        margin: const EdgeInsets.all(8),
+                        elevation: 6,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        action: SnackBarAction(
+                          label: 'DISMISS',
+                          textColor: AppColors.white,
+                          onPressed: () {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    Logger.error('Error showing OFFER_CREATED snackbar', e);
+                  }
+                }
+              });
               return;
             }
 
             // Default notification handling for other types
             Logger.data('Showing default notification');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (message.notification?.title != null)
-                        Text(
-                          message.notification!.title!,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.white,
-                            fontSize: 16,
-                          ),
+            
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (message.notification?.title != null)
+                              Text(
+                                message.notification!.title!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            if (message.notification?.title != null && message.notification?.body != null)
+                              const SizedBox(height: 4),
+                            if (message.notification?.body != null)
+                              Text(
+                                message.notification!.body!,
+                                style: const TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                          ],
                         ),
-                      if (message.notification?.title != null && message.notification?.body != null)
-                        const SizedBox(height: 4),
-                      if (message.notification?.body != null)
-                        Text(
-                          message.notification!.body!,
-                          style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 14,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                backgroundColor: AppColors.primary,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-                margin: const EdgeInsets.all(8),
-                elevation: 6,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                action: SnackBarAction(
-                  label: 'DISMISS',
-                  textColor: AppColors.white,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  },
-                ),
-              ),
-            );
+                      ),
+                      backgroundColor: AppColors.primary,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                      margin: const EdgeInsets.all(8),
+                      elevation: 6,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: AppColors.white,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing default notification snackbar', e);
+                }
+              }
+            });
           }
         },
         onError: (error, stackTrace) {
@@ -715,55 +766,101 @@ Error reinitializing notification listeners:
             previous.message != current.message ||
             previous.error != current.error,
         listener: (context, state) {
-          // Clear any existing snackbars
-          ScaffoldMessenger.of(context).clearSnackBars();
+          // Clear any existing snackbars if mounted
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(context).clearSnackBars();
+            } catch (e) {
+              Logger.error('Error clearing snackbars', e);
+            }
+          }
 
           // Show message if present, regardless of status
-          if (state.message != null) {
+          if (state.message != null && mounted) {
             Logger.data('Showing snackbar with message: ${state.message}');
-            // Ensure any existing snackbar is removed first
-            ScaffoldMessenger.of(context).removeCurrentSnackBar();
             
-            // Show the new snackbar
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message!),
-                backgroundColor: state.status == HomeStatus.error 
-                    ? AppColors.error 
-                    : AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-                action: SnackBarAction(
-                  label: 'DISMISS',
-                  textColor: AppColors.white,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  },
-                ),
-              ),
-            );
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  // Ensure any existing snackbar is removed first
+                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                  
+                  // Show the new snackbar
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        state.message!,
+                        style: state.status == HomeStatus.error 
+                            ? const TextStyle(color: AppColors.lightCream)
+                            : null,
+                      ),
+                      backgroundColor: state.status == HomeStatus.error 
+                          ? AppColors.error 
+                          : AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: state.status == HomeStatus.error 
+                            ? AppColors.lightCream
+                            : AppColors.white,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing message snackbar', e);
+                }
+              }
+            });
           }
 
           // Handle error messages
           if (state.hasError && state.error != null) {
             // Dismiss any loading dialogs first
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            try {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } catch (e) {
+              Logger.error('Error popping dialogs', e);
+            }
             
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.error!),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'DISMISS',
-                  textColor: AppColors.white,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  },
-                ),
-              ),
-            );
+            // Log the error for debugging
+            Logger.error('Error occurred', state.error);
+            
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        state.error!,
+                        style: const TextStyle(color: AppColors.lightCream),
+                      ),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: AppColors.lightCream,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing error snackbar', e);
+                }
+              }
+            });
           }
         },
         builder: (context, state) {

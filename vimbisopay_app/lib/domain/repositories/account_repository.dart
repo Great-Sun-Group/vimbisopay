@@ -68,6 +68,11 @@ abstract class AccountRepository {
   Future<Either<Failure, bool>> registerNotificationToken(String token);
 
   Future<Either<Failure, RecurringResponse>> createRecurring(RecurringRequest request);
+  
+  /// Upgrades a member to the Hustler10k tier
+  /// 
+  /// [accountId] The account ID of the member to upgrade
+  Future<Either<Failure, bool>> upgradeToHustler10k(String accountId);
 
   /// Updates a member's password after validating their current password
   /// 

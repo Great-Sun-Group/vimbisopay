@@ -169,7 +169,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         (failure) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(failure.message ?? 'Failed to load vendor profile'),
+              content: Text(
+                failure.message ?? 'Failed to load vendor profile',
+                style: const TextStyle(color: AppColors.lightCream),
+              ),
               backgroundColor: AppColors.errorRed,
             ),
           );
@@ -192,7 +195,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An error occurred: $e'),
+          content: Text(
+            'An error occurred: $e',
+            style: const TextStyle(color: AppColors.lightCream),
+          ),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -315,7 +321,15 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                             GestureDetector(
                               onTap: () async {
                                 try {
-                                  final sourceAccountId = _user?.dashboard?.member.memberID;
+                                  // Find the personal account ID (owned account)
+                                  final personalAccount = _user?.dashboard?.accounts.firstWhere(
+                                    (account) => account.isOwnedAccount,
+                                    orElse: () => _user!.dashboard!.accounts.first,
+                                  );
+                                  
+                                  final sourceAccountId = personalAccount?.accountID;
+                                  Logger.data('[UPGRADE_MEMBERSHIP] Using account ID: $sourceAccountId (isOwnedAccount: ${personalAccount?.isOwnedAccount})');
+                                  
                                   if (sourceAccountId != null) {
                                     // Show loading dialog
                                     if (!context.mounted) return;
@@ -333,24 +347,60 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                     if (!context.mounted) return;
                                     Navigator.pop(context);
 
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Membership upgrade initiated successfully'),
-                                        backgroundColor: AppColors.success,
-                                      ),
-                                    );
+                                    // Use post-frame callback to ensure widget tree is stable
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (context.mounted) {
+                                        try {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Membership upgrade initiated successfully'),
+                                              backgroundColor: AppColors.success,
+                                            ),
+                                          );
+                                        } catch (snackBarError) {
+                                          Logger.error('Error showing success snackbar', snackBarError);
+                                        }
+                                      }
+                                    });
+                                    
                                     _loadUserData(); // Refresh to show updated status
                                   }
                                 } catch (e) {
+                                  // Log the actual error for debugging
+                                  Logger.error('Failed to upgrade membership', e);
+                                  
                                   // Dismiss loading dialog
                                   if (context.mounted) {
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Failed to upgrade membership: ${e.toString()}'),
-                                        backgroundColor: AppColors.error,
-                                      ),
-                                    );
+                                    
+                                    // Default error message
+                                    String userFriendlyMessage = 'Unable to upgrade membership at this time. Please try again later.';
+                                    
+                                    // Check for specific error codes
+                                    final errorMessage = e.toString();
+                                    if (errorMessage.contains('INSUFFICIENT_SECURED_BALANCE')) {
+                                      userFriendlyMessage = 'You don\'t have enough secured balance to upgrade. Your maximum securable balance is too low for this upgrade.';
+                                      Logger.data('[UPGRADE_MEMBERSHIP] Detected INSUFFICIENT_SECURED_BALANCE error');
+                                    }
+                                    
+                                    // Use post-frame callback to ensure widget tree is stable
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (context.mounted) {
+                                        try {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                userFriendlyMessage,
+                                                style: const TextStyle(color: AppColors.lightCream),
+                                              ),
+                                              backgroundColor: AppColors.error,
+                                            ),
+                                          );
+                                        } catch (snackBarError) {
+                                          Logger.error('Error showing error snackbar', snackBarError);
+                                        }
+                                      }
+                                    });
                                   }
                                 }
                               },

@@ -11,7 +11,9 @@ class DomainFailure extends Failure {
 
 /// Infrastructure failures
 class InfrastructureFailure extends Failure {
-  const InfrastructureFailure([super.message]);
+  final String? code;
+  
+  const InfrastructureFailure([super.message, this.code]);
 }
 
 /// Server failures

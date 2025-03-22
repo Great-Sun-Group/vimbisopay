@@ -34,6 +34,7 @@ abstract class AppColors {
   static const Color black = Color(0xFF000000);         // BLACK
   static const Color black45 = Color(0x73000000);       // BLACK with 45% opacity
   static const Color white = Color(0xFFFFFFFF);         // WHITE
+  static const Color lightCream = Color(0xFFFFFAE6);    // LIGHT CREAM (for text on red backgrounds)
   static const Color red = Color(0xFFFF0000);           // RED
   static const Color darkRed = Color(0xFFB71C1C);       // DARK RED
   static const Color green = Color(0xFF4CAF50);         // GREEN (same as success)

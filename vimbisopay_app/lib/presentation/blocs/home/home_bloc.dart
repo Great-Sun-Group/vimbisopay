@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logger/logger.dart';
@@ -474,9 +475,28 @@ Dashboard refresh stats:
   }
 
   void _onHomeUpgradeTierFailed(HomeUpgradeTierFailed event, Emitter<HomeState> emit) {
+    // Log the actual error for debugging
+    _logger.e('Upgrade tier failed: ${event.message}');
+    _logger.d('Full error message: ${event.message}');
+    
+    // Default message
+    String userFriendlyMessage = 'Unable to upgrade membership at this time. Please try again later.';
+    
+    // Check for the error code in the message
+    // The error code is embedded in the message as "|code=ERROR_CODE"
+    if (event.message.contains('|code=INSUFFICIENT_SECURED_BALANCE')) {
+      userFriendlyMessage = 'You don\'t have enough secured balance to upgrade. Your maximum securable balance is too low for this upgrade.';
+      _logger.d('Detected INSUFFICIENT_SECURED_BALANCE error code');
+    } 
+    // Fallback to checking for the error code in JSON format
+    else if (event.message.contains('"code": "INSUFFICIENT_SECURED_BALANCE"')) {
+      userFriendlyMessage = 'You don\'t have enough secured balance to upgrade. Your maximum securable balance is too low for this upgrade.';
+      _logger.d('Detected INSUFFICIENT_SECURED_BALANCE error code in JSON format');
+    }
+    
     emit(state.copyWith(
       status: HomeStatus.error,
-      error: event.message,
+      error: userFriendlyMessage,
     ));
   }
 

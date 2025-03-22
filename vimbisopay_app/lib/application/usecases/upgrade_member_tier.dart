@@ -1,3 +1,5 @@
+import 'package:vimbisopay_app/core/error/failures.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 
@@ -7,6 +9,8 @@ class UpgradeMemberTier {
   UpgradeMemberTier(this.repository);
 
   Future<void> call(String sourceAccountId) async {
+    // Old implementation (kept but not used)
+    /*
     final request = RecurringRequest(
       sourceAccountID: sourceAccountId,
       templateType: 'MEMBERTIER_SUBSCRIPTION',
@@ -22,5 +26,22 @@ class UpgradeMemberTier {
     );
 
     await repository.createRecurring(request);
+    */
+    
+    // New implementation using the Hustler10k endpoint
+    Logger.data('[UPGRADE_MEMBER_TIER] Upgrading member with account ID: $sourceAccountId');
+    final result = await repository.upgradeToHustler10k(sourceAccountId);
+    
+    result.fold(
+      (failure) {
+        // Preserve error code in the exception message if available
+        if (failure is InfrastructureFailure && failure.code != null) {
+          throw Exception('Failed to upgrade member: ${failure.message}|code=${failure.code}');
+        } else {
+          throw Exception('Failed to upgrade member: ${failure.message}');
+        }
+      },
+      (_) => Logger.data('[UPGRADE_MEMBER_TIER] Member upgrade successful'),
+    );
   }
 }

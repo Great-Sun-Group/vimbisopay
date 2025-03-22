@@ -105,11 +105,10 @@ class UpgradeTierBottomSheet extends StatelessWidget {
                                   AlwaysStoppedAnimation<Color>(AppColors.white),
                             ),
                           )
-                        : const Center(
-                            child: Text(
-                              'Confirm Upgrade',
-                              style: TextStyle(fontSize: 16),
-                            ),
+                        : const Text(
+                            'Upgrade',
+                            style: TextStyle(fontSize: 16),
+                            textAlign: TextAlign.center,
                           ),
                   ),
                 ),

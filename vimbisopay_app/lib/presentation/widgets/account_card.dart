@@ -225,7 +225,7 @@ class AccountCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: HomeConstants.subheadingTextSize,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.successGreen,
+                        color: AppColors.techAzure,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

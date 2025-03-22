@@ -41,6 +41,8 @@ dependencies:
   path_provider: any
   image_picker: ^1.0.4
   cached_network_image: ^3.3.0
+  package_info_plus: ^4.2.0  # For app version information
+  device_info_plus: ^9.1.1   # For device information
 dev_dependencies:
   flutter_test:
     sdk: flutter

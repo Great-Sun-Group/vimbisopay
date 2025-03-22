@@ -708,7 +708,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         ),
                       )
                     : const Text(
-                        'Create Account',
+                        'Become a Member',
                         style: TextStyle(fontSize: 16),
                       ),
               ),

@@ -11,8 +11,8 @@ import 'package:vimbisopay_app/main.dart';
 /// Debug screen for the VimbisoPay app.
 ///
 /// This screen provides debugging tools for the app, such as forcing a refresh
-/// of the Remote Config and viewing the current values of feature flags,
-/// as well as testing and debugging push notifications.
+/// of the Remote Config, viewing the current values of feature flags,
+/// testing app updates, and debugging push notifications.
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
 
@@ -33,6 +33,11 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
   bool _hasLocalOverride = false;
   bool? _localOverrideValue;
   
+  // App updates tab variables
+  bool _checkingForUpdates = false;
+  String _updateStatus = '';
+  Map<String, dynamic>? _updateInfo;
+  
   // Notifications tab variables
   String _notificationStatus = 'Checking...';
   String _fcmToken = 'Unknown';
@@ -44,7 +49,7 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadCurrentValues();
     _initializeNotificationService();
   }
@@ -179,6 +184,7 @@ Received at: ${DateTime.now()}
           controller: _tabController,
           tabs: const [
             Tab(text: 'Feature Flags'),
+            Tab(text: 'App Updates'),
             Tab(text: 'Notifications'),
           ],
           labelColor: AppColors.primary,
@@ -191,6 +197,9 @@ Received at: ${DateTime.now()}
         children: [
           // Feature Flags Tab
           _buildFeatureFlagsTab(),
+          
+          // App Updates Tab
+          _buildAppUpdatesTab(),
           
           // Notifications Tab
           _buildNotificationsTab(),
@@ -490,6 +499,239 @@ Received at: ${DateTime.now()}
         ),
       ),
     );
+  }
+  
+  // App Updates Tab
+  Widget _buildAppUpdatesTab() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'App Update Testing',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _checkingForUpdates ? null : _checkForUpdates,
+              icon: const Icon(Icons.system_update),
+              label: const Text('Check for Updates'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textPrimary,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_checkingForUpdates)
+              const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+            if (_updateStatus.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Text(
+                  _updateStatus,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: _updateStatus.contains('available')
+                        ? AppColors.success
+                        : _updateStatus.contains('No updates') || _updateStatus.contains('Error')
+                            ? AppColors.error
+                            : AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            if (_updateInfo != null) ...[
+              const SizedBox(height: 16),
+              Card(
+                color: AppColors.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Update Information',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildUpdateInfoRow('Version', _updateInfo!['latest_version']),
+                      _buildUpdateInfoRow('Required', _updateInfo!['update_required'] ? 'Yes' : 'No'),
+                      _buildUpdateInfoRow('Priority', _updateInfo!['update_priority']),
+                      _buildUpdateInfoRow('Type', _updateInfo!['update_type']),
+                      if (_updateInfo!['file_size_bytes'] != null)
+                        _buildUpdateInfoRow('Size', _formatFileSize(_updateInfo!['file_size_bytes'])),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Release Notes:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _updateInfo!['release_notes'] ?? 'No release notes available',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                final result = await ServiceLocator.configManager.showUpdateDialog(
+                                  context,
+                                  _updateInfo!,
+                                );
+                                
+                                if (result && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('User chose to update')),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.visibility),
+                              label: const Text('Show Dialog'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                setState(() {
+                                  _checkingForUpdates = true;
+                                  _updateStatus = 'Downloading update...';
+                                });
+                                
+                                try {
+                                  final result = await ServiceLocator.configManager.downloadAndInstallUpdate(
+                                    _updateInfo!['update_url'],
+                                  );
+                                  
+                                  setState(() {
+                                    _checkingForUpdates = false;
+                                    _updateStatus = result
+                                        ? 'Update downloaded successfully!'
+                                        : 'Failed to download update.';
+                                  });
+                                } catch (e) {
+                                  setState(() {
+                                    _checkingForUpdates = false;
+                                    _updateStatus = 'Error downloading update: $e';
+                                  });
+                                }
+                              },
+                              icon: const Icon(Icons.download),
+                              label: const Text('Download'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                foregroundColor: AppColors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Helper method to build update info rows
+  Widget _buildUpdateInfoRow(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          Text(
+            value?.toString() ?? 'N/A',
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Helper method to format file size
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+  
+  // Method to check for updates
+  Future<void> _checkForUpdates() async {
+    setState(() {
+      _checkingForUpdates = true;
+      _updateStatus = 'Checking for updates...';
+      _updateInfo = null;
+    });
+    
+    try {
+      final updateInfo = await ServiceLocator.configManager.checkForUpdate();
+      
+      setState(() {
+        _checkingForUpdates = false;
+        if (updateInfo != null) {
+          _updateInfo = updateInfo;
+          _updateStatus = 'Update available: ${updateInfo['latest_version']}';
+        } else {
+          _updateStatus = 'No updates available';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _checkingForUpdates = false;
+        _updateStatus = 'Error checking for updates: $e';
+      });
+    }
   }
   
   // Notifications Tab

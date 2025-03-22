@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -87,7 +88,16 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
         (failure) {
           Navigator.of(dialogContext).pop();
           setState(() {
-            _error = failure.message ?? 'Failed to verify OTP';
+            if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+              // Extract the wait time from the error message if available
+              final reason = failure.message?.contains('Try again in') == true 
+                  ? failure.message 
+                  : 'Please wait before verifying another OTP';
+              _error = reason;
+              Logger.data('[VERIFY_OTP] Rate limited: $reason');
+            } else {
+              _error = failure.message ?? 'Failed to verify OTP';
+            }
             _isLoading = false;
           });
         },
@@ -223,7 +233,16 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
       result.fold(
         (failure) {
           setState(() {
-            _error = failure.message ?? 'Failed to resend OTP';
+            if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+              // Extract the wait time from the error message if available
+              final reason = failure.message?.contains('Try again in') == true 
+                  ? failure.message 
+                  : 'Please wait before requesting another OTP';
+              _error = reason;
+              Logger.data('[RESEND_OTP] Rate limited: $reason');
+            } else {
+              _error = failure.message ?? 'Failed to resend OTP';
+            }
           });
         },
         (_) {
