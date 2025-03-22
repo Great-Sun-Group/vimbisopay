@@ -13,18 +13,23 @@ class MemberTierBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Don't show anything for special tier
+    if (tierType == MemberTierType.special) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: _getBadgeColor(),
         borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
         border: Border.all(
-          color: tierType == MemberTierType.hustler ? AppColors.success : Colors.white,
+          color: tierType == MemberTierType.hustler ? AppColors.success : AppColors.white,
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: AppColors.black.withOpacity(0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -33,7 +38,7 @@ class MemberTierBadge extends StatelessWidget {
       child: Text(
         _getTierLabel(),
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.white,
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),

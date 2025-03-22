@@ -11,6 +11,7 @@ enum HomeStatus {
   loadingMore,
   acceptingCredex,
   cancellingCredex,
+  upgradingTier,
 }
 
 class HomeState extends Equatable {
@@ -55,6 +56,7 @@ class HomeState extends Equatable {
   bool get isLoadingMore => status == HomeStatus.loadingMore;
   bool get isAcceptingCredex => status == HomeStatus.acceptingCredex;
   bool get isCancellingCredex => status == HomeStatus.cancellingCredex;
+  bool get isUpgradingTier => status == HomeStatus.upgradingTier;
   bool get hasError => status == HomeStatus.error;
 
   bool get hasPendingTransactions => 

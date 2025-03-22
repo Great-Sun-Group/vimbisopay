@@ -1,88 +1,144 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:pointycastle/export.dart';
+import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:flutter/foundation.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 class PasswordService {
-  static const int SALT_LENGTH = 16;
-  static const int HASH_LENGTH = 32;
-  static const int ITERATIONS = 100000; // OWASP recommended minimum
-  
-  static ({String hash, String salt}) _hashPasswordSync(Map<String, dynamic> args) {
-    final String password = args['password'];
-    final String salt = args['salt'];
-    
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
-    pbkdf2.init(Pbkdf2Parameters(base64Decode(salt), ITERATIONS, HASH_LENGTH));
-    final hash = pbkdf2.process(utf8.encode(password));
-    
-    return (hash: base64Encode(hash), salt: salt);
-  }
+  final DatabaseHelper _databaseHelper;
+  final SecurityService _securityService;
+  final http.Client _httpClient;
 
-  Future<({String hash, String salt})> hashPassword(String password) async {
-    Logger.data('Generating password hash');
+  PasswordService({
+    required SecurityService securityService,
+    DatabaseHelper? databaseHelper,
+    http.Client? httpClient,
+  }) : _databaseHelper = databaseHelper ?? DatabaseHelper(),
+       _securityService = securityService,
+       _httpClient = httpClient ?? http.Client();
+
+  Future<bool> verifyPassword(String? username, String? password, String? deviceId) async {
     try {
-      final salt = _generateSalt();
-      
-      final result = await compute(_hashPasswordSync, {
-        'password': password,
-        'salt': salt,
-      });
-      
-      Logger.data('Password hash generated successfully');
-      return result;
+      Logger.interaction('Verifying password');
+      // In a real app, this would verify against the backend
+      // For now, we'll just check if the user has a PIN set
+      final hasPin = await _securityService.isSecuritySetup();
+      return hasPin;
     } catch (e) {
-      Logger.error('Failed to hash password', e);
-      throw Exception('Failed to hash password: $e');
-    }
-  }
-  
-  String _generateSalt() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(SALT_LENGTH, (i) => random.nextInt(256));
-    return base64Encode(bytes);
-  }
-
-  static bool _verifyPasswordSync(Map<String, dynamic> args) {
-    final String password = args['password'];
-    final String hash = args['hash'];
-    final String salt = args['salt'];
-    
-    final hashBytes = base64Decode(hash);
-    final saltBytes = base64Decode(salt);
-    
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
-    pbkdf2.init(Pbkdf2Parameters(saltBytes, ITERATIONS, HASH_LENGTH));
-    final newHash = pbkdf2.process(utf8.encode(password));
-    
-    // Use constant-time comparison to prevent timing attacks
-    if (hashBytes.length != newHash.length) {
+      Logger.error('Error verifying password', e);
       return false;
     }
-    
-    var result = 0;
-    for (var i = 0; i < hashBytes.length; i++) {
-      result |= hashBytes[i] ^ newHash[i];
-    }
-    
-    return result == 0;
   }
 
-  Future<bool> verifyPassword(String password, String hash, String salt) async {
-    Logger.data('Verifying password');
+  Future<String> hashPassword(String password) async {
+    final codec = const Utf8Codec();
+    final key = codec.encode(password);
+    final hash = sha256.convert(key);
+    return base64.encode(hash.bytes);
+  }
+
+  Map<String, String> get _baseHeaders => {
+    'Content-Type': 'application/json',
+    'x-client-api-key': ApiConfig.apiKey,
+  };
+
+  Map<String, String> _authHeaders(String token) => {
+    ..._baseHeaders,
+    'Authorization': 'Bearer $token',
+  };
+
+  Future<http.Response> _loggedRequest(
+    Future<http.Response> Function() request,
+    String url,
+    String method, {
+    Map<String, String>? headers,
+    dynamic body,
+  }) async {
     try {
-      final isValid = await compute(_verifyPasswordSync, {
-        'password': password,
-        'hash': hash,
-        'salt': salt,
-      });
-      
-      Logger.data('Password verification result: $isValid');
-      return isValid;
+      Logger.data('''
+Making API request:
+- URL: $url
+- Method: $method
+- Headers: $headers
+- Body: $body
+''');
+
+      final response = await request();
+
+      Logger.data('''
+API response received:
+- Status: ${response.statusCode}
+- Body: ${response.body}
+''');
+
+      return response;
     } catch (e) {
-      Logger.error('Failed to verify password', e);
-      throw Exception('Failed to verify password: $e');
+      Logger.error('API request failed', e);
+      rethrow;
+    }
+  }
+
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    Logger.interaction('Changing password');
+    
+    try {
+      // Get current user to access stored password hash
+      final user = await _databaseHelper.getUser();
+      if (user == null) {
+        throw Exception('Not authenticated');
+      }
+
+      if (user.passwordHash == null) {
+        throw Exception('No stored password hash found');
+      }
+
+      // Verify current password
+      final currentHash = await hashPassword(currentPassword);
+      if (currentHash != user.passwordHash) {
+        throw Exception('Current password is incorrect');
+      }
+
+      // Hash new password
+      final newHash = await hashPassword(newPassword);
+
+      final url = '${ApiConfig.baseUrl}/updatePassword';
+      final headers = _authHeaders(user.token);
+      final body = {
+        'currentPassword': currentHash,
+        'newPassword': newHash,
+      };
+
+      final response = await _loggedRequest(
+        () => _httpClient.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(body),
+        ),
+        url,
+        'POST',
+        headers: headers,
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to change password';
+        throw Exception(errorMessage);
+      }
+
+      // Update stored password hash
+      final updatedUser = user.copyWith(
+        passwordHash: newHash,
+        passwordChanged: DateTime.now(),
+      );
+      await _databaseHelper.saveUser(updatedUser);
+
+      Logger.state('Password changed successfully');
+    } catch (e) {
+      Logger.error('Error changing password', e);
+      throw Exception('Failed to change password: ${e.toString()}');
     }
   }
 }

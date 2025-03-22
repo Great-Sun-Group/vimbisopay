@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:async';
+import 'package:lottie/lottie.dart';
+import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -11,12 +17,22 @@ import 'package:vimbisopay_app/presentation/screens/auth_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/send_credex_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_setup_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/vendor_sales_tab_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -43,7 +59,7 @@ Message details:
 
     // Initialize NotificationService to handle background message
     print('Initializing NotificationService in background...');
-    final notificationService = NotificationService();
+    final notificationService = ServiceLocator.notificationService;
     final initialized = await notificationService.initialize();
     
     if (initialized) {
@@ -72,7 +88,7 @@ Message details:
       
       // Initialize database helper to refresh data
       print('Initializing database helper...');
-      final databaseHelper = DatabaseHelper();
+      final databaseHelper = ServiceLocator.databaseHelper;
       final user = await databaseHelper.getUser();
       if (user != null) {
         print('User found, refreshing data...');
@@ -104,21 +120,48 @@ void main() async {
     await Firebase.initializeApp();
     print('Firebase initialized successfully');
     
+    // Initialize Firebase Analytics
+    print('Initializing Firebase Analytics...');
+    final analytics = ServiceLocator.analytics;
+    print('Firebase Analytics initialized successfully');
+    
     // Set up background message handler
     print('Setting up background message handler...');
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('Background message handler set up');
     
+    // Initialize config services
+    print('Initializing config services...');
+    final configManager = await ServiceLocator.initializeConfigServices();
+    
+    Logger.data('ConfigManager initialized successfully');
+    Logger.data('Marketplace feature enabled: ${configManager.isFeatureEnabled('enable_marketplace')}');
+    
+    // Check for app updates
+    print('Checking for app updates...');
+    final updateInfo = await configManager.checkForUpdate();
+    if (updateInfo != null) {
+      Logger.data('Update available: ${updateInfo['latest_version']}');
+      Logger.data('Update required: ${updateInfo['update_required']}');
+    } else {
+      Logger.data('No updates available');
+    }
+    
     // Initialize NotificationService after Firebase is ready
     print('Initializing NotificationService...');
-    final notificationService = NotificationService();
+    final notificationService = ServiceLocator.notificationService;
     final initialized = await notificationService.initialize();
     
     if (!initialized) {
-      print('Failed to initialize NotificationService');
-    } else {
-      print('NotificationService initialized successfully');
+      Logger.error('Failed to initialize NotificationService');
+      // Don't proceed if notification service fails to initialize
+      return;
     }
+    Logger.data('''
+NotificationService initialized successfully:
+- Has refresh controller: ${notificationService.onRefreshNeeded != null}
+- Has notification controller: ${notificationService.onNotification != null}
+''');
     
     print('=== APP INITIALIZATION COMPLETE ===');
   } catch (e, stackTrace) {
@@ -129,18 +172,41 @@ void main() async {
 ''');
   }
   
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  runApp(MyApp(sharedPreferences: prefs));
 }
 
-// Rest of the file remains unchanged
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final SharedPreferences sharedPreferences;
+  
+  const MyApp({
+    required this.sharedPreferences,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VimbisoPay',
-      theme: ThemeData(
+    return MultiProvider(
+      providers: [
+        Provider<SharedPreferences>.value(value: sharedPreferences),
+        Provider<DatabaseHelper>.value(
+          value: ServiceLocator.databaseHelper,
+        ),
+        BlocProvider(
+          create: (context) => NotificationsBloc(sharedPreferences)..add(NotificationsInitialize()),
+        ),
+        StreamProvider<User?>(
+          create: (context) => context.read<DatabaseHelper>().userStream,
+          initialData: null,
+          catchError: (_, error) {
+            Logger.error('Error in User stream provider', error);
+            return null;
+          },
+        ),
+      ],
+      child: MaterialApp(
+        title: 'VimbisoPay',
+        theme: ThemeData(
         useMaterial3: true,
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primary,
@@ -160,8 +226,8 @@ class MyApp extends StatelessWidget {
           titleMedium: TextStyle(color: AppColors.textPrimary),
           titleSmall: TextStyle(color: AppColors.textSecondary),
         ),
-      ),
-      onGenerateRoute: (settings) {
+        ),
+        onGenerateRoute: (settings) {
         // Protected routes that require authentication
         if (settings.name == '/home') {
           return MaterialPageRoute(
@@ -173,6 +239,176 @@ class MyApp extends StatelessWidget {
         if (settings.name == '/settings') {
           return MaterialPageRoute(
             builder: (context) => const SettingsScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/notifications-settings') {
+          return MaterialPageRoute(
+            builder: (context) => const NotificationsSettingsScreen(),
+            settings: settings,
+          );
+        }
+
+        if (settings.name == '/marketplace') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(
+              builder: (context) => const MarketplaceScreen(),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+
+        // Search results screen
+        if (settings.name == '/search-results') {
+          if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+          }
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => SearchResultsScreen(
+              initialQuery: args?['query'] as String?,
+              initialCategory: args?['category'] as String?,
+            ),
+          );
+        }
+
+        // Product detail screen
+        if (settings.name == '/product-detail') {
+          if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+          }
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args == null || !args.containsKey('productId')) {
+            Logger.error('No product ID provided for product-detail route');
+            return MaterialPageRoute(builder: (context) => const MarketplaceScreen());
+          }
+          return MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              productId: args['productId'] as String,
+            ),
+          );
+        }
+        
+        // Vendor profile screen route
+        if (settings.name == '/vendor-profile') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('vendorId')) {
+              Logger.error('No vendor ID provided for vendor-profile route');
+              return MaterialPageRoute(
+                builder: (context) => const MarketplaceScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorProfileScreen(
+                vendorId: args['vendorId'] as String,
+                isOwner: args['isOwner'] as bool? ?? false,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Vendor registration screen route
+        if (settings.name == '/vendor-registration') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('memberId')) {
+              Logger.error('No member ID provided for vendor-registration route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorRegistrationScreen(
+                memberId: args['memberId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Vendor sales tab screen route
+        if (settings.name == '/vendor-sales-tab') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('vendorId')) {
+              Logger.error('No vendor ID provided for vendor-sales-tab route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => VendorSalesTabScreen(
+                vendorId: args['vendorId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        // Buyer invoice detail screen route
+        if (settings.name == '/buyer-invoice-detail') {
+          // Only allow access if the marketplace feature is enabled
+          if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || !args.containsKey('invoiceId')) {
+              Logger.error('No invoice ID provided for buyer-invoice-detail route');
+              return MaterialPageRoute(
+                builder: (context) => const MarketplaceScreen(),
+              );
+            }
+            
+            return MaterialPageRoute(
+              builder: (context) => BuyerInvoiceDetailScreen(
+                invoiceId: args['invoiceId'] as String,
+              ),
+              settings: settings,
+            );
+          } else {
+            // Redirect to home if marketplace is not enabled
+            Logger.state('Marketplace feature is disabled, redirecting to home');
+            return MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            );
+          }
+        }
+        
+        if (settings.name == '/debug') {
+          return MaterialPageRoute(
+            builder: (context) => const DebugScreen(),
             settings: settings,
           );
         }
@@ -244,8 +480,9 @@ class MyApp extends StatelessWidget {
         return MaterialPageRoute(
           builder: (context) => const IntroWrapper(),
         );
-      },
-      home: const IntroWrapper(),
+        },
+        home: const IntroWrapper(),
+      ),
     );
   }
 }
@@ -257,16 +494,27 @@ class IntroWrapper extends StatefulWidget {
   State<IntroWrapper> createState() => _IntroWrapperState();
 }
 
-class _IntroWrapperState extends State<IntroWrapper> {
+class _IntroWrapperState extends State<IntroWrapper> with SingleTickerProviderStateMixin {
   bool _showIntro = true;
   bool _loading = true;
   bool _hasExistingUser = false;
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
-  final SecurityService _securityService = SecurityService();
+  final _databaseHelper = ServiceLocator.databaseHelper;
+  final _securityService = ServiceLocator.securityService;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    );
+    
+    // Start the animation and make it repeat
+    _animationController.repeat();
+    
     _checkInitialState();
   }
 
@@ -332,13 +580,23 @@ class _IntroWrapperState extends State<IntroWrapper> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          child: Lottie.asset(
+            'assets/animations/loading_anim.json',
+            width: 120,
+            height: 120,
+            fit: BoxFit.contain,
+            controller: _animationController,
           ),
         ),
       );
@@ -422,7 +680,7 @@ class LoginSignupScreen extends StatelessWidget {
                     side: const BorderSide(color: AppColors.primary),
                   ),
                   child: const Text(
-                    'Create Account',
+                    'Become a Member',
                     style: TextStyle(fontSize: 18),
                   ),
                 ),

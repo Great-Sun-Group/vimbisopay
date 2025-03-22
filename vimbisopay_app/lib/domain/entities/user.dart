@@ -4,8 +4,10 @@ class User {
   final String memberId;
   final String phone;
   final String token;
+  final bool otpVerified;  // Whether OTP verification is complete
+  final String? version;  // API version (v1, v2)
+  final String? authMethod;  // Authentication method (phone_only, etc)
   final String? passwordHash;  // Hashed password
-  final String? passwordSalt;  // Salt used for hashing
   final DateTime? passwordChanged;  // When the password was last changed
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
 
@@ -13,8 +15,10 @@ class User {
     required this.memberId,
     required this.phone,
     required this.token,
+    this.otpVerified = false,
+    this.version,
+    this.authMethod,
     this.passwordHash,
-    this.passwordSalt,
     this.passwordChanged,
     this.dashboard,
   });
@@ -31,8 +35,10 @@ class User {
       'memberId': memberId,
       'phone': phone,
       'token': token,
+      'otp_verified': otpVerified,
+      'version': version,
+      'auth_method': authMethod,
       'password_hash': passwordHash,
-      'password_salt': passwordSalt,
       'password_changed': passwordChanged?.millisecondsSinceEpoch,
       'dashboard': dashboard?.toMap(),
     };
@@ -43,8 +49,10 @@ class User {
       memberId: map['memberId'] as String,
       phone: map['phone'] as String,
       token: map['token'] as String,
+      otpVerified: map['otp_verified'] as bool? ?? false,
+      version: map['version'] as String?,
+      authMethod: map['auth_method'] as String?,
       passwordHash: map['password_hash'] as String?,
-      passwordSalt: map['password_salt'] as String?,
       passwordChanged: map['password_changed'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['password_changed'] as int)
           : null,
@@ -58,8 +66,10 @@ class User {
     String? memberId,
     String? phone,
     String? token,
+    bool? otpVerified,
+    String? version,
+    String? authMethod,
     String? passwordHash,
-    String? passwordSalt,
     DateTime? passwordChanged,
     Dashboard? dashboard,
   }) {
@@ -67,8 +77,10 @@ class User {
       memberId: memberId ?? this.memberId,
       phone: phone ?? this.phone,
       token: token ?? this.token,
+      otpVerified: otpVerified ?? this.otpVerified,
+      version: version ?? this.version,
+      authMethod: authMethod ?? this.authMethod,
       passwordHash: passwordHash ?? this.passwordHash,
-      passwordSalt: passwordSalt ?? this.passwordSalt,
       passwordChanged: passwordChanged ?? this.passwordChanged,
       dashboard: dashboard ?? this.dashboard,
     );
@@ -81,8 +93,10 @@ class User {
         other.memberId == memberId &&
         other.phone == phone &&
         other.token == token &&
+        other.otpVerified == otpVerified &&
+        other.version == version &&
+        other.authMethod == authMethod &&
         other.passwordHash == passwordHash &&
-        other.passwordSalt == passwordSalt &&
         other.passwordChanged == passwordChanged &&
         other.dashboard == dashboard;
   }
@@ -93,8 +107,21 @@ class User {
         phone,
         token,
         passwordHash,
-        passwordSalt,
         passwordChanged,
         dashboard,
       );
+
+  @override
+  String toString() {
+    return '''User {
+  memberId: $memberId,
+  phone: $phone,
+  otpVerified: $otpVerified,
+  version: $version,
+  authMethod: $authMethod,
+  passwordHash: ${passwordHash != null ? '[REDACTED]' : 'null'},
+  passwordChanged: $passwordChanged,
+  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'}
+}''';
+  }
 }

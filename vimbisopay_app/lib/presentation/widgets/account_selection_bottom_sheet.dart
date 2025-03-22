@@ -37,7 +37,7 @@ class AccountSelectionBottomSheet extends StatelessWidget {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.transparent,
         builder: (context) => Container(
           height: MediaQuery.of(context).size.height * 0.9,
           decoration: const BoxDecoration(

@@ -85,18 +85,18 @@ class _SwipeableTransactionCardState extends State<SwipeableTransactionCard> wit
                       ? null
                       : widget.onCancel,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
+                    backgroundColor: AppColors.transparent,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   icon: const Icon(
                     Icons.cancel,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                   label: const Text(
                     'Cancel',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),

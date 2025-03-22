@@ -1,7 +1,7 @@
 name: vimbisopay_app
 description: A new Flutter project.
 publish_to: 'none'
-version: 1.0.0+32
+version: 1.0.0+42
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -32,10 +32,17 @@ dependencies:
   screen_brightness: ^0.2.2
   firebase_messaging: ^14.7.4
   firebase_core: ^2.22.0
-
+  firebase_remote_config: ^4.3.4
+  firebase_analytics: ^10.7.4  # Added for Remote Config ABT support
+  provider: ^6.1.1
+  logger: ^2.0.2+1
   path: any
   audioplayers: ^6.1.0
   path_provider: any
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
+  package_info_plus: ^4.2.0  # For app version information
+  device_info_plus: ^9.1.1   # For device information
 dev_dependencies:
   flutter_test:
     sdk: flutter

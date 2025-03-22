@@ -162,3 +162,32 @@ class HomeSearchStarted extends HomeEvent {
   @override
   List<Object> get props => [query];
 }
+
+class HomeUpgradeTierStarted extends HomeEvent {
+  final String sourceAccountId;
+
+  const HomeUpgradeTierStarted(this.sourceAccountId);
+
+  @override
+  List<Object> get props => [sourceAccountId];
+}
+
+class HomeUpgradeTierCompleted extends HomeEvent {
+  const HomeUpgradeTierCompleted();
+}
+
+class HomeUpgradeTierFailed extends HomeEvent {
+  final String message;
+
+  const HomeUpgradeTierFailed(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+class HomeOfferAccepted extends HomeEvent {
+  final String credexId;
+  const HomeOfferAccepted(this.credexId);
+  @override
+  List<Object> get props => [credexId];
+}

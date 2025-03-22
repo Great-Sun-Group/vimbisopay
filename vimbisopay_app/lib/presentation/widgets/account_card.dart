@@ -6,11 +6,13 @@ import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 class AccountCard extends StatelessWidget {
   final DashboardAccount account;
   final MemberTier memberTier;
+  final VoidCallback? onUpgrade;
 
   const AccountCard({
     super.key,
     required this.account,
     required this.memberTier,
+    this.onUpgrade,
   });
 
   @override
@@ -67,35 +69,77 @@ class AccountCard extends StatelessWidget {
   }
 
   Widget _buildTierLimitBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: HomeConstants.defaultPadding - 4,
-        vertical: HomeConstants.smallPadding - 2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(HomeConstants.buttonBorderRadius),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Tier Limit',
-            style: TextStyle(
-              fontSize: HomeConstants.captionTextSize,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
+    // Don't show tier limit for special tier
+    if (memberTier.type == MemberTierType.special) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: HomeConstants.defaultPadding - 4,
+            vertical: HomeConstants.smallPadding - 2,
           ),
-          const SizedBox(height: HomeConstants.tinyPadding - 2),
-          Text(
-            '\$${memberTier.dailySecuredCredexLimit} USD/day',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(HomeConstants.buttonBorderRadius),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Daily Limit',
+                style: TextStyle(
+                  fontSize: HomeConstants.captionTextSize,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: HomeConstants.tinyPadding - 2),
+              Text(
+                '\$${memberTier.dailySecuredCredexLimit.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (memberTier.type == MemberTierType.open && onUpgrade != null) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: onUpgrade,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.upgrade,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Upgrade',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -181,7 +225,7 @@ class AccountCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: HomeConstants.subheadingTextSize,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                        color: AppColors.techAzure,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -208,7 +252,7 @@ class AccountCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: HomeConstants.subheadingTextSize,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red,
+                        color: AppColors.errorRed,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

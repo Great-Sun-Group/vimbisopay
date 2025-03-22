@@ -1,1211 +1,671 @@
-import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'dart:convert';
+import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
-import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
-import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:logger/logger.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
+import 'package:vimbisopay_app/core/error/exceptions.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart'
-    show Dashboard, DashboardAccount, PendingData, PendingOffer;
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
+import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
+  final AccountRepository accountRepository;
+  final DatabaseHelper databaseHelper;
   final AcceptCredexBulk acceptCredexBulk;
   final AcceptCredex acceptCredex;
-  final AccountRepository accountRepository;
-  DatabaseHelper _databaseHelper = DatabaseHelper();
-
-  // For testing
-  set databaseHelper(DatabaseHelper helper) => _databaseHelper = helper;
-  final Set<String> _processedCredexIds = {};
-  bool _isInitialized = false;
-
-  static final NotificationService _notificationService = NotificationService();
-  StreamSubscription<RemoteMessage>? _notificationSubscription;
-  static String? _currentFcmToken;
-  bool _isTokenSetupComplete = false;
-  final Completer<void> _tokenSetupCompleter = Completer<void>();
-  static bool _isTokenRegistrationInProgress = false;
-  static final _tokenRegistrationLock = Object();
+  final UpgradeMemberTier upgradeMemberTier;
+  final _logger = Logger();
+  
+  int _totalAccounts = 0;
+  int _processedAccounts = 0;
 
   HomeBloc({
+    required this.accountRepository,
+    required this.databaseHelper,
     required this.acceptCredexBulk,
     required this.acceptCredex,
-    required this.accountRepository,
-  }) : super(const HomeState(status: HomeStatus.initial)) {
-    Logger.lifecycle('HomeBloc initialized');
-
-    on<HomePageChanged>(_onPageChanged);
-    on<HomeDataLoaded>(_onDataLoaded);
-    on<HomeLedgerLoaded>(_onLedgerLoaded);
-    on<HomeErrorOccurred>(_onErrorOccurred);
-    on<HomeLoadStarted>(_onLoadStarted);
-    on<HomeRefreshStarted>(_onRefreshStarted);
-    on<HomeLoadMoreStarted>(_onLoadMoreStarted);
-    on<HomeAcceptCredexStarted>(_onAcceptCredexStarted);
-    on<HomeAcceptCredexCompleted>(_onAcceptCredexCompleted);
-    on<HomeAcceptCredexBulkStarted>(_onAcceptCredexBulkStarted);
-    on<HomeAcceptCredexBulkCompleted>(_onAcceptCredexBulkCompleted);
-    on<HomeCancelCredexStarted>(_onCancelCredexStarted);
-    on<HomeCancelCredexCompleted>(_onCancelCredexCompleted);
-    on<HomeFetchPendingTransactions>(_onFetchPendingTransactions);
-    on<HomeRegisterNotificationToken>(_onRegisterNotificationToken);
-    on<HomeSearchStarted>(_onSearchStarted);
-    on<HomeLoadPendingTransactions>(_onLoadPendingTransactions);
-    on<CreateCredexEvent>(_onCreateCredex);
-
-    _initializeNotifications();
+    required this.upgradeMemberTier,
+  }) : super(const HomeState()) {
+    on<HomeLoadStarted>(_onHomeLoadStarted);
+    on<HomeRefreshStarted>(_onHomeRefreshStarted);
+    on<HomeLoadMoreStarted>(_onHomeLoadMoreStarted);
+    on<HomeDataLoaded>(_onHomeDataLoaded);
+    on<HomeLedgerLoaded>(_onHomeLedgerLoaded);
+    on<HomeErrorOccurred>(_onHomeErrorOccurred);
+    on<HomePageChanged>(_onHomePageChanged);
+    on<HomeAcceptCredexStarted>(_onHomeAcceptCredexStarted);
+    on<HomeAcceptCredexBulkStarted>(_onHomeAcceptCredexBulkStarted);
+    on<HomeCancelCredexStarted>(_onHomeCancelCredexStarted);
+    on<HomeSearchStarted>(_onHomeSearchStarted);
+    on<HomeUpgradeTierStarted>(_onHomeUpgradeTierStarted);
+    on<HomeUpgradeTierCompleted>(_onHomeUpgradeTierCompleted);
+    on<HomeUpgradeTierFailed>(_onHomeUpgradeTierFailed);
+    on<HomeFetchPendingTransactions>(_onHomeFetchPendingTransactions);
+    on<HomeOfferAccepted>(_onHomeOfferAccepted);
   }
 
-  Future<void> _setupFcmToken() async {
-    if (_isTokenSetupComplete) {
-      Logger.data('Token setup already completed, skipping');
-      return;
-    }
+  void loadInitialData() {
+    add(const HomeLoadStarted());
+  }
 
-    Logger.data('Setting up FCM token...');
-    final messaging = FirebaseMessaging.instance;
+  Future<void> _onHomeLoadStarted(HomeLoadStarted event, Emitter<HomeState> emit) async {
+    emit(state.copyWith(status: HomeStatus.loading));
     
     try {
-      // Get initial token
-      String? token;
-      if (Platform.isIOS) {
-        final apnsToken = await messaging.getAPNSToken();
-        if (apnsToken != null) {
-          token = await messaging.getToken();
-        }
-      } else {
-        token = await messaging.getToken();
-      }
-
-      // Complete token setup first
-      _isTokenSetupComplete = true;
-      if (!_tokenSetupCompleter.isCompleted) {
-        _tokenSetupCompleter.complete();
-      }
-
-      // Then register token if needed
-      if (token != null && token != _currentFcmToken) {
-        Logger.data('New FCM token obtained: $token');
-        await _registerToken(token);
-      }
-
-      // Set up token refresh listener only once
-      messaging.onTokenRefresh.listen((String newToken) {
-        Logger.data('FCM token refreshed: $newToken');
-        // Only register if token has actually changed and no registration in progress
-        if (newToken != _currentFcmToken && !_isTokenRegistrationInProgress) {
-          // Use unawaited Future to handle token registration
-          Future(() async {
-            try {
-              await _registerToken(newToken);
-            } catch (e) {
-              Logger.error('Error registering refreshed token', e);
-            }
-          });
-        }
-      });
-    } catch (e) {
-      Logger.error('Error setting up FCM token', e);
-      if (!_tokenSetupCompleter.isCompleted) {
-        _tokenSetupCompleter.completeError(e);
-      }
-      rethrow;
-    }
-  }
-
-  Future<void> _registerToken(String token) async {
-    // Atomic check and set of registration flag
-    if (_isTokenRegistrationInProgress || token == _currentFcmToken) {
-      Logger.data('Token registration skipped: ${_isTokenRegistrationInProgress ? 'in progress' : 'already registered'}');
-      return;
-    }
-
-    try {
-      _isTokenRegistrationInProgress = true;
-      Logger.data('Registering notification token');
+      // Get current user which includes the dashboard
+      final userResult = await accountRepository.getCurrentUser();
       
-      final result = await accountRepository.registerNotificationToken(token);
-      
-      result.fold(
-        (failure) {
-          Logger.error('Failed to register notification token', failure);
-          add(HomeErrorOccurred(
-              failure.message ?? 'Failed to register notification token'));
-          throw failure;
-        },
-        (_) {
-          Logger.data('Successfully registered notification token');
-          _currentFcmToken = token; // Only update on success
-        },
-      );
-    } catch (e) {
-      Logger.error('Error in token registration', e);
-      rethrow;
-    } finally {
-      _isTokenRegistrationInProgress = false;
-    }
-  }
-
-  Future<void> _initializeNotifications() async {
-    Logger.data('=== INITIALIZING NOTIFICATIONS IN HOME BLOC ===');
-
-    try {
-      // Initialize Firebase first
-      Logger.data('Getting initial message...');
-      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-      if (initialMessage != null) {
-        Logger.data('Initial message received:');
-        Logger.data('Title: ${initialMessage.notification?.title}');
-        Logger.data('Body: ${initialMessage.notification?.body}');
-        Logger.data('Data: ${initialMessage.data}');
-
-        // Process initial message
-        Logger.data('Processing initial message...');
-        _notificationService.sendTestNotification(initialMessage);
-      }
-
-      // Cancel any existing subscription first
-      await _notificationSubscription?.cancel();
-      Logger.data('Previous notification subscription cancelled');
-
-      // Initialize notification service with retries
-      Logger.data('Initializing notification service...');
-      bool initialized = false;
-      int retries = 0;
-      while (!initialized && retries < 3) {
-        initialized = await _notificationService.initialize();
-        if (!initialized) {
-          Logger.data('Failed to initialize notification service, attempt ${retries + 1}');
-          await Future.delayed(const Duration(seconds: 2));
-          retries++;
-        }
-      }
-
-      if (!initialized) {
-        Logger.error('Failed to initialize notification service after retries');
-        return;
-      }
-
-      Logger.data('Notification service initialized successfully');
-
-      // Setup FCM token
-      await _setupFcmToken();
-
-      // Re-initialize notification service when app resumes
-      SystemChannels.lifecycle.setMessageHandler((msg) async {
-        if (msg == AppLifecycleState.resumed.toString()) {
-          print('App resumed, reinitializing notification service...');
-          await _notificationService.initialize();
-
-          // Also refresh data when app resumes
-          print('App resumed, refreshing data...');
-          await _refreshViaLogin();
-        }
-        return null;
-      });
-
-      // Listen to notification events and refresh dashboard
-      await _notificationSubscription
-          ?.cancel(); // Ensure previous subscription is cancelled
-      _notificationSubscription = _notificationService.onNotification.listen(
-        (message) async {
-          print('=== NOTIFICATION RECEIVED IN HOME BLOC ===');
-          print('Title: ${message.notification?.title}');
-          print('Body: ${message.notification?.body}');
-          print('Data: ${message.data}');
-
-          try {
-            Logger.data('=== PROCESSING NOTIFICATION IN HOME BLOC ===');
-
-            // Extract message content first
-            final title = message.notification?.title ?? message.data['title'];
-            final body = message.notification?.body ?? message.data['body'];
-            final toastMessage = body ?? title ?? 'New transaction received';
-
-            Logger.data('Extracted message content: $toastMessage');
-
-            // Show toast message and start refresh simultaneously
-            Logger.data(
-                'Emitting notification received state and starting refresh...');
-            emit(state.copyWith(
-              message: toastMessage,
-              status: HomeStatus.refreshing,
-            ));
-            Logger.data('State emitted successfully');
-
-            // Keep the message visible during refresh
-            final refreshFuture = _refreshViaLogin();
-            await Future.wait([
-              refreshFuture,
-              Future.delayed(
-                  const Duration(seconds: 3)), // Ensure message stays visible
-            ]);
-
-            await _refreshViaLogin();
-            Logger.data('Refresh completed');
-
-            // Show success message
-            Logger.data('Emitting success state...');
-            emit(state.copyWith(
-              message: '✅ Data refreshed',
-              status: HomeStatus.success,
-            ));
-
-            // Clear message after a moment
-            await Future.delayed(const Duration(seconds: 2));
-            emit(state.copyWith(message: null));
-
-            Logger.data('Success state emitted');
-          } catch (e, stackTrace) {
-            Logger.error('''
-[NOTIFICATION_FLOW] Error processing notification in HomeBloc:
-- Error: $e
-- Stack trace: $stackTrace
-''');
-          }
-        },
-        onError: (error) {
-          Logger.error('Error in notification stream', error);
-        },
-      );
-
-      Logger.data('Notification handling setup complete in HomeBloc');
-    } catch (e, stackTrace) {
-      Logger.error('Error setting up notifications', e, stackTrace);
-    }
-  }
-
-  List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
-    Logger.data('Deduplicating ${entries.length} ledger entries');
-    final uniqueEntries = entries.where((entry) {
-      final isUnique = !_processedCredexIds.contains(entry.credexID);
-      if (isUnique) {
-        _processedCredexIds.add(entry.credexID);
-      }
-      return isUnique;
-    }).toList();
-
-    uniqueEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    Logger.data('Returned ${uniqueEntries.length} unique entries');
-    return uniqueEntries;
-  }
-
-  Future<void> loadInitialData() async {
-    if (_isInitialized) {
-      Logger.data('Initial data already loaded, skipping');
-      return;
-    }
-    _isInitialized = true;
-
-    Logger.data('Starting initial data load');
-    final stopwatch = Stopwatch()..start();
-
-    add(const HomeLoadStarted());
-    _processedCredexIds.clear();
-
-    // Wait for token setup to complete before proceeding
-    try {
-      await _tokenSetupCompleter.future;
-      // First try to get cached data from database
-      final user = await _databaseHelper.getUser();
-      Logger.data('Retrieved user from database: ${user != null}');
-
-      if (user?.dashboard != null) {
-        Logger.data('Using cached dashboard data');
-        final pendingInTransactions = user!.dashboard!.accounts
-            .expand(
-                (account) => (account.pendingInData.data ?? []).map((tx) => tx))
-            .toList();
-        final pendingOutTransactions = user.dashboard!.accounts
-            .expand((account) =>
-                (account.pendingOutData.data ?? []).map((tx) => tx))
-            .toList();
-
-        // Emit cached data immediately
-        emit(state.copyWith(
-          status: HomeStatus.loading,
-          dashboard: user.dashboard,
-          pendingInTransactions: pendingInTransactions,
-          pendingOutTransactions: pendingOutTransactions,
-          filteredPendingInTransactions: pendingInTransactions,
-          filteredPendingOutTransactions: pendingOutTransactions,
-          filteredLedgerEntries: const [],
-        ));
-
-        // Load ledger data in background if we have accounts
-        if (user.dashboard!.accounts.isNotEmpty) {
-          await _loadLedgerData(user.dashboard!);
-        }
-      }
-
-      // Then refresh data from server
-      await _refreshViaLogin();
-    } catch (e, stackTrace) {
-      Logger.error('Failed to load initial data', e, stackTrace);
-
-      // Only show error if we don't have any data
-      if (state.dashboard == null) {
-        add(const HomeErrorOccurred('Failed to load initial data'));
-      }
-    }
-
-    stopwatch.stop();
-    Logger.performance(
-        'Initial data load took ${stopwatch.elapsedMilliseconds}ms');
-  }
-
-  int processedAccounts = 0;
-  int totalAccounts = 0;
-
-  Future<void> _loadLedgerData(Dashboard dashboard) async {
-    Logger.data('Loading ledger data for accounts');
-
-    final Map<String, List<LedgerEntry>> accountLedgers = {};
-    final List<LedgerEntry> allEntries = [];
-    bool hasMoreEntries = false;
-    final List<String> errors = [];
-
-    totalAccounts = dashboard.accounts.length;
-
-    try {
-      final accounts = dashboard.accounts;
-      for (int i = 0; i < accounts.length; i += 2) {
-        final batch = accounts.skip(i).take(2);
-
-        for (final account in batch) {
-          Logger.data('Fetching ledger for account: ${account.accountName}');
-
-          final result = await accountRepository.getLedger(
-            accountId: account.accountID,
-            startRow: 0,
-            numRows: 20,
-          );
-
-          processedAccounts++;
-          final isLastAccount = processedAccounts == totalAccounts;
-
-          result.fold(
-            (failure) {
-              Logger.error(
-                  'Failed to fetch ledger for account ${account.accountID}',
-                  failure);
-              errors.add('Failed to load ledger for ${account.accountName}');
-
-              if (isLastAccount && allEntries.isEmpty) {
-                add(const HomeLedgerLoaded(
-                  accountLedgers: {},
-                  combinedEntries: [],
-                  hasMore: false,
-                ));
-              }
-            },
-            (response) {
-              try {
-                if (!response.containsKey('data')) {
-                  throw 'Invalid response structure: missing data field';
-                }
-
-                final data = response['data'];
-                if (!data.containsKey('dashboard')) {
-                  throw 'Invalid response structure: missing dashboard field';
-                }
-
-                final dashboard = data['dashboard'];
-                final ledgerData = dashboard['ledger'] as List?;
-
-                if (ledgerData == null) {
-                  throw 'Invalid response structure: missing ledger data';
-                }
-
-                final pagination =
-                    dashboard['pagination'] as Map<String, dynamic>?;
-                final hasMore = pagination?['hasMore'] as bool? ?? false;
-
-                if (hasMore) {
-                  hasMoreEntries = true;
-                }
-
-                final entries = ledgerData
-                    .map((entry) {
-                      try {
-                        return LedgerEntry.fromJson(
-                          entry as Map<String, dynamic>,
-                          accountId: account.accountID,
-                          accountName: account.accountName,
-                        );
-                      } catch (e) {
-                        Logger.error('Error parsing ledger entry', e);
-                        return null;
-                      }
-                    })
-                    .whereType<LedgerEntry>()
-                    .toList();
-
-                if (entries.isNotEmpty) {
-                  accountLedgers[account.accountID] = entries;
-                  allEntries.addAll(entries);
-                }
-
-                // if (isLastAccount) {
-                //   if (allEntries.isNotEmpty) {
-                //     final uniqueEntries =
-                //         _deduplicateAndSortEntries(allEntries);
-                //     add(HomeLedgerLoaded(
-                //       accountLedgers: accountLedgers,
-                //       combinedEntries: uniqueEntries,
-                //       hasMore: false,
-                //     ));
-                //   } else if (errors.isNotEmpty) {
-                //     add(HomeErrorOccurred(errors.join('\n')));
-                //   } else {
-                //     add(const HomeLedgerLoaded(
-                //       accountLedgers: {},
-                //       combinedEntries: [],
-                //       hasMore: false,
-                //     ));
-                //   }
-                // }
-                if (isLastAccount) {
-                  if (allEntries.isNotEmpty) {
-                    final uniqueEntries =
-                        _deduplicateAndSortEntries(allEntries);
-                    add(HomeLedgerLoaded(
-                      accountLedgers: accountLedgers,
-                      combinedEntries: uniqueEntries,
-                      hasMore: hasMoreEntries,
-                      showCompletionToast: processedAccounts == totalAccounts &&
-                          errors
-                              .isEmpty, // Only show toast when all accounts are processed successfully
-                    ));
-                  } else if (errors.isNotEmpty) {
-                    add(HomeErrorOccurred(errors.join('\n')));
-                  } else {
-                    add(const HomeLedgerLoaded(
-                      accountLedgers: {},
-                      combinedEntries: [],
-                      hasMore: false,
-                      showCompletionToast: false,
-                    ));
-                  }
-                }
-              } catch (e) {
-                Logger.error('Error processing ledger data', e);
-                errors
-                    .add('Error processing ledger for ${account.accountName}');
-
-                if (isLastAccount && allEntries.isEmpty) {
-                  add(const HomeLedgerLoaded(
-                    accountLedgers: {},
-                    combinedEntries: [],
-                    hasMore: false,
-                  ));
-                }
-              }
-            },
-          );
-        }
-      }
-    } catch (e, stackTrace) {
-      Logger.error('Error in _loadLedgerData', e, stackTrace);
-      add(const HomeErrorOccurred('Failed to load ledger data'));
-    }
-  }
-
-  Future<void> _refreshFromDb() async {
-    try {
-      final user = await _databaseHelper.getUser();
-      Logger.data('Retrieved user from database: ${user != null}');
-      if (user == null) {
-        add(const HomeErrorOccurred('User not found'));
-        return;
-      }
-
-      Logger.data('User dashboard available: ${user.dashboard != null}');
-      if (user.dashboard == null) {
-        add(const HomeErrorOccurred('Dashboard data not available'));
-        return;
-      }
-
-      // Compare with state
-      Logger.data('Current state:');
-      Logger.data(
-          '- ${state.pendingInTransactions.length} pending in transactions');
-      Logger.data(
-          '- ${state.pendingOutTransactions.length} pending out transactions');
-
-      final pendingInTransactions = user.dashboard!.accounts
-          .expand(
-              (account) => (account.pendingInData.data ?? []).map((tx) => tx))
-          .toList();
-      final pendingOutTransactions = user.dashboard!.accounts
-          .expand(
-              (account) => (account.pendingOutData.data ?? []).map((tx) => tx))
-          .toList();
-
-      Logger.data('Database contains:');
-      Logger.data('- ${pendingInTransactions.length} pending in transactions');
-      Logger.data(
-          '- ${pendingOutTransactions.length} pending out transactions');
-
-      // First update with refreshing state to ensure UI shows loading
-      emit(state.copyWith(
-        status: HomeStatus.refreshing,
-        message: null,
-        error: null,
-      ));
-
-      // Then update with new data and success state
-      emit(state.copyWith(
-        status: HomeStatus.success,
-        dashboard: user.dashboard,
-        pendingInTransactions: pendingInTransactions,
-        pendingOutTransactions: pendingOutTransactions,
-        // Also update filtered lists if no search is active
-        filteredPendingInTransactions:
-            state.searchQuery.isEmpty ? pendingInTransactions : null,
-        filteredPendingOutTransactions:
-            state.searchQuery.isEmpty ? pendingOutTransactions : null,
-        message: null,
-        error: null,
-      ));
-
-      // Log each transaction for debugging
-      if (pendingInTransactions.isNotEmpty) {
-        Logger.data('Pending In Transactions:');
-        for (var tx in pendingInTransactions) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} from ${tx.counterpartyAccountName}');
-        }
-      }
-
-      if (pendingOutTransactions.isNotEmpty) {
-        Logger.data('Pending Out Transactions:');
-        for (var tx in pendingOutTransactions) {
-          Logger.data(
-              '- ${tx.credexID}: ${tx.formattedInitialAmount} to ${tx.counterpartyAccountName}');
-        }
-      }
-    } catch (e) {
-      Logger.error('Failed to fetch pending transactions', e);
-      add(HomeErrorOccurred('Failed to fetch pending transactions: $e'));
-    }
-  }
-
-  Future<void> _refreshViaLogin() async {
-    Logger.data('Starting refresh via login');
-    final stopwatch = Stopwatch()..start();
-
-    try {
-      final user = await _databaseHelper.getUser();
-      if (user == null ||
-          user.passwordHash == null ||
-          user.passwordSalt == null) {
-        Logger.error('Cannot refresh: No stored user credentials');
-        add(const HomeErrorOccurred(
-            'Unable to refresh data: No stored credentials'));
-        return;
-      }
-
-      final loginResult = await accountRepository.login(
-        phone: user.phone,
-        passwordHash: user.passwordHash,
-        passwordSalt: user.passwordSalt,
-      );
-
-      await loginResult.fold(
+      await userResult.fold(
         (failure) async {
-          Logger.error('Login refresh failed', failure);
-          add(HomeErrorOccurred(failure.message ?? 'Failed to refresh data'));
+          emit(state.copyWith(
+            status: HomeStatus.error,
+            error: failure.message ?? 'Failed to load dashboard',
+          ));
         },
-        (newUser) async {
-          Logger.data('Login refresh successful, processing new data');
-
-          // Extract pending transactions from the new dashboard
-          final pendingInTransactions = newUser.dashboard!.accounts
-              .expand((account) =>
-                  (account.pendingInData.data ?? []).map((tx) => tx))
-              .toList();
-          final pendingOutTransactions = newUser.dashboard!.accounts
-              .expand((account) =>
-                  (account.pendingOutData.data ?? []).map((tx) => tx))
-              .toList();
-
-          Logger.data(
-              'Found ${pendingInTransactions.length} pending in and ${pendingOutTransactions.length} pending out transactions in new data');
-
-          // Update database
-          await _databaseHelper.saveUser(newUser);
-          Logger.data('Updated user data in database');
-
-          // Clear processed IDs before updating state
-          _processedCredexIds.clear();
-
-          // Force state update with loading first
-          emit(state.copyWith(
-            status: HomeStatus.refreshing,
-            message: 'Updating balances...',
-          ));
-
-          // Then update with new data
-          emit(state.copyWith(
-            status: HomeStatus.success,
-            dashboard: newUser.dashboard,
-            pendingInTransactions: pendingInTransactions,
-            pendingOutTransactions: pendingOutTransactions,
-            // Also update filtered lists if no search is active
-            filteredPendingInTransactions:
-                state.searchQuery.isEmpty ? pendingInTransactions : null,
-            filteredPendingOutTransactions:
-                state.searchQuery.isEmpty ? pendingOutTransactions : null,
-            message: '✅ Data refreshed',
-            error: null,
-          ));
-
-          if (newUser.dashboard!.accounts.isNotEmpty) {
-            Logger.data(
-                'Updated state with new dashboard data. Net balance: ${newUser.dashboard!.accounts[state.currentPage].balanceData.netCredexAssetsInDefaultDenom}');
-          }
-
-          // Then load ledger data if needed
-          if (newUser.dashboard!.accounts.isNotEmpty) {
-            await _loadLedgerData(newUser.dashboard!);
-          } else {
-            add(const HomeLedgerLoaded(
-              accountLedgers: {},
-              combinedEntries: [],
-              hasMore: false,
+        (user) async {
+          if (user == null || user.dashboard == null) {
+            emit(state.copyWith(
+              status: HomeStatus.error,
+              error: 'No user data found',
             ));
+            return;
+          }
+          
+          // Extract pending transactions from all accounts
+          final List<PendingOffer> pendingIn = [];
+          final List<PendingOffer> pendingOut = [];
+          
+          for (final account in user.dashboard!.accounts) {
+            pendingIn.addAll(account.pendingInData.data);
+            pendingOut.addAll(account.pendingOutData.data);
           }
 
+          // Add the HomeDataLoaded event with the dashboard and pending transactions
+          add(HomeDataLoaded(
+            dashboard: user.dashboard!,
+            pendingInTransactions: pendingIn,
+            pendingOutTransactions: pendingOut,
+            keepLoading: true,
+          ));
+          
+          // Load ledger data after dashboard is initialized
+          await _loadLedgerData(user.dashboard!);
         },
       );
-
-      stopwatch.stop();
-      Logger.performance(
-          'Login refresh took ${stopwatch.elapsedMilliseconds}ms');
-    } catch (e, stackTrace) {
-      Logger.error('Error in login refresh', e, stackTrace);
-      add(HomeErrorOccurred(e.toString()));
-    }
-  }
-
-  void _onPageChanged(HomePageChanged event, Emitter<HomeState> emit) {
-    Logger.interaction('Page changed to ${event.page}');
-    emit(state.copyWith(
-      currentPage: event.page,
-      message: null,
-    ));
-  }
-
-  void _onLoadStarted(HomeLoadStarted event, Emitter<HomeState> emit) {
-    Logger.state('Initial loading started');
-    emit(state.copyWith(
-      status: HomeStatus.loading,
-      message: null,
-      error: null,
-    ));
-  }
-
-  void _onRefreshStarted(
-      HomeRefreshStarted event, Emitter<HomeState> emit) async {
-    print('=== REFRESH STARTED IN HOME BLOC ===');
-    emit(state.copyWith(
-      status: HomeStatus.refreshing,
-      message: '🔄 Refreshing data...',
-      error: null,
-    ));
-
-    try {
-      print('Starting refresh via login...');
-      await _refreshViaLogin();
-      print('Refresh completed successfully');
-
-      // Emit success state after refresh
-      emit(state.copyWith(
-        status: HomeStatus.success,
-        message: '✅ Data refreshed',
-      ));
-    } catch (e, stackTrace) {
-      Logger.error('''
-[NOTIFICATION_FLOW] Error during refresh:
-- Error: $e
-- Stack trace: $stackTrace
-''');
+    } catch (e) {
       emit(state.copyWith(
         status: HomeStatus.error,
-        message: 'Failed to refresh data',
-        error: e.toString(),
+        error: 'Failed to initialize dashboard: ${e.toString()}',
       ));
     }
   }
 
-  void _onLoadMoreStarted(
-      HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
-    if (!state.hasMoreEntries) {
-      Logger.state('Load more ignored - no more entries available');
-      emit(state.copyWith(
-        status: HomeStatus.success,
-        error: null,
-      ));
+  Future<void> _onHomeRefreshStarted(HomeRefreshStarted event, Emitter<HomeState> emit) async {
+    _logger.i('''
+Starting home refresh:
+- Has dashboard: ${state.dashboard != null}
+- Current status: ${state.status}
+- Trigger: ${event.toString()}
+''');
+
+    if (state.dashboard == null) {
+      _logger.e('Cannot refresh - no dashboard available');
       return;
     }
+    emit(state.copyWith(status: HomeStatus.refreshing));
+    
+    try {
+      // Get stored user first
+      final storedUser = await databaseHelper.getUser();
+      if (storedUser == null || storedUser.passwordHash == null) {
+        emit(state.copyWith(
+          status: HomeStatus.error,
+          error: 'No stored credentials found',
+        ));
+        return;
+      }
 
-    Logger.state('Loading more entries');
-    emit(state.copyWith(
-      status: HomeStatus.loadingMore,
-      message: null,
-      error: null,
-    ));
+      _logger.i('Re-logging in to refresh token...');
+      // Re-login with stored password hash to refresh token
+      // Re-login with stored password hash to refresh token
+      final loginResult = await accountRepository.loginV2(
+        phone: storedUser.phone,
+        passwordHash: storedUser.passwordHash,
+      );
+      _logger.i('Re-login completed');
+      
+      await loginResult.fold(
+        (failure) async {
+          emit(state.copyWith(
+            status: HomeStatus.error,
+            error: failure.message ?? 'Failed to refresh dashboard',
+          ));
+        },
+        (user) async {
+          if (user.dashboard == null) {
+            emit(state.copyWith(
+              status: HomeStatus.error,
+              error: 'No dashboard data found',
+            ));
+            return;
+          }
 
-    // Add a small delay to ensure state is emitted
-    await Future.delayed(const Duration(milliseconds: 10));
+          try {
+            _logger.i('Saving updated user and refreshing data...');
+            // Save updated user with new token
+            await databaseHelper.saveUser(user);
+            
+            // Extract pending transactions from refreshed dashboard
+            final List<PendingOffer> pendingIn = [];
+            final List<PendingOffer> pendingOut = [];
+            
+            for (final account in user.dashboard!.accounts) {
+              pendingIn.addAll(account.pendingInData.data);
+              pendingOut.addAll(account.pendingOutData.data);
+            }
+
+            _logger.i('''
+Dashboard refresh stats:
+- Accounts: ${user.dashboard!.accounts.length}
+- Pending In: ${pendingIn.length}
+- Pending Out: ${pendingOut.length}
+''');
+
+            // Update state with refreshed data
+            emit(state.copyWith(
+              status: HomeStatus.success,
+              dashboard: user.dashboard,
+              pendingInTransactions: pendingIn,
+              pendingOutTransactions: pendingOut,
+              processingCredexIds: state.processingCredexIds, // Preserve processing state
+            ));
+            
+            // Load ledger data with refreshed dashboard
+            _logger.i('Loading ledger data for refreshed dashboard...');
+            await _loadLedgerData(user.dashboard!);
+            _logger.i('Refresh complete');
+
+            // Show success message
+            emit(state.copyWith(
+              status: HomeStatus.success,
+              message: 'Dashboard refreshed successfully',
+              processingCredexIds: state.processingCredexIds, // Preserve processing state
+            ));
+          } catch (e) {
+            _logger.e('Error saving user or updating state: $e');
+            emit(state.copyWith(
+              status: HomeStatus.error,
+              error: 'Failed to update dashboard data',
+            ));
+          }
+        },
+      );
+    } catch (e) {
+      emit(state.copyWith(
+        status: HomeStatus.error,
+        error: 'Failed to refresh dashboard: ${e.toString()}',
+      ));
+    }
   }
 
-  void _onDataLoaded(HomeDataLoaded event, Emitter<HomeState> emit) {
-    Logger.data('''Dashboard data loaded:
-      Accounts: ${event.dashboard.accounts.length}
-      Pending In: ${event.pendingInTransactions.length}
-      Pending Out: ${event.pendingOutTransactions.length}
-    ''');
+  Future<void> _onHomeLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
+    if (state.dashboard == null || !state.hasMoreEntries) return;
+    
+    // Prevent multiple concurrent load more requests
+    if (state.status == HomeStatus.loadingMore) return;
+    
+    emit(state.copyWith(status: HomeStatus.loadingMore));
 
-    // Always update the main data lists
-    final newState = state.copyWith(
-      status: event.keepLoading ? state.status : HomeStatus.success,
+    try {
+      final accounts = state.dashboard!.accounts;
+      final Map<String, List<LedgerEntry>> accountLedgers = Map.from(state.accountLedgers);
+      final List<LedgerEntry> allEntries = List.from(state.combinedLedgerEntries);
+      bool hasMoreEntries = false;
+
+      // Find oldest timestamp across all entries
+      DateTime? oldestTimestamp;
+      for (final entries in accountLedgers.values) {
+        if (entries.isNotEmpty) {
+          final lastEntryTimestamp = entries.last.timestamp;
+          if (oldestTimestamp == null || lastEntryTimestamp.isBefore(oldestTimestamp)) {
+            oldestTimestamp = lastEntryTimestamp;
+          }
+        }
+      }
+
+      // Load next page for each account sequentially
+      for (final account in accounts) {
+        // Fetch new entries with retry logic
+        bool success = false;
+        int retryDelay = 5000; // Start with 5 seconds
+        int retryCount = 0;
+        const maxRetries = 3;
+
+        while (!success && retryCount < maxRetries) {
+          try {
+            final result = await accountRepository.getLedger(
+              accountId: account.accountID,
+              afterTimestamp: oldestTimestamp,
+              limit: 10, // Reduced batch size to prevent rate limiting
+            );
+
+            result.fold(
+              (failure) {
+                _logger.e('Failed to load more entries for account ${account.accountID}: ${failure.toString()}');
+                success = true; // Don't retry on non-rate-limit failures
+              },
+              (entries) {
+                if (entries.isNotEmpty) {
+                  // Update existing entries
+                  if (accountLedgers.containsKey(account.accountID)) {
+                    accountLedgers[account.accountID]!.addAll(entries);
+                  } else {
+                    accountLedgers[account.accountID] = entries;
+                  }
+                  allEntries.addAll(entries);
+                  
+                  // Check if we got the maximum number of entries
+                  if (entries.length >= 10) {
+                    hasMoreEntries = true;
+                  }
+
+                  // Emit intermediate updates to show progress
+                  final uniqueEntries = _deduplicateAndSortEntries(allEntries);
+                  add(HomeLedgerLoaded(
+                    accountLedgers: accountLedgers,
+                    combinedEntries: uniqueEntries,
+                    hasMore: hasMoreEntries,
+                  ));
+                }
+                success = true;
+              },
+            );
+          } catch (e) {
+            if (e is RateLimitException) {
+              retryCount++;
+              if (retryCount < maxRetries) {
+                _logger.w('Rate limit hit (attempt $retryCount of $maxRetries), retrying in ${retryDelay}ms');
+                await Future.delayed(Duration(milliseconds: retryDelay));
+                retryDelay *= 2; // Exponential backoff
+              } else {
+                _logger.e('Max retries reached for rate limit');
+                success = true;
+              }
+            } else {
+              _logger.e('Error fetching more entries: $e');
+              success = true;
+            }
+          }
+        }
+
+        // Add delay between accounts to prevent rate limiting
+        if (accounts.last != account) {
+          await Future.delayed(const Duration(milliseconds: 5000)); // Increased delay to match _loadLedgerData
+        }
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Error in _onHomeLoadMoreStarted: $e\n$stackTrace');
+      add(const HomeErrorOccurred('Failed to load more entries'));
+    }
+  }
+
+  Future<void> _onHomeDataLoaded(HomeDataLoaded event, Emitter<HomeState> emit) async {
+    emit(state.copyWith(
+      status: HomeStatus.success,
       dashboard: event.dashboard,
       pendingInTransactions: event.pendingInTransactions,
       pendingOutTransactions: event.pendingOutTransactions,
-      message: null,
-      error: null,
-    );
-
-    // If there's an active search, apply filtering
-    if (state.searchQuery.isNotEmpty) {
-      final query = state.searchQuery.toLowerCase();
-
-      final filteredPendingIn = event.pendingInTransactions.where((tx) {
-        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-            tx.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      final filteredPendingOut = event.pendingOutTransactions.where((tx) {
-        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-            tx.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      // Also filter ledger entries if they exist
-      final filteredLedger = state.combinedLedgerEntries.where((entry) {
-        return entry.description.toLowerCase().contains(query) ||
-            entry.formattedAmount.toLowerCase().contains(query) ||
-            entry.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      emit(newState.copyWith(
-        filteredPendingInTransactions: filteredPendingIn,
-        filteredPendingOutTransactions: filteredPendingOut,
-        filteredLedgerEntries: filteredLedger,
-      ));
-    } else {
-      // If no search query, filtered lists should match main lists
-      emit(newState.copyWith(
-        filteredPendingInTransactions: event.pendingInTransactions,
-        filteredPendingOutTransactions: event.pendingOutTransactions,
-        filteredLedgerEntries: state.combinedLedgerEntries,
-      ));
+      processingCredexIds: state.processingCredexIds, // Preserve processing state
+    ));
+    if (event.keepLoading) {
+      await _loadLedgerData(event.dashboard);
     }
   }
 
-  void _onLedgerLoaded(HomeLedgerLoaded event, Emitter<HomeState> emit) {
-    Logger.data('''Ledger data loaded:
-      Total Entries: ${event.combinedEntries.length}
-      Has More: ${event.hasMore}
-      Accounts with Data: ${event.accountLedgers.keys.length}
-    ''');
-
-    // Always update the main ledger data
-    final newState = state.copyWith(
+  void _onHomeLedgerLoaded(HomeLedgerLoaded event, Emitter<HomeState> emit) {
+    emit(state.copyWith(
       status: HomeStatus.success,
       accountLedgers: event.accountLedgers,
       combinedLedgerEntries: event.combinedEntries,
       hasMoreEntries: event.hasMore,
-      message: (event.showCompletionToast &&
-              event.combinedEntries.isNotEmpty &&
-              processedAccounts == totalAccounts)
-          ? '✅ Transaction history loaded'
-          : null,
-      error: null,
-    );
-
-    // If there's an active search, apply filtering
-    if (state.searchQuery.isNotEmpty) {
-      final query = state.searchQuery.toLowerCase();
-
-      final filteredEntries = event.combinedEntries.where((entry) {
-        return entry.description.toLowerCase().contains(query) ||
-            entry.formattedAmount.toLowerCase().contains(query) ||
-            entry.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      // Also filter pending transactions to maintain consistency
-      final filteredPendingIn = state.pendingInTransactions.where((tx) {
-        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-            tx.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      final filteredPendingOut = state.pendingOutTransactions.where((tx) {
-        return tx.formattedInitialAmount.toLowerCase().contains(query) ||
-            tx.counterpartyAccountName.toLowerCase().contains(query);
-      }).toList();
-
-      emit(newState.copyWith(
-        filteredLedgerEntries: filteredEntries,
-        filteredPendingInTransactions: filteredPendingIn,
-        filteredPendingOutTransactions: filteredPendingOut,
-      ));
-    } else {
-      // If no search query, filtered lists should match main lists
-      emit(newState.copyWith(
-        filteredLedgerEntries: event.combinedEntries,
-        filteredPendingInTransactions: state.pendingInTransactions,
-        filteredPendingOutTransactions: state.pendingOutTransactions,
-      ));
-    }
+      processingCredexIds: state.processingCredexIds, // Preserve processing state
+    ));
   }
 
-  void _onErrorOccurred(HomeErrorOccurred event, Emitter<HomeState> emit) {
-    Logger.error('Home error occurred: ${event.message}');
+  void _onHomeErrorOccurred(HomeErrorOccurred event, Emitter<HomeState> emit) {
     emit(state.copyWith(
       status: HomeStatus.error,
       error: event.message,
-      message: null,
     ));
-
-    // If error is related to authentication, clear state
-    if (event.message?.toLowerCase().contains('credentials') == true ||
-        event.message?.toLowerCase().contains('unauthorized') == true ||
-        event.message?.toLowerCase().contains('unauthenticated') == true) {
-      _processedCredexIds.clear();
-      emit(const HomeState(status: HomeStatus.initial));
-    }
   }
 
-  @override
-  Future<void> close() async {
-    Logger.lifecycle('HomeBloc closing');
-    _processedCredexIds.clear();
-    _isInitialized = false;
-    await _notificationSubscription?.cancel();
-    await super.close();
+  void _onHomePageChanged(HomePageChanged event, Emitter<HomeState> emit) {
+    emit(state.copyWith(currentPage: event.page));
   }
 
-  void _onAcceptCredexStarted(
-    HomeAcceptCredexStarted event,
-    Emitter<HomeState> emit,
-  ) async {
-    Logger.state('Starting single credex acceptance for ${event.credexId}');
-
+  Future<void> _onHomeAcceptCredexStarted(HomeAcceptCredexStarted event, Emitter<HomeState> emit) async {
+    // Add the credexId to processing state
+    final updatedProcessingIds = [...state.processingCredexIds, event.credexId];
+    
     emit(state.copyWith(
       status: HomeStatus.acceptingCredex,
-      processingCredexIds: [event.credexId],
-      error: null,
+      processingCredexIds: updatedProcessingIds,
     ));
-
-    final stopwatch = Stopwatch()..start();
+    
     final result = await acceptCredex(event.credexId);
-    stopwatch.stop();
-
-    Logger.performance(
-        'Single credex acceptance took ${stopwatch.elapsedMilliseconds}ms');
-
     result.fold(
       (failure) {
-        Logger.error('Single credex acceptance failed', failure);
-        add(HomeErrorOccurred(
-            failure.message ?? 'Failed to accept transaction'));
-      },
-      (_) async {
-        Logger.data('Successfully processed credex transaction');
-
-        // Set loading state
+        // On failure, remove from processing state
+        add(const HomeErrorOccurred('Failed to accept Credex'));
         emit(state.copyWith(
-          status: HomeStatus.refreshing,
-          message: 'Refreshing balances...',
-          error: null,
+          processingCredexIds: state.processingCredexIds.where((id) => id != event.credexId).toList(),
         ));
-
-        // Add a small delay to ensure backend has processed the transaction
-        await Future.delayed(const Duration(seconds: 2));
-
-        // Refresh data to get updated balances and transactions
-        await _refreshViaLogin();
-
-        add(const HomeAcceptCredexCompleted());
+      },
+      (_) {
+        // On success, keep in processing state
+        emit(state.copyWith(
+          status: HomeStatus.success,
+          processingCredexIds: updatedProcessingIds, // Keep the credexId in processing state
+          message: 'Transaction accepted successfully',
+        ));
+        // Trigger refresh to update dashboard and transactions
+        add(const HomeRefreshStarted());
       },
     );
   }
 
-  void _onAcceptCredexCompleted(
-    HomeAcceptCredexCompleted event,
-    Emitter<HomeState> emit,
-  ) {
-    Logger.state('Single credex acceptance completed');
-    emit(state.copyWith(
-      status: HomeStatus.success,
-      processingCredexIds: const [],
-      message: 'Transaction accepted successfully',
-      error: null,
-    ));
-  }
-
-  void _onAcceptCredexBulkStarted(
-    HomeAcceptCredexBulkStarted event,
-    Emitter<HomeState> emit,
-  ) async {
-    Logger.state(
-        'Starting credex acceptance for ${event.credexIds.length} transactions');
-
-    // If only one credex, use single accept endpoint
-    if (event.credexIds.length == 1) {
-      add(HomeAcceptCredexStarted(event.credexIds.first));
-      return;
-    }
-
+  Future<void> _onHomeAcceptCredexBulkStarted(HomeAcceptCredexBulkStarted event, Emitter<HomeState> emit) async {
+    // Add all credexIds to processing state
+    final updatedProcessingIds = [...state.processingCredexIds, ...event.credexIds];
+    
     emit(state.copyWith(
       status: HomeStatus.acceptingCredex,
-      processingCredexIds: event.credexIds,
-      error: null,
+      processingCredexIds: updatedProcessingIds,
     ));
-
-    final stopwatch = Stopwatch()..start();
+    
     final result = await acceptCredexBulk(event.credexIds);
-    stopwatch.stop();
-
-    Logger.performance(
-        'Bulk credex acceptance took ${stopwatch.elapsedMilliseconds}ms');
-
     result.fold(
       (failure) {
-        Logger.error('Bulk credex acceptance failed', failure);
-        add(HomeErrorOccurred(
-            failure.message ?? 'Failed to accept transactions'));
-      },
-      (_) async {
-        Logger.data(
-            'Successfully processed ${event.credexIds.length} credex transactions');
-
-        // Set loading state
+        // On failure, remove all from processing state
+        add(const HomeErrorOccurred('Failed to accept Credex transactions'));
         emit(state.copyWith(
-          status: HomeStatus.refreshing,
-          message: 'Refreshing balances...',
-          error: null,
+          processingCredexIds: state.processingCredexIds.where((id) => !event.credexIds.contains(id)).toList(),
         ));
-
-        // Add a small delay to ensure backend has processed the transaction
-        await Future.delayed(const Duration(seconds: 2));
-
-        // Refresh data to get updated balances and transactions
-        await _refreshViaLogin();
-
-        add(const HomeAcceptCredexBulkCompleted());
+      },
+      (_) {
+        // On success, keep in processing state
+        emit(state.copyWith(
+          status: HomeStatus.success,
+          processingCredexIds: updatedProcessingIds, // Keep all credexIds in processing state
+          message: 'Transactions accepted successfully',
+        ));
+        // Trigger refresh to update dashboard and transactions
+        add(const HomeRefreshStarted());
       },
     );
   }
 
-  void _onAcceptCredexBulkCompleted(
-    HomeAcceptCredexBulkCompleted event,
-    Emitter<HomeState> emit,
-  ) {
-    Logger.state('Bulk credex acceptance completed');
-    // No need to refresh here as it's already done in _onAcceptCredexBulkStarted
-  }
-
-  void _onCancelCredexStarted(
-    HomeCancelCredexStarted event,
-    Emitter<HomeState> emit,
-  ) async {
-    Logger.state('Starting credex cancellation for ${event.credexId}');
-
+  Future<void> _onHomeCancelCredexStarted(HomeCancelCredexStarted event, Emitter<HomeState> emit) async {
     emit(state.copyWith(
       status: HomeStatus.cancellingCredex,
-      processingCredexIds: [event.credexId],
-      error: null,
+      processingCredexIds: [...state.processingCredexIds, event.credexId],
     ));
-
     final result = await accountRepository.cancelCredex(event.credexId);
-
     result.fold(
-      (failure) {
-        Logger.error('Credex cancellation failed', failure);
-        add(HomeErrorOccurred(
-            failure.message ?? 'Failed to cancel transaction'));
-      },
-      (_) async {
-        Logger.data('Successfully cancelled credex transaction');
-
-        // Set loading state and trigger refresh immediately
+      (failure) => add(const HomeErrorOccurred('Failed to cancel Credex')),
+      (_) {
         emit(state.copyWith(
-          status: HomeStatus.refreshing,
-          message: 'Refreshing balances...',
-          error: null,
+          status: HomeStatus.success,
+          processingCredexIds: const [],
+          message: 'Transaction cancelled successfully',
         ));
-
-        // Refresh data to get updated balances and transactions
-        await _refreshViaLogin();
-
-        add(const HomeCancelCredexCompleted());
+        // Trigger refresh to update dashboard and transactions
+        add(const HomeRefreshStarted());
       },
     );
   }
 
-  void _onCancelCredexCompleted(
-    HomeCancelCredexCompleted event,
-    Emitter<HomeState> emit,
-  ) {
-    Logger.state('Credex cancellation completed');
-    emit(state.copyWith(
-      status: HomeStatus.success,
-      processingCredexIds: const [],
-      message: 'Credex cancelled successfully',
-      error: null,
-    ));
-  }
-
-  Future<void> _onFetchPendingTransactions(
-    HomeFetchPendingTransactions event,
-    Emitter<HomeState> emit,
-  ) async {
-    Logger.state('Refresh started');
-    emit(state.copyWith(
-      status: HomeStatus.refreshing,
-      message: null,
-      error: null,
-    ));
-
-    // First check what's in the database
-    Logger.data('Checking database state before refresh');
-    // Trigger refresh
-    await _refreshFromDb();
-  }
-
-  void _onSearchStarted(HomeSearchStarted event, Emitter<HomeState> emit) {
-    Logger.interaction('Search started with query: ${event.query}');
-
-    // Always update search query first
-    emit(state.copyWith(searchQuery: event.query));
-
-    if (event.query.isEmpty) {
-      Logger.data('Empty search query - showing all transactions');
-      emit(state.copyWith(
-        filteredLedgerEntries: state.combinedLedgerEntries,
-        filteredPendingInTransactions: state.pendingInTransactions,
-        filteredPendingOutTransactions: state.pendingOutTransactions,
-      ));
-      return;
-    }
-
+  void _onHomeSearchStarted(HomeSearchStarted event, Emitter<HomeState> emit) {
     final query = event.query.toLowerCase();
-    Logger.data('Filtering transactions with query: $query');
-
-    // Filter ledger entries
     final filteredEntries = state.combinedLedgerEntries.where((entry) {
-      final matches = entry.description.toLowerCase().contains(query) ||
-          entry.formattedAmount.toLowerCase().contains(query) ||
-          entry.counterpartyAccountName.toLowerCase().contains(query);
-      if (matches) {
-        Logger.data('Matched ledger entry: ${entry.description}');
-      }
-      return matches;
+      return entry.description.toLowerCase().contains(query) ||
+             entry.formattedAmount.toLowerCase().contains(query) ||
+             entry.counterpartyAccountName.toLowerCase().contains(query);
     }).toList();
-
-    // Filter pending in transactions
+    
     final filteredPendingIn = state.pendingInTransactions.where((tx) {
-      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
-          tx.counterpartyAccountName.toLowerCase().contains(query);
-      if (matches) {
-        Logger.data('Matched pending in: ${tx.counterpartyAccountName}');
-      }
-      return matches;
+      return tx.counterpartyAccountName.toLowerCase().contains(query) ||
+             tx.formattedInitialAmount.toLowerCase().contains(query);
     }).toList();
-
-    // Filter pending out transactions
+    
     final filteredPendingOut = state.pendingOutTransactions.where((tx) {
-      final matches = tx.formattedInitialAmount.toLowerCase().contains(query) ||
-          tx.counterpartyAccountName.toLowerCase().contains(query);
-      if (matches) {
-        Logger.data('Matched pending out: ${tx.counterpartyAccountName}');
-      }
-      return matches;
+      return tx.counterpartyAccountName.toLowerCase().contains(query) ||
+             tx.formattedInitialAmount.toLowerCase().contains(query);
     }).toList();
-
-    Logger.data('''Search results:
-      Ledger entries: ${filteredEntries.length}
-      Pending in: ${filteredPendingIn.length}
-      Pending out: ${filteredPendingOut.length}
-    ''');
 
     emit(state.copyWith(
+      searchQuery: query,
       filteredLedgerEntries: filteredEntries,
       filteredPendingInTransactions: filteredPendingIn,
       filteredPendingOutTransactions: filteredPendingOut,
     ));
   }
 
-  Future<void> _onRegisterNotificationToken(
-    HomeRegisterNotificationToken event,
-    Emitter<HomeState> emit,
-  ) async {
-    // Skip if token setup is not complete
-    if (!_isTokenSetupComplete) {
-      Logger.data('Token setup not complete, skipping registration');
-      return;
+  Future<void> _onHomeUpgradeTierStarted(HomeUpgradeTierStarted event, Emitter<HomeState> emit) async {
+    emit(state.copyWith(status: HomeStatus.upgradingTier));
+    try {
+      await upgradeMemberTier(event.sourceAccountId);
+      add(const HomeUpgradeTierCompleted());
+    } catch (e) {
+      add(HomeUpgradeTierFailed(e.toString()));
     }
-    
-    // Skip if token is already registered
-    if (event.token == _currentFcmToken) {
-      Logger.data('Token already registered, skipping');
-      return;
-    }
-
-    await _registerToken(event.token);
   }
 
-  void _onLoadPendingTransactions(
-    HomeLoadPendingTransactions event,
-    Emitter<HomeState> emit,
-  ) {
-    Logger.data('Loading pending transactions');
+  void _onHomeUpgradeTierCompleted(HomeUpgradeTierCompleted event, Emitter<HomeState> emit) {
     emit(state.copyWith(
       status: HomeStatus.success,
-      pendingInTransactions: event.pendingInTransactions,
-      pendingOutTransactions: event.pendingOutTransactions,
-      filteredPendingInTransactions: event.pendingInTransactions,
-      filteredPendingOutTransactions: event.pendingOutTransactions,
+      message: 'Tier upgrade successful',
     ));
   }
 
-  Future<void> _onCreateCredex(
-    CreateCredexEvent event,
+  void _onHomeUpgradeTierFailed(HomeUpgradeTierFailed event, Emitter<HomeState> emit) {
+    // Log the actual error for debugging
+    _logger.e('Upgrade tier failed: ${event.message}');
+    _logger.d('Full error message: ${event.message}');
+    
+    // Default message
+    String userFriendlyMessage = 'Unable to upgrade membership at this time. Please try again later.';
+    
+    // Check for the error code in the message
+    // The error code is embedded in the message as "|code=ERROR_CODE"
+    if (event.message.contains('|code=INSUFFICIENT_SECURED_BALANCE')) {
+      userFriendlyMessage = 'You don\'t have enough secured balance to upgrade. Your maximum securable balance is too low for this upgrade.';
+      _logger.d('Detected INSUFFICIENT_SECURED_BALANCE error code');
+    } 
+    // Fallback to checking for the error code in JSON format
+    else if (event.message.contains('"code": "INSUFFICIENT_SECURED_BALANCE"')) {
+      userFriendlyMessage = 'You don\'t have enough secured balance to upgrade. Your maximum securable balance is too low for this upgrade.';
+      _logger.d('Detected INSUFFICIENT_SECURED_BALANCE error code in JSON format');
+    }
+    
+    emit(state.copyWith(
+      status: HomeStatus.error,
+      error: userFriendlyMessage,
+    ));
+  }
+
+  Future<void> _onHomeFetchPendingTransactions(
+    HomeFetchPendingTransactions event,
     Emitter<HomeState> emit,
   ) async {
-    Logger.data('Creating credex request');
+    // Trigger a refresh to update the dashboard and transactions
+    add(const HomeRefreshStarted());
+  }
 
-    final result = await accountRepository.createCredex(event.request);
+  void _onHomeOfferAccepted(HomeOfferAccepted event, Emitter<HomeState> emit) {
+    _logger.i('Offer accepted notification received for credexId: ${event.credexId}');
+    
+    // Add the credexId to processingCredexIds to show "Processing..." state
+    // Don't trigger a refresh here since the notification service will handle that
+    emit(state.copyWith(
+      processingCredexIds: [...state.processingCredexIds, event.credexId],
+    ));
+  }
 
-    result.fold(
-      (failure) {
-        Logger.error('Failed to create credex', failure);
-        add(HomeErrorOccurred(failure.message ?? 'Failed to create credex'));
-      },
-      (_) {
-        Logger.data('Successfully created credex');
-      },
-    );
+  Future<void> _loadLedgerData(Dashboard dashboard) async {
+    _logger.d('Loading ledger data for accounts');
+
+    final Map<String, List<LedgerEntry>> accountLedgers = {};
+    final List<LedgerEntry> allEntries = [];
+    bool hasMoreEntries = false;
+    final List<String> errors = [];
+
+    try {
+      final accounts = dashboard.accounts;
+      
+      // Phase 1: Load and display cached entries immediately
+      _logger.d('Phase 1: Loading cached entries');
+      for (final account in accounts) {
+        // Load directly from cache for immediate display
+        final cachedEntries = await databaseHelper.getLedgerEntries(account.accountID);
+        if (cachedEntries.isNotEmpty) {
+          _logger.d('Found ${cachedEntries.length} cached entries for account ${account.accountName}');
+          accountLedgers[account.accountID] = cachedEntries;
+          allEntries.addAll(cachedEntries);
+          
+          // Emit immediately to show cached data
+          final uniqueEntries = _deduplicateAndSortEntries(allEntries);
+          add(HomeLedgerLoaded(
+            accountLedgers: accountLedgers,
+            combinedEntries: uniqueEntries,
+            hasMore: true,
+            showCompletionToast: false,
+          ));
+        }
+      }
+
+      // Phase 2: Fetch new entries in background
+      _logger.d('Phase 2: Fetching new entries');
+      _totalAccounts = accounts.length;
+      _processedAccounts = 0;
+
+      for (final account in accounts) {
+        final hasCachedEntries = await databaseHelper.hasLedgerEntries(account.accountID);
+        final latestTimestamp = hasCachedEntries 
+          ? await databaseHelper.getLatestLedgerTimestamp(account.accountID)
+          : null;
+
+        _logger.d('Fetching entries for ${account.accountName} (cached: $hasCachedEntries)');
+        
+        _processedAccounts++;
+        
+        // Add delay between accounts to prevent rate limiting
+        if (_processedAccounts < _totalAccounts) {
+          await Future.delayed(const Duration(milliseconds: 5000)); // Increased delay to 5 seconds
+        }
+
+        // Fetch new entries with retry logic
+        bool success = false;
+        int retryDelay = 5000; // Start with 5 seconds
+        int retryCount = 0;
+        const maxRetries = 3;
+
+        while (!success && retryCount < maxRetries) {
+          try {
+            final result = await accountRepository.getLedger(
+              accountId: account.accountID,
+              afterTimestamp: latestTimestamp,
+              limit: hasCachedEntries ? 10 : null, // No limit for initial load
+            );
+
+            await result.fold(
+              (failure) async {
+                _logger.e('Failed to fetch new entries for account ${account.accountID}: ${failure.toString()}');
+                errors.add('Failed to load new entries for ${account.accountName}');
+                success = true; // Don't retry on non-rate-limit failures
+              },
+              (entries) async {
+                if (entries.isNotEmpty) {
+                  _logger.d('Received ${entries.length} new entries for ${account.accountName}');
+                  
+                  // Update or add to existing entries
+                  if (accountLedgers.containsKey(account.accountID)) {
+                    accountLedgers[account.accountID]!.addAll(entries);
+                  } else {
+                    accountLedgers[account.accountID] = entries;
+                  }
+                  allEntries.addAll(entries);
+                  
+                  // Check if we got all entries
+                  hasMoreEntries = hasCachedEntries && entries.length >= 10;
+
+                  // Emit update with new entries
+                  final uniqueEntries = _deduplicateAndSortEntries(allEntries);
+                  add(HomeLedgerLoaded(
+                    accountLedgers: accountLedgers,
+                    combinedEntries: uniqueEntries,
+                    hasMore: hasMoreEntries,
+                    showCompletionToast: _processedAccounts == _totalAccounts && errors.isEmpty,
+                  ));
+                }
+                success = true;
+              },
+            );
+          } catch (e) {
+            if (e is RateLimitException) {
+              retryCount++;
+              if (retryCount < maxRetries) {
+                _logger.w('Rate limit hit (attempt $retryCount of $maxRetries), retrying in ${retryDelay}ms');
+                await Future.delayed(Duration(milliseconds: retryDelay));
+                retryDelay *= 2; // Exponential backoff
+              } else {
+                _logger.e('Max retries reached for rate limit');
+                errors.add('Rate limit exceeded for ${account.accountName}');
+                success = true;
+              }
+            } else {
+              _logger.e('Error fetching entries: $e');
+              errors.add('Error loading entries for ${account.accountName}: ${e.toString()}');
+              success = true;
+            }
+          }
+        }
+      }
+
+      // Final error handling
+      if (errors.isNotEmpty) {
+        add(HomeErrorOccurred(errors.join('\n')));
+      } else if (allEntries.isEmpty) {
+        add(const HomeLedgerLoaded(
+          accountLedgers: {},
+          combinedEntries: [],
+          hasMore: false,
+          showCompletionToast: true,
+        ));
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Error in _loadLedgerData: $e\n$stackTrace');
+      add(const HomeErrorOccurred('Failed to load ledger data'));
+    }
+  }
+
+  List<LedgerEntry> _deduplicateAndSortEntries(List<LedgerEntry> entries) {
+    // Create a map using uniqueIdentifier as key to remove duplicates
+    final uniqueEntries = <String, LedgerEntry>{};
+    for (final entry in entries) {
+      uniqueEntries[entry.uniqueIdentifier] = entry;
+    }
+    
+    // Convert back to list and sort by timestamp
+    final sortedEntries = uniqueEntries.values.toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    
+    return sortedEntries;
   }
 }

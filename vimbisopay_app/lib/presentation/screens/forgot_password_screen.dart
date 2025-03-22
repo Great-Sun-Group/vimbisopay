@@ -4,7 +4,11 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
-import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
+import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'dart:async' show unawaited;
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -14,13 +18,11 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _isSubmitted = false;
   final Map<String, String?> _fieldErrors = {
     'phone': null,
   };
@@ -39,20 +41,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
   @override
   void initState() {
     super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     Logger.lifecycle('ForgotPasswordScreen initialized');
   }
 
   @override
   void dispose() {
     Logger.lifecycle('ForgotPasswordScreen disposing');
-    if (!_isLoading) {
-      _spinController.dispose();
-    }
     _phoneController.dispose();
     super.dispose();
   }
@@ -128,74 +122,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     );
   }
 
-  Widget _buildSuccessContent() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildHeaderBanner(),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.success.withOpacity(0.2),
+  void _showOtpVerification(String phone, String memberId, String token) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PasswordResetOTPFlow(
+        phone: phone,
+        token: token,
+        memberId: memberId,
+        onVerificationComplete: (OtpVerificationResponse response) {
+          // Close OTP dialog
+          Navigator.pop(context);
+          
+          // Show reset password bottom sheet
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            isDismissible: false,
+            enableDrag: false,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
             ),
-          ),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                color: AppColors.success,
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Instructions Sent!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We\'ve sent password reset instructions to +${_phoneController.text}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.4,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: FilledButton(
-            onPressed: () {
-              Logger.interaction('Returning to login from forgot password success');
-              Navigator.of(context).pop();
-            },
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+            builder: (context) => ChangePasswordBottomSheet(
+              resetToken: response.details.resetToken,
+              memberId: response.details.memberId,
             ),
-            child: const Text(
-              'Return to Login',
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 
@@ -227,6 +181,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
     );
   }
 
+  final _repository = ServiceLocator.accountRepository;
+
   Future<void> _handleSubmit() async {
     Logger.interaction('[ForgotPassword] Submit button pressed');
     
@@ -250,54 +206,65 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
       _isLoading = true;
     });
 
-    _spinController.repeat();
-
     // Show loading dialog
     unawaited(showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       useSafeArea: false,
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {
         Logger.interaction('[ForgotPassword] Building loading dialog');
-        return LoadingDialog(
-          spinController: _spinController,
+        return const LoadingDialog(
           message: 'Sending instructions...',
         );
       },
     ));
 
     try {
-      // TODO: Implement actual password reset API call
-      await Future.delayed(const Duration(seconds: 2));
+      final phoneNumber = '+${_phoneController.text}';
+      final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+      final result = await _repository.requestOtp(
+        phone: sanitizedPhone,
+        purpose: 'PASSWORD_RESET',
+      );
 
       if (!mounted) return;
 
-      Logger.interaction('[ForgotPassword] Instructions sent successfully');
-      
       // Helper function to safely pop dialog and update state
       void cleanup() {
         if (mounted) {
           Navigator.of(context).pop(); // Pop loading dialog
           setState(() {
             _isLoading = false;
-            _spinController.stop();
           });
         }
       }
 
-      cleanup();
-      setState(() {
-        _isSubmitted = true;
-      });
+      result.fold(
+        (failure) {
+          cleanup();
+          _showError(failure.message ?? 'Failed to send reset instructions. Please try again.');
+        },
+        (response) {
+          cleanup();
+          final memberId = response['data']?['action']?['details']?['memberID'];
+          final token = response['data']?['action']?['details']?['token'];
+          if (memberId == null || token == null) {
+            _showError('Failed to get required information from response');
+            return;
+          }
+          Logger.data('[ForgotPassword] Got memberId and token from response');
+          // Show OTP verification dialog with memberId and token
+          _showOtpVerification(sanitizedPhone, memberId, token);
+        },
+      );
     } catch (e) {
       Logger.error('[ForgotPassword] Error sending reset instructions', e);
       if (mounted) {
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
-          _spinController.stop();
         });
         _showError('Failed to send reset instructions. Please try again.');
       }
@@ -306,17 +273,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Single
 
   @override
   Widget build(BuildContext context) {
-    if (_isSubmitted) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: _buildSuccessContent(),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

@@ -3,10 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
+import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
+import 'package:vimbisopay_app/presentation/widgets/upgrade_tier_bottom_sheet.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/ui_utils.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' show Dashboard, MemberTierType;
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
@@ -16,9 +19,12 @@ import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
+import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,89 +36,386 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
-  final AccountRepository _accountRepository = AccountRepositoryImpl();
+  final AccountRepository _accountRepository = AccountRepositoryImpl(
+    passwordService: ServiceLocator.passwordService,
+  );
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   late HomeBloc _homeBloc;
   bool _isDisposed = false;
   bool _isInitializing = true;
+  final NotificationService _notificationService = NotificationService();
+  StreamSubscription? _refreshSubscription;
+  StreamSubscription? _notificationSubscription;
 
-  Widget _buildUserAvatar(HomeState state) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: 16.0,
-        top: 16.0,
-        bottom: 16.0,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          CircleAvatar(
-            radius: HomeConstants.avatarSize / 2,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            child: state.dashboard != null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.person,
-                        color: AppColors.primary,
-                        size: HomeConstants.avatarSize / 2,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        UIUtils.getInitials(
-                          state.dashboard!.firstname,
-                          state.dashboard!.lastname,
-                        ),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: HomeConstants.captionTextSize,
-                        ),
-                      ),
-                    ],
-                  )
-                : const Icon(
-                    Icons.person_outline,
-                    color: AppColors.primary,
-                    size: HomeConstants.avatarSize / 2,
-                  ),
+  void _showUpgradeBottomSheet(BuildContext context, String accountId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.transparent,
+      builder: (context) => BlocProvider.value(
+        value: _homeBloc,
+        child: BlocListener<HomeBloc, HomeState>(
+          listenWhen: (previous, current) => 
+            previous.status != current.status && 
+            (current.status == HomeStatus.upgradingTier || 
+             current.status == HomeStatus.success || 
+             current.status == HomeStatus.error),
+          listener: (context, state) {
+            if (state.status == HomeStatus.upgradingTier) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const LoadingDialog(
+                  message: 'Upgrading your account...',
+                ),
+              );
+            } else if (state.status == HomeStatus.success || state.status == HomeStatus.error) {
+              try {
+                // Safely pop dialogs by wrapping in try-catch
+                // First try to pop the loading dialog
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+                
+                // Then try to pop the bottom sheet
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                Logger.error('Error while popping dialogs', e);
+                // If we can't pop normally, use a more aggressive approach
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            }
+          },
+          child: UpgradeTierBottomSheet(
+            onConfirm: () {
+              _homeBloc.add(HomeUpgradeTierStarted(accountId));
+            },
+            onCancel: () => Navigator.pop(context),
+            isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
           ),
-          if (state.dashboard?.memberTier != null)
-            Positioned(
-              right: -8,
-              bottom: -8,
-              child: MemberTierBadge(
-                tierType: state.dashboard!.memberTier.type,
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
 
-  void _setupScrollListener() {
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.9) {
-        Logger.interaction('Scroll threshold reached, loading more entries');
-        _homeBloc.add(const HomeLoadMoreStarted());
+  Future<void> _setupNotificationListeners() async {
+    if (!mounted || _isDisposed) {
+      Logger.error('Cannot setup listeners - widget is disposed or unmounted');
+      return;
+    }
+
+    Logger.data('Setting up notification listeners');
+    
+    try {
+      // Cancel any existing subscriptions
+      await _refreshSubscription?.cancel();
+      await _notificationSubscription?.cancel();
+      _refreshSubscription = null;
+      _notificationSubscription = null;
+
+      final initialized = await _notificationService.initialize();
+      if (!initialized) {
+        Logger.error('Failed to initialize NotificationService');
+        return;
       }
-    });
+
+      if (!mounted || _isDisposed) {
+        Logger.error('Widget disposed during initialization');
+        return;
+      }
+
+      // Listen for refresh events
+      Logger.data('Setting up refresh subscription');
+      _refreshSubscription = _notificationService.onRefreshNeeded.listen(
+        (_) {
+          Logger.data('''
+Refresh triggered by notification:
+- Is disposed: $_isDisposed
+- Is mounted: $mounted
+- Has HomeBloc: ${_homeBloc != null}
+''');
+          if (!_isDisposed && mounted) {
+            Logger.data('Triggering HomeRefreshStarted event');
+            _homeBloc.add(const HomeRefreshStarted());
+          } else {
+            Logger.error('Cannot refresh - widget is disposed or unmounted');
+          }
+        },
+        onError: (error, stackTrace) {
+          Logger.error('''
+Error in refresh subscription:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+        },
+      );
+      Logger.data('Refresh subscription setup complete');
+
+      // Listen for notifications to show SnackBar
+      Logger.data('Setting up notification subscription');
+      _notificationSubscription = _notificationService.onNotification.listen(
+        (message) {
+          if (!_isDisposed && mounted) {
+            Logger.data('Showing notification SnackBar');
+            
+            // Clear any existing SnackBars first
+            try {
+              ScaffoldMessenger.of(context).clearSnackBars();
+            } catch (e) {
+              Logger.error('Error clearing snackbars', e);
+            }
+            
+            final notificationType = message.data['type']?.toUpperCase();
+            Logger.data('Processing notification type: $notificationType');
+            
+            // Handle OFFER_ACCEPTED notification
+            if (notificationType == 'OFFER_ACCEPTED') {
+              final credexId = message.data['credexID'];
+              if (credexId != null) {
+                Logger.data('Received OFFER_ACCEPTED for credexId: $credexId');
+                _homeBloc.add(HomeOfferAccepted(credexId));
+                
+                // Use post-frame callback to ensure widget tree is stable
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    try {
+                      // Show status change snackbar
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: AppColors.white,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (message.notification?.title != null)
+                                        Text(
+                                          message.notification!.title!,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      if (message.notification?.body != null)
+                                        Text(
+                                          message.notification!.body!,
+                                          style: const TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          backgroundColor: AppColors.success,
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 4),
+                          margin: const EdgeInsets.all(8),
+                          elevation: 6,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      Logger.error('Error showing OFFER_ACCEPTED snackbar', e);
+                    }
+                  }
+                });
+                return;
+              }
+            }
+            
+            // Special handling for OFFER_CREATED
+            if (notificationType == 'OFFER_CREATED') {
+              Logger.data('Showing OFFER_CREATED notification');
+              
+              // Use post-frame callback to ensure widget tree is stable
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  try {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Transform.rotate(
+                                angle: 180 * (3.14159 / 180), // Rotate 180 degrees to show incoming
+                                child: const Icon(
+                                  Icons.payments,
+                                  color: AppColors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'New Incoming Offer',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.white,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    if (message.notification?.body != null)
+                                      Text(
+                                        message.notification!.body!,
+                                        style: const TextStyle(
+                                          color: AppColors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 4),
+                        margin: const EdgeInsets.all(8),
+                        elevation: 6,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        action: SnackBarAction(
+                          label: 'DISMISS',
+                          textColor: AppColors.white,
+                          onPressed: () {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    Logger.error('Error showing OFFER_CREATED snackbar', e);
+                  }
+                }
+              });
+              return;
+            }
+
+            // Default notification handling for other types
+            Logger.data('Showing default notification');
+            
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (message.notification?.title != null)
+                              Text(
+                                message.notification!.title!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            if (message.notification?.title != null && message.notification?.body != null)
+                              const SizedBox(height: 4),
+                            if (message.notification?.body != null)
+                              Text(
+                                message.notification!.body!,
+                                style: const TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      backgroundColor: AppColors.primary,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                      margin: const EdgeInsets.all(8),
+                      elevation: 6,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: AppColors.white,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing default notification snackbar', e);
+                }
+              }
+            });
+          }
+        },
+        onError: (error, stackTrace) {
+          Logger.error('''
+Error in notification subscription:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+        },
+      );
+      Logger.data('''
+Notification listeners setup complete:
+- Refresh subscription active: ${_refreshSubscription != null}
+- Notification subscription active: ${_notificationSubscription != null}
+''');
+    } catch (e, stackTrace) {
+      Logger.error('''
+Error setting up notification listeners:
+- Error: $e
+- Stack trace: $stackTrace
+''');
+    }
   }
 
   void _initializeBloc() {
     Logger.lifecycle('Initializing HomeBloc');
     _homeBloc = HomeBloc(
+      accountRepository: _accountRepository,
+      databaseHelper: _databaseHelper,
       acceptCredexBulk: AcceptCredexBulk(_accountRepository),
       acceptCredex: AcceptCredex(_accountRepository),
-      accountRepository: _accountRepository,
+      upgradeMemberTier: UpgradeMemberTier(_accountRepository),
     );
     
     // Use addPostFrameCallback to ensure widget is fully mounted
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!_isDisposed && mounted) {
         _homeBloc.loadInitialData();
+        await _setupNotificationListeners();
       }
     });
   }
@@ -126,6 +429,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _checkUserAndInitialize();
   }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent * 0.9) {
+        
+        // Cancel existing timer if any
+        _scrollDebounceTimer?.cancel();
+        
+        // Set new timer
+        _scrollDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+          if (mounted && !_isDisposed) {
+            Logger.interaction('Scroll threshold reached, loading more entries');
+            _homeBloc.add(const HomeLoadMoreStarted());
+          }
+        });
+      }
+    });
+  }
+
+  Timer? _scrollDebounceTimer;
 
   Future<void> _checkUserAndInitialize() async {
     try {
@@ -154,8 +478,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     Logger.lifecycle('App lifecycle state changed to: $state');
     if (state == AppLifecycleState.resumed && mounted && !_isDisposed) {
-      Logger.lifecycle('App resumed - reinitializing bloc and refreshing data');
+      Logger.lifecycle('App resumed - reinitializing services');
+      
+      // First check if we need to reinitialize the bloc
       _checkUserAndInitialize();
+      
+      // Then reinitialize notification listeners
+      Logger.lifecycle('Reinitializing notification listeners');
+      _setupNotificationListeners().then((_) {
+        Logger.lifecycle('Notification listeners reinitialized');
+        
+        // Trigger a refresh to ensure data is up to date
+        if (mounted && !_isDisposed) {
+          Logger.lifecycle('Triggering refresh after resume');
+          _homeBloc.add(const HomeRefreshStarted());
+        }
+      }).catchError((error, stackTrace) {
+        Logger.error('''
+Error reinitializing notification listeners:
+- Error: $error
+- Stack trace: $stackTrace
+''');
+      });
+    } else if (state == AppLifecycleState.paused) {
+      Logger.lifecycle('App paused - cleaning up notification subscriptions');
+      _refreshSubscription?.cancel();
+      _notificationSubscription?.cancel();
+      _refreshSubscription = null;
+      _notificationSubscription = null;
     }
   }
 
@@ -165,9 +515,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _isDisposed = true;
     _pageController.dispose();
     _scrollController.dispose();
+    _scrollDebounceTimer?.cancel();
+    _refreshSubscription?.cancel();
+    _notificationSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Don't close the HomeBloc here as it needs to stay alive for notifications
     super.dispose();
+  }
+
+  Widget _buildUserAvatar(HomeState state) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 16.0,
+        top: 16.0,
+        bottom: 16.0,
+      ),
+      child: CircleAvatar(
+        radius: HomeConstants.avatarSize / 2,
+        backgroundColor: AppColors.primary.withOpacity(0.1),
+        child: state.dashboard != null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.person,
+                    color: AppColors.primary,
+                    size: HomeConstants.avatarSize / 2,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    UIUtils.getInitials(
+                      state.dashboard!.firstname,
+                      state.dashboard!.lastname,
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: HomeConstants.captionTextSize,
+                    ),
+                  ),
+                ],
+              )
+            : const Icon(
+                Icons.person_outline,
+                color: AppColors.primary,
+                size: HomeConstants.avatarSize / 2,
+              ),
+      ),
+    );
   }
 
   PreferredSize _buildAppBar(HomeState state) {
@@ -277,6 +672,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   key: ValueKey('account_card_${state.dashboard!.accounts[index].accountID}_${state.dashboard!.accounts[index].balanceData.netCredexAssetsInDefaultDenom}'),
                   account: state.dashboard!.accounts[index],
                   memberTier: state.dashboard!.memberTier,
+                  onUpgrade: state.dashboard!.memberTier.type == MemberTierType.open
+                      ? () => _showUpgradeBottomSheet(
+                          context, state.dashboard!.accounts[index].accountID)
+                      : null,
                 ),
               );
             },
@@ -367,55 +766,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             previous.message != current.message ||
             previous.error != current.error,
         listener: (context, state) {
-          // Clear any existing snackbars
-          ScaffoldMessenger.of(context).clearSnackBars();
+          // Clear any existing snackbars if mounted
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(context).clearSnackBars();
+            } catch (e) {
+              Logger.error('Error clearing snackbars', e);
+            }
+          }
 
           // Show message if present, regardless of status
-          if (state.message != null) {
+          if (state.message != null && mounted) {
             Logger.data('Showing snackbar with message: ${state.message}');
-            // Ensure any existing snackbar is removed first
-            ScaffoldMessenger.of(context).removeCurrentSnackBar();
             
-            // Show the new snackbar
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message!),
-                backgroundColor: state.status == HomeStatus.error 
-                    ? AppColors.error 
-                    : AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4), // Increased duration
-                action: SnackBarAction(
-                  label: 'DISMISS',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  },
-                ),
-              ),
-            );
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  // Ensure any existing snackbar is removed first
+                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                  
+                  // Show the new snackbar
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        state.message!,
+                        style: state.status == HomeStatus.error 
+                            ? const TextStyle(color: AppColors.lightCream)
+                            : null,
+                      ),
+                      backgroundColor: state.status == HomeStatus.error 
+                          ? AppColors.error 
+                          : AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: state.status == HomeStatus.error 
+                            ? AppColors.lightCream
+                            : AppColors.white,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing message snackbar', e);
+                }
+              }
+            });
           }
 
           // Handle error messages
           if (state.hasError && state.error != null) {
             // Dismiss any loading dialogs first
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            try {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } catch (e) {
+              Logger.error('Error popping dialogs', e);
+            }
             
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.error!),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'DISMISS',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  },
-                ),
-              ),
-            );
+            // Log the error for debugging
+            Logger.error('Error occurred', state.error);
+            
+            // Use post-frame callback to ensure widget tree is stable
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        state.error!,
+                        style: const TextStyle(color: AppColors.lightCream),
+                      ),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: 'DISMISS',
+                        textColor: AppColors.lightCream,
+                        onPressed: () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  Logger.error('Error showing error snackbar', e);
+                }
+              }
+            });
           }
         },
         builder: (context, state) {
@@ -430,7 +875,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
 
           return Scaffold(
-            backgroundColor: Colors.transparent,
+            backgroundColor: AppColors.transparent,
             appBar: _buildAppBar(state),
             body: SafeArea(
               child: _buildScrollableContent(state),

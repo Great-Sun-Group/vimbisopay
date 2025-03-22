@@ -1,25 +1,49 @@
-// Core failure types that can be extended by specific layers
+/// Core failure types that can be extended by specific layers
 abstract class Failure {
   final String? message;
   const Failure([this.message]);
 }
 
-// Domain-specific failures
+/// Domain-specific failures
 class DomainFailure extends Failure {
   const DomainFailure([super.message]);
 }
 
-// Infrastructure failures
+/// Infrastructure failures
 class InfrastructureFailure extends Failure {
-  const InfrastructureFailure([super.message]);
+  final String? code;
+  
+  const InfrastructureFailure([super.message, this.code]);
 }
 
-// Server failures
+/// Server failures
 class ServerFailure extends InfrastructureFailure {
   const ServerFailure([super.message]);
 }
 
-// Application failures
+/// Not found failures
+class NotFoundFailure extends InfrastructureFailure {
+  const NotFoundFailure([super.message]);
+}
+
+/// Validation failures
+class ValidationFailure extends InfrastructureFailure {
+  const ValidationFailure([super.message]);
+}
+
+/// Application failures
 class ApplicationFailure extends Failure {
   const ApplicationFailure([super.message]);
+}
+
+/// Authentication failures
+class AuthFailure extends InfrastructureFailure {
+  final String? code;
+  
+  const AuthFailure({
+    String? message,
+    this.code,
+  }) : super(message);
+
+  bool get isPasswordRequired => code == 'PASSWORD_REQUIRED';
 }

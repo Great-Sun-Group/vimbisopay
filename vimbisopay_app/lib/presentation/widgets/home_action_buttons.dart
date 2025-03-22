@@ -3,6 +3,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_qr_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_selection_bottom_sheet.dart';
@@ -32,7 +33,7 @@ class HomeActionButtons extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No accounts available to send from',
+            'No accounts available to offer from',
             style: TextStyle(color: AppColors.textPrimary),
           ),
           backgroundColor: AppColors.error,
@@ -57,7 +58,7 @@ class HomeActionButtons extends StatelessWidget {
       Logger.interaction('Showing account selection for send');
       showModalBottomSheet(
         context: context,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.transparent,
         isScrollControlled: true,
           builder: (context) => AccountSelectionBottomSheet(
             accounts: accounts!,
@@ -98,7 +99,7 @@ class HomeActionButtons extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.9,
         decoration: const BoxDecoration(
@@ -115,7 +116,7 @@ class HomeActionButtons extends StatelessWidget {
   void _showAccountSelection(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       isScrollControlled: true,
           builder: (context) => AccountSelectionBottomSheet(
             accounts: accounts!,
@@ -126,9 +127,60 @@ class HomeActionButtons extends StatelessWidget {
           ),
     );
   }
+  
+  void _handleMarketplaceTap(BuildContext context) {
+    Logger.interaction('Marketplace tab tapped');
+    Navigator.pushNamed(context, '/marketplace');
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Check if marketplace feature is enabled
+    final bool isMarketplaceEnabled = ServiceLocator.featureFlagService.isMarketplaceEnabled();
+    
+    // Create navigation items
+    final List<BottomNavigationBarItem> items = [
+      BottomNavigationBarItem(
+        icon: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withOpacity(0.1),
+          ),
+          child: const Icon(Icons.payments_outlined),
+        ),
+        label: 'Offer',
+      ),
+      BottomNavigationBarItem(
+        icon: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withOpacity(0.1),
+          ),
+          child: const Icon(Icons.account_balance_wallet_outlined),
+        ),
+        label: 'Receive',
+      ),
+    ];
+    
+    // Add marketplace tab if feature is enabled
+    if (isMarketplaceEnabled) {
+      items.add(
+        BottomNavigationBarItem(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withOpacity(0.1),
+            ),
+            child: const Icon(Icons.storefront_outlined),
+          ),
+          label: 'Market',
+        ),
+      );
+    }
+    
     return BottomNavigationBar(
       backgroundColor: AppColors.surface,
       elevation: 8,
@@ -137,35 +189,14 @@ class HomeActionButtons extends StatelessWidget {
       showSelectedLabels: true,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
-      items: [
-        BottomNavigationBarItem(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withOpacity(0.1),
-            ),
-            child: const Icon(Icons.payments_outlined),
-          ),
-          label: 'Send',
-        ),
-        BottomNavigationBarItem(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withOpacity(0.1),
-            ),
-            child: const Icon(Icons.account_balance_wallet_outlined),
-          ),
-          label: 'Receive',
-        ),
-      ],
+      items: items,
       onTap: (index) {
         if (index == 0) {
           _handleSendTap(context);
-        } else {
+        } else if (index == 1) {
           _handleReceiveTap(context);
+        } else if (isMarketplaceEnabled && index == 2) {
+          _handleMarketplaceTap(context);
         }
       },
     );

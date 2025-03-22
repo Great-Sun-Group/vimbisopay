@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
@@ -9,6 +10,61 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/empty_state.dart';
+
+/// A compact loading animation widget that uses the Lottie animation
+class InlineLoadingAnimation extends StatefulWidget {
+  final double size;
+
+  const InlineLoadingAnimation({
+    super.key,
+    this.size = 40,
+  });
+
+  @override
+  State<InlineLoadingAnimation> createState() => _InlineLoadingAnimationState();
+}
+
+class _InlineLoadingAnimationState extends State<InlineLoadingAnimation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize animation controller with half the normal duration for 2x speed
+    _animationController = AnimationController(
+      vsync: this,
+      // The animation has 162 frames at 60fps (about 2.7 seconds)
+      // For 2x speed, we use half that duration
+      duration: const Duration(milliseconds: 1350),
+    );
+
+    // Start the animation and make it repeat
+    _animationController.repeat();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: Lottie.asset(
+          'assets/animations/loading_anim.json',
+          fit: BoxFit.contain,
+          controller: _animationController,
+        ),
+      ),
+    );
+  }
+}
 
 class TransactionsList extends StatefulWidget {
   const TransactionsList({super.key});
@@ -49,7 +105,9 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   void _acceptBulkTransactions(BuildContext context) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted(_selectedTransactions.toList()));
+    context
+        .read<HomeBloc>()
+        .add(HomeAcceptCredexBulkStarted(_selectedTransactions.toList()));
     setState(() {
       _selectionMode = false;
       _selectedTransactions.clear();
@@ -57,7 +115,7 @@ class _TransactionsListState extends State<TransactionsList> {
   }
 
   void _acceptSingleTransaction(BuildContext context, String credexId) {
-    context.read<HomeBloc>().add(HomeAcceptCredexBulkStarted([credexId]));
+    context.read<HomeBloc>().add(HomeAcceptCredexStarted(credexId));
   }
 
   void _cancelTransaction(BuildContext context, String credexId) {
@@ -80,14 +138,15 @@ class _TransactionsListState extends State<TransactionsList> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Pending Transactions',
+                'Pending Credex',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
-              if (pendingIn.isNotEmpty && state.status != HomeStatus.acceptingCredex) ...[
+              if (pendingIn.isNotEmpty &&
+                  state.status != HomeStatus.acceptingCredex) ...[
                 TextButton.icon(
                   onPressed: () {
                     setState(() {
@@ -115,21 +174,18 @@ class _TransactionsListState extends State<TransactionsList> {
                   ? null
                   : () => _acceptBulkTransactions(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success,
+                backgroundColor: AppColors.techAzure,
                 minimumSize: const Size.fromHeight(40),
               ),
               child: state.status == HomeStatus.acceptingCredex
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
+                      child: InlineLoadingAnimation(size: 20),
                     )
                   : Text(
                       'Confirm ${_selectedTransactions.length} Transactions',
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: AppColors.white),
                     ),
             ),
           ),
@@ -145,7 +201,8 @@ class _TransactionsListState extends State<TransactionsList> {
               ),
             ),
           ),
-          ...pendingIn.map((offer) => _buildPendingTransactionTile(offer, true, state)),
+          ...pendingIn
+              .map((offer) => _buildPendingTransactionTile(offer, true, state)),
         ],
         if (pendingOut.isNotEmpty) ...[
           const Padding(
@@ -159,22 +216,27 @@ class _TransactionsListState extends State<TransactionsList> {
               ),
             ),
           ),
-          ...pendingOut.map((offer) => _buildPendingTransactionTile(offer, false, state)),
+          ...pendingOut.map(
+              (offer) => _buildPendingTransactionTile(offer, false, state)),
         ],
       ],
     );
   }
 
-  Widget _buildPendingTransactionTile(PendingOffer offer, bool isIncoming, HomeState state) {
+  Widget _buildPendingTransactionTile(
+      PendingOffer offer, bool isIncoming, HomeState state) {
     final bool isSelected = _selectedTransactions.contains(offer.credexID);
-    final bool isProcessing = state.processingCredexIds.contains(offer.credexID);
+    final bool isProcessing =
+        state.processingCredexIds.contains(offer.credexID);
     final bool isCancelling = state.status == HomeStatus.cancellingCredex;
 
     final Widget transactionCard = Card(
       elevation: isSelected ? 2 : 0,
       color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
       child: InkWell(
-        onTap: (state.status == HomeStatus.acceptingCredex || isProcessing || !isIncoming)
+        onTap: (state.status == HomeStatus.acceptingCredex ||
+                isProcessing ||
+                !isIncoming)
             ? null
             : _selectionMode
                 ? () {
@@ -196,7 +258,8 @@ class _TransactionsListState extends State<TransactionsList> {
                   padding: const EdgeInsets.only(right: 8.0),
                   child: Checkbox(
                     value: isSelected,
-                    onChanged: (state.status == HomeStatus.acceptingCredex || isProcessing)
+                    onChanged: (state.status == HomeStatus.acceptingCredex ||
+                            isProcessing)
                         ? null
                         : (bool? value) {
                             setState(() {
@@ -240,7 +303,9 @@ class _TransactionsListState extends State<TransactionsList> {
                     Text(
                       offer.secured ? 'Secured Credex' : 'Unsecured Credex',
                       style: TextStyle(
-                        color: offer.secured ? AppColors.success : AppColors.warning,
+                        color: offer.secured
+                            ? AppColors.techAzure
+                            : AppColors.warning,
                         fontSize: 13,
                       ),
                     ),
@@ -255,7 +320,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   Text(
                     offer.formattedInitialAmount,
                     style: TextStyle(
-                      color: isIncoming ? AppColors.success : Colors.white,
+                      color: isIncoming ? AppColors.techAzure : AppColors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -264,11 +329,14 @@ class _TransactionsListState extends State<TransactionsList> {
                     const SizedBox(height: 8),
                     if (isIncoming)
                       ElevatedButton(
-                        onPressed: (state.status == HomeStatus.acceptingCredex || isProcessing)
-                            ? null
-                            : () => _acceptSingleTransaction(context, offer.credexID),
+                        onPressed:
+                            (state.status == HomeStatus.acceptingCredex ||
+                                    isProcessing)
+                                ? null
+                                : () => _acceptSingleTransaction(
+                                    context, offer.credexID),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
+                          backgroundColor: AppColors.techAzure,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           minimumSize: const Size(60, 30),
                         ),
@@ -276,15 +344,12 @@ class _TransactionsListState extends State<TransactionsList> {
                             ? const SizedBox(
                                 height: 15,
                                 width: 15,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
+                                child: InlineLoadingAnimation(size: 15),
                               )
                             : const Text(
                                 'Confirm',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               ),
@@ -295,23 +360,24 @@ class _TransactionsListState extends State<TransactionsList> {
                             ? null
                             : () => _cancelTransaction(context, offer.credexID),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
+                          backgroundColor: isProcessing
+                              ? AppColors.primary.withOpacity(0.6)
+                              : AppColors.error,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           minimumSize: const Size(60, 30),
                         ),
                         child: isProcessing
-                            ? const SizedBox(
-                                height: 15,
-                                width: 15,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ? const Text(
+                                'Processing...',
+                                style: TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 12,
                                 ),
                               )
                             : const Text(
                                 'Cancel',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               ),
@@ -346,7 +412,7 @@ class _TransactionsListState extends State<TransactionsList> {
               padding: const EdgeInsets.only(right: 20.0),
               child: const Icon(
                 Icons.cancel,
-                color: Colors.white,
+                color: AppColors.white,
                 size: 28,
               ),
             ),
@@ -375,14 +441,15 @@ class _TransactionsListState extends State<TransactionsList> {
             leading: Icon(
               _getTransactionIcon(transaction.type, transaction.amount),
               color: transaction.amount >= 0
-                  ? AppColors.success
-                  : AppColors.error,
+                  ? AppColors.techAzure
+                  : AppColors.primary,
               size: 28,
             ),
             title: Text(
               transaction.description,
               style: const TextStyle(
                 fontWeight: FontWeight.w500,
+                color: Colors.white,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -413,8 +480,8 @@ class _TransactionsListState extends State<TransactionsList> {
               transaction.formattedAmount,
               style: TextStyle(
                 color: transaction.amount >= 0
-                    ? AppColors.success
-                    : Colors.white,
+                    ? AppColors.techAzure
+                    : AppColors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -477,10 +544,12 @@ class _TransactionsListState extends State<TransactionsList> {
           previous.processingCredexIds != current.processingCredexIds,
       listener: (context, state) {
         Logger.data('TransactionsList state update - Status: ${state.status}');
-        Logger.data('Has pending transactions: ${state.hasPendingTransactions}');
+        Logger.data(
+            'Has pending transactions: ${state.hasPendingTransactions}');
         Logger.data('Pending in count: ${state.pendingInTransactions.length}');
-        Logger.data('Pending out count: ${state.pendingOutTransactions.length}');
-        
+        Logger.data(
+            'Pending out count: ${state.pendingOutTransactions.length}');
+
         // Clear selection for any transactions that are being processed
         if (state.processingCredexIds.isNotEmpty) {
           setState(() {
@@ -515,15 +584,18 @@ class _TransactionsListState extends State<TransactionsList> {
         if (state.searchQuery.isNotEmpty) {
           // Check if we have any results at all
           final hasFilteredResults = state.filteredLedgerEntries.isNotEmpty ||
-                                   state.filteredPendingInTransactions.isNotEmpty ||
-                                   state.filteredPendingOutTransactions.isNotEmpty;
-          
+              state.filteredPendingInTransactions.isNotEmpty ||
+              state.filteredPendingOutTransactions.isNotEmpty;
+
           Logger.data('Search query: ${state.searchQuery}');
           Logger.data('Has filtered results: $hasFilteredResults');
-          Logger.data('Filtered ledger entries: ${state.filteredLedgerEntries.length}');
-          Logger.data('Filtered pending in: ${state.filteredPendingInTransactions.length}');
-          Logger.data('Filtered pending out: ${state.filteredPendingOutTransactions.length}');
-          
+          Logger.data(
+              'Filtered ledger entries: ${state.filteredLedgerEntries.length}');
+          Logger.data(
+              'Filtered pending in: ${state.filteredPendingInTransactions.length}');
+          Logger.data(
+              'Filtered pending out: ${state.filteredPendingOutTransactions.length}');
+
           // Show no results view if we have no matches
           if (!hasFilteredResults) {
             return _buildNoSearchResults();
@@ -534,7 +606,7 @@ class _TransactionsListState extends State<TransactionsList> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (state.filteredPendingInTransactions.isNotEmpty || 
+                if (state.filteredPendingInTransactions.isNotEmpty ||
                     state.filteredPendingOutTransactions.isNotEmpty)
                   _buildPendingTransactionsSection(
                     state.filteredPendingInTransactions,
@@ -543,9 +615,10 @@ class _TransactionsListState extends State<TransactionsList> {
                   ),
                 if (state.filteredLedgerEntries.isNotEmpty) ...[
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Text(
-                      'Transaction History',
+                      'Account Ledger',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -569,20 +642,20 @@ class _TransactionsListState extends State<TransactionsList> {
                 state.pendingOutTransactions,
                 state,
               ),
-              if (state.status == HomeStatus.loading || state.status == HomeStatus.initial) ...[
+              if (state.status == HomeStatus.loading ||
+                  state.status == HomeStatus.initial) ...[
                 const Padding(
                   padding: EdgeInsets.all(24.0),
                   child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                    ),
+                    child: InlineLoadingAnimation(size: 80),
                   ),
                 ),
               ] else if (state.combinedLedgerEntries.isNotEmpty) ...[
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Text(
-                    'Transaction History',
+                    'Account Ledger',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -608,9 +681,7 @@ class _TransactionsListState extends State<TransactionsList> {
                   const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
+                      child: InlineLoadingAnimation(size: 50),
                     ),
                   ),
               ],
@@ -619,13 +690,12 @@ class _TransactionsListState extends State<TransactionsList> {
         }
 
         // Show loading indicator only if we don't have any data yet
-        if (state.status == HomeStatus.initial || state.status == HomeStatus.loading) {
+        if (state.status == HomeStatus.initial ||
+            state.status == HomeStatus.loading) {
           return const Padding(
             padding: EdgeInsets.all(24.0),
             child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
+              child: InlineLoadingAnimation(size: 80),
             ),
           );
         }
@@ -663,7 +733,7 @@ class _TransactionsListState extends State<TransactionsList> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Your transaction history will appear here once you start sending or receiving payments.',
+                  'Your Account Ledger will appear here once you start sending or receiving payments.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary,
@@ -682,7 +752,7 @@ class _TransactionsListState extends State<TransactionsList> {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Text(
-                'Transaction History',
+                'Account Ledger',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -708,9 +778,7 @@ class _TransactionsListState extends State<TransactionsList> {
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
+                  child: InlineLoadingAnimation(size: 50),
                 ),
               ),
           ],

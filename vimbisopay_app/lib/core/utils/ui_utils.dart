@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
 class UIUtils {
   static Size getScreenDimensions(BuildContext context) {
@@ -33,8 +34,8 @@ class UIUtils {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        Colors.black.withOpacity(0.1),
-        Colors.black,
+        AppColors.black.withOpacity(0.1),
+        AppColors.black,
       ],
     ),
   );

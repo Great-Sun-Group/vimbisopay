@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
+import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
+import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
 class LoginScreen extends StatefulWidget {
@@ -18,13 +22,12 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _repository = AccountRepositoryImpl();
-  final _databaseHelper = DatabaseHelper();
+  final _repository = ServiceLocator.accountRepository;
+  final _databaseHelper = ServiceLocator.databaseHelper;
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _showPassword = false;
@@ -47,11 +50,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _spinController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     _loadSavedUser();
   }
 
@@ -71,9 +69,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    if (!_isLoading) {
-      _spinController.dispose();
-    }
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -132,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
           SizedBox(height: 16),
           Text(
-            'Welcome Back!',
+            'VimbisoPay',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -142,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
           SizedBox(height: 8),
           Text(
-            'Log in to your VimbisoPay account to send money, check balances, and manage your transactions securely.',
+            'Log in to grow your business and manage your wealth.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -250,6 +245,55 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
+  Future<void> _doV1Login(String phoneNumber) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: AppColors.barrierColor,
+      builder: (context) => LoadingDialog(
+        message: 'Verifying phone number...',
+      ),
+    );
+
+    final v1Result = await _repository.login(
+      phone: phoneNumber,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context); // Pop loading dialog
+
+    v1Result.fold(
+      (v1Failure) {
+        _showErrorDialog(
+          'Failed to initialize verification. Please try again.',
+        );
+      },
+      (v1User) {
+        // Show success dialog for phone verification
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => SuccessDialog(
+            title: 'Phone Verified',
+            message: 'Your phone number has been verified. Please set up your password.',
+            onDismiss: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => SetupPasswordDialog(
+                  token: v1User.token,
+                  memberId: v1User.memberId,
+                  phone: phoneNumber,
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleLogin() async {
     Logger.interaction('[Login] Login button pressed');
     
@@ -273,19 +317,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _isLoading = true;
     });
 
-    _spinController.repeat();
 
     // Show loading dialog
     unawaited(showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black26,
+      barrierColor: AppColors.barrierColor,
       useSafeArea: false,
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {
         Logger.interaction('[Login] Building loading dialog');
         return LoadingDialog(
-          spinController: _spinController,
           message: 'Logging you in...',
         );
       },
@@ -297,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     Logger.interaction('[Login] Calling login API');
     Logger.performance('[Login] API call start: login');
     
-    final result = await _repository.login(
+    final result = await _repository.loginV2(
       phone: phoneNumber,
       password: password,
     );
@@ -312,7 +354,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
           _isLoading = false;
-          _spinController.stop();
         });
       }
     }
@@ -321,22 +362,156 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       (failure) async {
         Logger.error('[Login] Login failed', failure);
         cleanup();
-        _showErrorDialog(
-          'We couldn\'t log you in. Please check your phone number and password, then try again.',
-        );
+
+        // Check if this is a PASSWORD_REQUIRED error
+        if (failure is AuthFailure && failure.isPasswordRequired) {
+          // Show loading while doing v1 login
+                showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => LoadingDialog(
+                  message: 'Initializing verification...',
+            ),
+          );
+
+          // Do v1 login first to get token
+          final v1Result = await _repository.login(phone: phoneNumber);
+
+          if (!mounted) return;
+          Navigator.pop(context); // Pop loading dialog
+          
+          v1Result.fold(
+            (v1Failure) {
+              _showErrorDialog('Failed to initialize verification. Please try again.');
+            },
+            (v1User) async {
+              // Request OTP with loading dialog
+                  showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => LoadingDialog(
+                          message: 'Sending verification code...',
+                ),
+              );
+
+              final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+              final otpResult = await _repository.requestOtp(
+                phone: sanitizedPhone,
+                purpose: 'PASSWORD_RESET',
+              );
+
+              if (!mounted) return;
+              Navigator.pop(context); // Pop loading dialog
+    
+              otpResult.fold(
+                (otpFailure) {
+                  _showErrorDialog('Failed to send verification code.');
+                },
+                (_) {
+                  // Show success dialog
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => SuccessDialog(
+                      title: 'Code Sent',
+                      message: 'A verification code has been sent to your Whatsapp phone number.',
+                      onDismiss: () {
+                        Navigator.pop(context);
+                        // Show OTP dialog
+                              // Show OTP dialog with stored password
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => OTPVerificationDialog(
+                                  token: v1User.token,
+                                  phone: phoneNumber,
+                                  memberId: v1User.memberId,
+                                  password: password,
+                                ),
+                              );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        } else {
+          _showErrorDialog(
+            'We couldn\'t log you in. Please check your phone number and password, then try again.',
+          );
+        }
       },
       (user) async {
         Logger.interaction('[Login] Login successful');
-        Logger.interaction('[Login] Saving user data');
-        await _databaseHelper.saveUser(user);
         
-        if (mounted) {
-          Logger.interaction('[Login] Navigating to auth screen');
-          Navigator.pushReplacementNamed(
-            context,
-            '/auth',
-            arguments: user,
+        // Check if OTP verification is needed
+        if (user.version == 'v2' && user.authMethod == 'password' && !user.otpVerified) {
+          Logger.interaction('[Login] OTP verification required');
+          cleanup();
+          
+          // Request OTP
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => LoadingDialog(
+                  message: 'Sending verification code...',
+            ),
           );
+
+          final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+          final otpResult = await _repository.requestOtp(
+            phone: sanitizedPhone,
+            purpose: 'PASSWORD_RESET',
+          );
+
+          if (!mounted) return;
+          Navigator.pop(context); // Pop loading dialog
+
+          otpResult.fold(
+            (otpFailure) {
+              _showErrorDialog('Failed to send verification code.');
+            },
+            (_) {
+              // Show OTP verification flow
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => OTPVerificationFlow(
+                  token: user.token,
+                  phone: phoneNumber,
+                  memberId: user.memberId,
+                  user: user,
+                  onVerificationComplete: (verifiedUser) async {
+                    // Save verified user
+                    await _databaseHelper.saveUser(verifiedUser);
+                    
+                    if (mounted) {
+                      // Navigate to auth screen
+                      Navigator.pushReplacementNamed(
+                        context,
+                        '/auth',
+                        arguments: verifiedUser,
+                      );
+                    }
+                  },
+                ),
+              );
+            },
+          );
+        } else {
+          // No OTP verification needed, proceed normally
+          Logger.interaction('[Login] Saving user data');
+          await _databaseHelper.saveUser(user);
+          
+          if (mounted) {
+            Logger.interaction('[Login] Navigating to auth screen');
+            Navigator.pushReplacementNamed(
+              context,
+              '/auth',
+              arguments: user,
+            );
+          }
         }
       },
     );
@@ -392,6 +567,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               _formKey.currentState?.validate();
                             });
                           },
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context).nextFocus();
+                          },
                           validator: (_) => _getFieldError('phone'),
                         ),
                       ),
@@ -432,6 +610,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               _validateForm();
                               _formKey.currentState?.validate();
                             });
+                          },
+                          onFieldSubmitted: (_) {
+                            if (_isFormValid && !_isLoading) {
+                              _handleLogin();
+                            }
                           },
                           validator: (_) => _getFieldError('password'),
                         ),
@@ -482,6 +665,57 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      // Register section
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.highlightOverlay,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Not a Member Yet?',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      Navigator.pushNamed(context, '/create-account');
+                                    },
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 50),
+                                backgroundColor: AppColors.surface,
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Register',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
 class ForgotPINScreen extends StatefulWidget {
@@ -18,9 +16,9 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
   final _passwordController = TextEditingController();
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
-  final _repository = AccountRepositoryImpl();
-  final _securityService = SecurityService();
-  final _databaseHelper = DatabaseHelper();
+  final _repository = ServiceLocator.accountRepository;
+  final _securityService = ServiceLocator.securityService;
+  final _databaseHelper = ServiceLocator.databaseHelper;
   
   bool _isLoading = false;
   bool _isVerified = false;
