@@ -10,6 +10,7 @@ class User {
   final String? passwordHash;  // Hashed password
   final DateTime? passwordChanged;  // When the password was last changed
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
+  final bool activateMarket;  // Whether the user is already a vendor in the marketplace
 
   const User({
     required this.memberId,
@@ -21,6 +22,7 @@ class User {
     this.passwordHash,
     this.passwordChanged,
     this.dashboard,
+    this.activateMarket = false,
   });
 
   MemberTier? get tier => dashboard?.memberTier;
@@ -41,10 +43,23 @@ class User {
       'password_hash': passwordHash,
       'password_changed': passwordChanged?.millisecondsSinceEpoch,
       'dashboard': dashboard?.toMap(),
+      'activate_market': activateMarket,
     };
   }
 
   factory User.fromMap(Map<String, dynamic> map) {
+    // Get dashboard if available
+    final dashboardMap = map['dashboard'] as Map<String, dynamic>?;
+    final dashboard = dashboardMap != null ? Dashboard.fromMap(dashboardMap) : null;
+    
+    // Check for activateMarket in the map or in the dashboard for backward compatibility
+    bool activateMarket = false;
+    if (map.containsKey('activate_market')) {
+      activateMarket = map['activate_market'] as bool? ?? false;
+    } else if (dashboard != null && dashboardMap!.containsKey('activateMarket')) {
+      activateMarket = dashboardMap['activateMarket'] as bool? ?? false;
+    }
+    
     return User(
       memberId: map['memberId'] as String,
       phone: map['phone'] as String,
@@ -56,9 +71,8 @@ class User {
       passwordChanged: map['password_changed'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['password_changed'] as int)
           : null,
-      dashboard: map['dashboard'] != null 
-          ? Dashboard.fromMap(map['dashboard'] as Map<String, dynamic>)
-          : null,
+      dashboard: dashboard,
+      activateMarket: activateMarket,
     );
   }
 
@@ -72,6 +86,7 @@ class User {
     String? passwordHash,
     DateTime? passwordChanged,
     Dashboard? dashboard,
+    bool? activateMarket,
   }) {
     return User(
       memberId: memberId ?? this.memberId,
@@ -83,6 +98,7 @@ class User {
       passwordHash: passwordHash ?? this.passwordHash,
       passwordChanged: passwordChanged ?? this.passwordChanged,
       dashboard: dashboard ?? this.dashboard,
+      activateMarket: activateMarket ?? this.activateMarket,
     );
   }
 
@@ -98,7 +114,8 @@ class User {
         other.authMethod == authMethod &&
         other.passwordHash == passwordHash &&
         other.passwordChanged == passwordChanged &&
-        other.dashboard == dashboard;
+        other.dashboard == dashboard &&
+        other.activateMarket == activateMarket;
   }
 
   @override
@@ -109,6 +126,7 @@ class User {
         passwordHash,
         passwordChanged,
         dashboard,
+        activateMarket,
       );
 
   @override
@@ -121,7 +139,8 @@ class User {
   authMethod: $authMethod,
   passwordHash: ${passwordHash != null ? '[REDACTED]' : 'null'},
   passwordChanged: $passwordChanged,
-  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'}
+  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'},
+  activateMarket: $activateMarket
 }''';
   }
 }

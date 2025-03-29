@@ -340,6 +340,7 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (context) => VendorRegistrationScreen(
                 memberId: args['memberId'] as String,
+                user: args['user'] as User?,
               ),
               settings: settings,
             );

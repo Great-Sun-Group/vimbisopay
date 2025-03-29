@@ -132,7 +132,12 @@ class AccountRepositoryImpl implements AccountRepository {
         }
 
         // Otherwise process as normal login with dashboard
-        final dashboardObj = dashboard.Dashboard.fromMap({
+        // Extract vendor status from dashboard data
+        final bool isVendor = dashboardData['member']['activateMarket'] as bool? ?? false;
+        Logger.data('[LOGIN_V2] Vendor status from API: $isVendor');
+        
+        // Parse dashboard data including accountsInternal
+        final Map<String, dynamic> dashboardMap = {
           'member': {
             'memberID': actionDetails['memberID'],
             'memberTier': dashboardData['member']['memberTier'],
@@ -140,6 +145,7 @@ class AccountRepositoryImpl implements AccountRepository {
             'lastname': dashboardData['member']['lastname'],
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
+            'profilePictureThumbnail': dashboardData['member']['profilePictureThumbnail'] as String?,
           },
           'accounts': dashboardData['accounts']
               .map((accountData) => {
@@ -176,7 +182,17 @@ class AccountRepositoryImpl implements AccountRepository {
                     'sendOffersTo': accountData['sendOffersTo'],
                   })
               .toList(),
-        });
+        };
+        
+        // Add accountsInternal if present in the response
+        if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+          Logger.data('[LOGIN_V2] Found accountsInternal in dashboard data');
+          dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+        } else {
+          Logger.data('[LOGIN_V2] No accountsInternal found in dashboard data');
+        }
+        
+        final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
         final user = User(
           memberId: memberId,
@@ -188,6 +204,7 @@ class AccountRepositoryImpl implements AccountRepository {
           passwordHash: passwordHash,
           passwordChanged: password != null ? DateTime.now() : null,
           dashboard: dashboardObj,
+          activateMarket: isVendor, // Set activateMarket based on vendor status
         );
 
         // Save user with password info to database
@@ -310,6 +327,40 @@ class AccountRepositoryImpl implements AccountRepository {
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
+                Logger.data('[TOKEN_REFRESH] Creating updated user with refreshed token');
+                Logger.data('[TOKEN_REFRESH] Original user activateMarket: ${user.activateMarket}');
+                Logger.data('[TOKEN_REFRESH] New user activateMarket: ${newUser.activateMarket}');
+                
+                // Extract vendor status directly from the login response
+                bool isVendor = false;
+                
+                // Get the raw login response to extract vendor status
+                try {
+                  // We need to access the raw login response to get the vendor status
+                  // This is similar to how it's done in the loginV2 method
+                  final loginResponse = await loginV2(
+                    phone: user.phone,
+                    passwordHash: user.passwordHash,
+                  );
+                  
+                  // Extract vendor status from the login response
+                  loginResponse.fold(
+                    (failure) {
+                      Logger.error('[TOKEN_REFRESH] Failed to get vendor status from login response', failure);
+                    },
+                    (refreshedUser) {
+                      isVendor = refreshedUser.activateMarket;
+                      Logger.data('[TOKEN_REFRESH] Extracted vendor status from login response: $isVendor');
+                    }
+                  );
+                } catch (e) {
+                  Logger.error('[TOKEN_REFRESH] Error extracting vendor status from login response', e);
+                }
+                
+                // Use the extracted vendor status or fall back to previous values
+                final activateMarket = isVendor || newUser.activateMarket || user.activateMarket;
+                Logger.data('[TOKEN_REFRESH] Final activateMarket value: $activateMarket');
+                
                 final userWithPasswordHash = User(
                   memberId: newUser.memberId,
                   phone: newUser.phone,
@@ -317,8 +368,13 @@ class AccountRepositoryImpl implements AccountRepository {
                   passwordHash: user.passwordHash,
                   passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
+                  activateMarket: activateMarket, // Set vendor status based on dashboard data
+                  version: newUser.version,
+                  authMethod: newUser.authMethod,
+                  otpVerified: newUser.otpVerified,
                 );
 
+                Logger.data('[TOKEN_REFRESH] Updated user activateMarket: ${userWithPasswordHash.activateMarket}');
                 final saveResult = await saveUser(userWithPasswordHash);
 
                 return saveResult.fold(
@@ -722,7 +778,16 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final dashboardData = jsonResponse['data']['dashboard'];
 
-        final dashboardObj = dashboard.Dashboard.fromMap({
+        // Extract vendor status from dashboard data
+        final bool isVendor = dashboardData['member']['activateMarket'] as bool? ?? false;
+        Logger.data('[LOGIN] Vendor status from API: $isVendor');
+        
+        // Extract profile thumbnail URL from dashboard data
+        final String? profileThumbnailUrl = dashboardData['member']['profilePictureThumbnail'] as String?;
+        Logger.data('[LOGIN] Profile thumbnail URL: $profileThumbnailUrl');
+        
+        // Parse dashboard data including accountsInternal
+        final Map<String, dynamic> dashboardMap = {
           'member': {
             'memberID': actionDetails['memberID'],
             'memberTier': dashboardData['member']['memberTier'],
@@ -730,6 +795,7 @@ class AccountRepositoryImpl implements AccountRepository {
             'lastname': dashboardData['member']['lastname'],
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
+            'profilePictureThumbnail': profileThumbnailUrl,
           },
           'accounts': dashboardData['accounts']
               .map((accountData) => {
@@ -766,7 +832,17 @@ class AccountRepositoryImpl implements AccountRepository {
                     'sendOffersTo': accountData['sendOffersTo'],
                   })
               .toList(),
-        });
+        };
+        
+        // Add accountsInternal if present in the response
+        if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+          Logger.data('[LOGIN] Found accountsInternal in dashboard data');
+          dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+        } else {
+          Logger.data('[LOGIN] No accountsInternal found in dashboard data');
+        }
+        
+        final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
         // Extract version and authMethod from token
         final tokenInfo = _extractTokenInfo(token);
@@ -796,6 +872,7 @@ class AccountRepositoryImpl implements AccountRepository {
           version: version,
           authMethod: authMethod,
           dashboard: dashboardObj,
+          activateMarket: isVendor, // Set activateMarket based on vendor status
         );
 
         return Right(user);
@@ -1486,7 +1563,12 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
             }
 
             Logger.data('Creating Dashboard from response data');
-            final dashboardObj = dashboard.Dashboard.fromMap({
+            // Parse dashboard data including accountsInternal
+            // Extract profile thumbnail URL from dashboard data
+            final String? profileThumbnailUrl = dashboardData['member']['profilePictureThumbnail'] as String?;
+            Logger.data('[RECURRING] Profile thumbnail URL: $profileThumbnailUrl');
+            
+            final Map<String, dynamic> dashboardMap = {
               'member': {
                 'memberID': dashboardData['member']['memberID'],
                 'memberTier': dashboardData['member']['memberTier'],
@@ -1494,6 +1576,7 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                 'lastname': dashboardData['member']['lastname'],
                 'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
                 'defaultDenom': dashboardData['member']['defaultDenom'],
+                'profilePictureThumbnail': profileThumbnailUrl,
               },
               'accounts': dashboardData['accounts']
                   .map((accountData) => {
@@ -1530,7 +1613,17 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                         'sendOffersTo': accountData['sendOffersTo'],
                       })
                   .toList(),
-            });
+            };
+            
+            // Add accountsInternal if present in the response
+            if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+              Logger.data('[RECURRING] Found accountsInternal in dashboard data');
+              dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+            } else {
+              Logger.data('[RECURRING] No accountsInternal found in dashboard data');
+            }
+            
+            final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
             Logger.data('Creating RecurringResponse with parsed dashboard');
             return Right(RecurringResponse(

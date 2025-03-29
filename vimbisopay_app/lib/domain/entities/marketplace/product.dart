@@ -5,6 +5,8 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 /// A product is an item or service that can be purchased in the marketplace.
 /// Products are associated with vendors and can have various attributes like
 /// price, description, and images.
+/// 
+/// Each product is linked to an internal account of type PRODUCTION for inventory tracking.
 class Product extends Entity {
   /// The unique identifier for the product.
   final String id;
@@ -35,9 +37,9 @@ class Product extends Entity {
 
   /// Whether the product is currently available.
   final bool isAvailable;
-
-  /// The quantity available in inventory, if applicable.
-  final int? inventory;
+  
+  /// The ID of the internal account associated with this product.
+  final String? accountId;
 
   /// The date when the product was created.
   final DateTime createdAt;
@@ -57,7 +59,7 @@ class Product extends Entity {
     required this.category,
     required this.tags,
     required this.isAvailable,
-    this.inventory,
+    this.accountId,
     required this.createdAt,
     required this.updatedAt,
   }) : super(id);
@@ -75,7 +77,7 @@ class Product extends Entity {
       category: json['category'],
       tags: List<String>.from(json['tags'] ?? []),
       isAvailable: json['is_available'],
-      inventory: json['inventory'],
+      accountId: json['account_id'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -94,7 +96,7 @@ class Product extends Entity {
       'category': category,
       'tags': tags,
       'is_available': isAvailable,
-      'inventory': inventory,
+      'account_id': accountId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -132,7 +134,7 @@ class Product extends Entity {
     String? category,
     List<String>? tags,
     bool? isAvailable,
-    int? inventory,
+    String? accountId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -147,7 +149,7 @@ class Product extends Entity {
       category: category ?? this.category,
       tags: tags ?? this.tags,
       isAvailable: isAvailable ?? this.isAvailable,
-      inventory: inventory ?? this.inventory,
+      accountId: accountId ?? this.accountId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

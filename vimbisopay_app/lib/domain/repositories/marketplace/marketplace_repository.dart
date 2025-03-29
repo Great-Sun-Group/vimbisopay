@@ -7,6 +7,22 @@ import 'package:dartz/dartz.dart';
 /// This repository handles all marketplace-related operations, including
 /// vendor management, product listings, and invoicing.
 abstract class MarketplaceRepository {
+  /// Enables vendor functionality for a member.
+  ///
+  /// When enabled, creates required internal accounts if they don't exist.
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> enableVendorFunctionality();
+
+  /// Updates a member's profile with vendor details.
+  ///
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateMemberWithVendorDetails({
+    String? firstname,
+    String? lastname,
+    String? memberHandle,
+    String? vendorBio,
+  });
+  
   /// Gets a vendor by ID.
   ///
   /// Returns a [Vendor] if found, or a [Failure] if an error occurs.
@@ -70,6 +86,15 @@ abstract class MarketplaceRepository {
   /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
   Future<Either<Failure, List<Product>>> searchProducts(String query);
 
+  /// Creates an internal account for a product.
+  ///
+  /// Returns the account ID if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, String>> createInternalAccount({
+    required String accountName,
+    required String defaultDenom,
+    required String accountType,
+  });
+
   /// Creates a new product.
   ///
   /// Returns the created [Product] if successful, or a [Failure] if an error occurs.
@@ -83,7 +108,7 @@ abstract class MarketplaceRepository {
     required String category,
     required List<String> tags,
     required bool isAvailable,
-    int? inventory,
+    String? accountId,
   });
 
   /// Updates an existing product.
@@ -99,7 +124,7 @@ abstract class MarketplaceRepository {
     String? category,
     List<String>? tags,
     bool? isAvailable,
-    int? inventory,
+    String? accountId,
   });
 
   /// Gets an invoice by ID.
@@ -195,5 +220,26 @@ abstract class MarketplaceRepository {
   Future<Either<Failure, AssetMarker>> transferAssetMarker({
     required String id,
     required String newOwnerId,
+  });
+  
+  /// Uploads a profile image and optimizes it.
+  ///
+  /// Returns a map of asset IDs if successful, or a [Failure] if an error occurs.
+  /// The map contains keys: 'originalAssetID', 'asset200ID', and 'asset600ID'.
+  Future<Either<Failure, Map<String, String>>> uploadProfileImage({
+    required String imagePath,
+    required String drAccountId,
+    String? crAccountId,
+  });
+
+  /// Updates a member's profile pictures with the given asset IDs.
+  ///
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateProfilePictures({
+    required String sourceId,
+    required String originalAssetId,
+    required String thumbnailAssetId,
+    required String asset200Id,
+    required String asset600Id,
   });
 }

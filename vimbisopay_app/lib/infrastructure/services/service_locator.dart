@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/marketplace/marketplace_repository_impl.dart';
@@ -15,8 +16,7 @@ import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class ServiceLocator {
-  // API configuration
-  static const String _apiBaseUrl = 'https://api.vimbisopay.com/v1';
+
   
   // Services
   static final SecurityService _securityService = SecurityService();
@@ -47,7 +47,8 @@ class ServiceLocator {
   
   static final MarketplaceRepository marketplaceRepository = MarketplaceRepositoryImpl(
     httpClient: _httpClient,
-    baseUrl: '$_apiBaseUrl/marketplace',
+    baseUrl: ApiConfig.baseUrl,
+    databaseHelper: _databaseHelper,
   );
 
   // Private constructor to prevent instantiation
@@ -117,11 +118,11 @@ class ServiceLocator {
     
     // Initialize RemoteConfigService
     final prefs = await SharedPreferences.getInstance();
-    _remoteConfigService = RemoteConfigService(_httpClient, prefs, _apiBaseUrl);
+    _remoteConfigService = RemoteConfigService(_httpClient, prefs, ApiConfig.baseUrl);
     await _remoteConfigService!.initialize();
     
     // Initialize AppUpdateService
-    _appUpdateService = AppUpdateService(_httpClient, prefs, _apiBaseUrl);
+    _appUpdateService = AppUpdateService(_httpClient, prefs, ApiConfig.baseUrl);
     
     // Initialize ConfigManager
     _configManager = ConfigManager(
@@ -135,5 +136,5 @@ class ServiceLocator {
   }
   
   // API configuration
-  static String get apiBaseUrl => _apiBaseUrl;
+  static String get apiBaseUrl => ApiConfig.baseUrl;
 }

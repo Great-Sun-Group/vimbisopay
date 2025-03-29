@@ -65,7 +65,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
               'price': product.price,
               'currency': product.currency,
               'category': product.category,
-              'inventory': product.inventory ?? 0,
+              'accountId': product.accountId,
               'isAvailable': product.isAvailable,
             }).toList();
             _isLoading = false;
@@ -101,6 +101,38 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
         );
       }
       
+      // Check if the result contains a product
+      if (result.containsKey('product') && result['product'] != null) {
+        final productMap = result['product'] as Map<String, dynamic>;
+        Logger.data('[INVENTORY_MANAGEMENT] Retrieved product data from AddEditSkuScreen');
+        
+        try {
+          // Create a new product map from the data
+          final retrievedProduct = {
+            'id': productMap['id'],
+            'name': productMap['name'],
+            'description': productMap['description'],
+            'price': productMap['price'],
+            'currency': productMap['currency'],
+            'category': productMap['category'],
+            'accountId': productMap['accountId'],
+            'isAvailable': productMap['isAvailable'],
+          };
+          
+          // Update the state with the new product
+          setState(() {
+            // Add the new product to the list
+            _skus.add(retrievedProduct);
+          });
+          
+          // No need to reload all SKUs
+          return;
+        } catch (e) {
+          Logger.error('[INVENTORY_MANAGEMENT] Error creating product map from result data', e);
+          // Continue to reload all SKUs
+        }
+      }
+      
       // Refresh the SKU list
       _loadSkus();
     }
@@ -128,260 +160,48 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
         );
       }
       
+      // Check if the result contains a product
+      if (result.containsKey('product') && result['product'] != null) {
+        final productMap = result['product'] as Map<String, dynamic>;
+        Logger.data('[INVENTORY_MANAGEMENT] Retrieved product data from AddEditSkuScreen');
+        
+        try {
+          // Create a new product map from the data
+          final retrievedProduct = {
+            'id': productMap['id'],
+            'name': productMap['name'],
+            'description': productMap['description'],
+            'price': productMap['price'],
+            'currency': productMap['currency'],
+            'category': productMap['category'],
+            'accountId': productMap['accountId'],
+            'isAvailable': productMap['isAvailable'],
+          };
+          
+          // Update the state with the updated product
+          setState(() {
+            // Find the index of the product with the matching ID
+            final index = _skus.indexWhere((sku) => sku['id'] == skuId);
+            if (index != -1) {
+              // Replace the product at that index
+              _skus[index] = retrievedProduct;
+            } else {
+              // If not found, add it to the list
+              _skus.add(retrievedProduct);
+            }
+          });
+          
+          // No need to reload all SKUs
+          return;
+        } catch (e) {
+          Logger.error('[INVENTORY_MANAGEMENT] Error creating product map from result data', e);
+          // Continue to reload all SKUs
+        }
+      }
+      
       // Refresh the SKU list
       _loadSkus();
     }
-  }
-  
-  Future<void> _showAdjustInventoryDialog(dynamic sku) async {
-    final TextEditingController quantityController = TextEditingController();
-    String? errorMessage;
-    bool isAdding = true;
-    
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Adjust Inventory for ${sku['name']}'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Current Inventory: ${sku['inventory']}'),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment<bool>(
-                            value: true,
-                            label: Text('Add'),
-                            icon: Icon(Icons.add),
-                          ),
-                          ButtonSegment<bool>(
-                            value: false,
-                            label: Text('Remove'),
-                            icon: Icon(Icons.remove),
-                          ),
-                        ],
-                        selected: {isAdding},
-                        onSelectionChanged: (newSelection) {
-                          setState(() {
-                            isAdding = newSelection.first;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity',
-                    hintText: 'Enter quantity to adjust',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                if (errorMessage != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    errorMessage!,
-                    style: const TextStyle(color: AppColors.errorRed),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  // Validate input
-                  final quantityText = quantityController.text.trim();
-                  if (quantityText.isEmpty) {
-                    setState(() {
-                      errorMessage = 'Please enter a quantity';
-                    });
-                    return;
-                  }
-                  
-                  int? quantity;
-                  try {
-                    quantity = int.parse(quantityText);
-                    if (quantity <= 0) {
-                      setState(() {
-                        errorMessage = 'Quantity must be greater than zero';
-                      });
-                      return;
-                    }
-                  } catch (e) {
-                    setState(() {
-                      errorMessage = 'Please enter a valid number';
-                    });
-                    return;
-                  }
-                  
-                  // Check if removing more than available
-                  if (!isAdding && quantity > sku['inventory']) {
-                    setState(() {
-                      errorMessage = 'Cannot remove more than available inventory';
-                    });
-                    return;
-                  }
-                  
-                  // Call the repository to update the product's inventory
-                  _updateProductInventory(
-                    sku['id'],
-                    isAdding ? sku['inventory'] + quantity : sku['inventory'] - quantity,
-                  ).then((success) {
-                    if (success) {
-                      Navigator.pop(context, {
-                        'isAdding': isAdding,
-                        'quantity': quantity,
-                      });
-                    } else {
-                      setState(() {
-                        errorMessage = 'Failed to update inventory';
-                      });
-                    }
-                  });
-                },
-                child: const Text('Adjust'),
-              ),
-            ],
-          );
-        },
-      ),
-    ).then((result) {
-      if (result != null && mounted) {
-        // Update the local state
-        setState(() {
-          if (result['isAdding']) {
-            sku['inventory'] += result['quantity'];
-          } else {
-            sku['inventory'] -= result['quantity'];
-          }
-        });
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result['isAdding']
-                  ? 'Added ${result['quantity']} to inventory'
-                  : 'Removed ${result['quantity']} from inventory',
-            ),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
-      }
-    });
-  }
-  
-  Future<void> _showInventoryHistoryDialog(dynamic sku) async {
-    // In a real implementation, this would fetch the inventory history from the repository
-    // For now, we'll just show a dialog with simulated data
-    
-    // Simulate inventory history data
-    final List<Map<String, dynamic>> history = [
-      {
-        'id': 'txn-1',
-        'type': 'add',
-        'quantity': 10,
-        'date': DateTime.now().subtract(const Duration(days: 7)),
-        'notes': 'Initial inventory',
-      },
-      {
-        'id': 'txn-2',
-        'type': 'add',
-        'quantity': 20,
-        'date': DateTime.now().subtract(const Duration(days: 3)),
-        'notes': 'Restocked',
-      },
-      {
-        'id': 'txn-3',
-        'type': 'remove',
-        'quantity': 5,
-        'date': DateTime.now().subtract(const Duration(days: 1)),
-        'notes': 'Sold to customer',
-      },
-    ];
-    
-    await showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Inventory History for ${sku['name']}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: history.length,
-                  itemBuilder: (context, index) {
-                    final transaction = history[index];
-                    final isAdd = transaction['type'] == 'add';
-                    
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isAdd ? AppColors.successGreen : AppColors.errorRed,
-                        child: Icon(
-                          isAdd ? Icons.add : Icons.remove,
-                          color: AppColors.white,
-                        ),
-                      ),
-                      title: Text(
-                        isAdd
-                            ? 'Added ${transaction['quantity']} units'
-                            : 'Removed ${transaction['quantity']} units',
-                      ),
-                      subtitle: Text(
-                        '${transaction['date'].toString().substring(0, 16)} - ${transaction['notes']}',
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
   
   @override
@@ -549,18 +369,20 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Inventory',
+                            'Account ID',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
                           Text(
-                            '${sku['inventory']} units',
+                            sku['accountId'] != null 
+                                ? sku['accountId'].toString().substring(0, 8) + '...'
+                                : 'Not assigned',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: sku['inventory'] > 0
+                              color: sku['accountId'] != null
                                   ? AppColors.successGreen
                                   : AppColors.errorRed,
                             ),
@@ -575,19 +397,9 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                 alignment: MainAxisAlignment.end,
                 children: [
                   TextButton.icon(
-                    icon: const Icon(Icons.history),
-                    label: const Text('History'),
-                    onPressed: () => _showInventoryHistoryDialog(sku),
-                  ),
-                  TextButton.icon(
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
                     onPressed: () => _navigateToEditSku(sku['id']),
-                  ),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.inventory),
-                    label: const Text('Adjust'),
-                    onPressed: () => _showAdjustInventoryDialog(sku),
                   ),
                 ],
               ),
@@ -615,29 +427,5 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
         return '$currency ${price / 100}';
     }
     return '$symbol${price / 100}';
-  }
-  
-  /// Updates a product's inventory in the repository.
-  ///
-  /// Returns true if the update was successful, false otherwise.
-  Future<bool> _updateProductInventory(String productId, int newInventory) async {
-    try {
-      // Call the repository to update the product's inventory
-      final result = await _marketplaceRepository.updateProduct(
-        id: productId,
-        inventory: newInventory,
-      );
-      
-      return result.fold(
-        (failure) {
-          Logger.error('Failed to update product inventory', failure);
-          return false;
-        },
-        (product) => true,
-      );
-    } catch (e) {
-      Logger.error('Error updating product inventory', e);
-      return false;
-    }
   }
 }

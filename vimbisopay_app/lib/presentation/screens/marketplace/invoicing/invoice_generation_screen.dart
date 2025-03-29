@@ -89,17 +89,14 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
           // Generate QR code data
           final qrData = 'vimbisopay://invoice/${invoice.id}';
           
-          // Update inventory for each product in the basket
-          _updateInventory(widget.basket.items).then((_) {
-            setState(() {
-              _isLoading = false;
-              _invoiceId = invoice.id;
-              _invoiceQrData = qrData;
-            });
-            
-            // Log success
-            Logger.data('Invoice generated successfully: ${invoice.id}');
+          setState(() {
+            _isLoading = false;
+            _invoiceId = invoice.id;
+            _invoiceQrData = qrData;
           });
+          
+          // Log success
+          Logger.data('Invoice generated successfully: ${invoice.id}');
         },
       );
     } catch (e) {
@@ -331,47 +328,6 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
         ),
       ),
     );
-  }
-  
-  /// Updates the inventory for each product in the basket.
-  ///
-  /// This method is called after an invoice is generated to reduce the inventory
-  /// of each product by the quantity purchased.
-  Future<void> _updateInventory(List<BasketItem> items) async {
-    for (final item in items) {
-      try {
-        // Get the current product to get its current inventory
-        final productResult = await _marketplaceRepository.getProduct(item.product.id);
-        
-        await productResult.fold(
-          (failure) {
-            Logger.error('Failed to get product for inventory update', failure);
-          },
-          (product) async {
-            // Calculate new inventory
-            final currentInventory = product.inventory ?? 0;
-            final newInventory = currentInventory - item.quantity;
-            
-            // Update product inventory
-            final updateResult = await _marketplaceRepository.updateProduct(
-              id: product.id,
-              inventory: (newInventory >= 0 ? newInventory : 0).toInt(), // Prevent negative inventory and convert to int
-            );
-            
-            updateResult.fold(
-              (failure) {
-                Logger.error('Failed to update product inventory', failure);
-              },
-              (updatedProduct) {
-                Logger.data('Updated inventory for ${product.name}: $currentInventory -> ${updatedProduct.inventory}');
-              },
-            );
-          },
-        );
-      } catch (e) {
-        Logger.error('Error updating inventory for product ${item.product.id}', e);
-      }
-    }
   }
   
   Widget _buildInvoiceSuccess() {

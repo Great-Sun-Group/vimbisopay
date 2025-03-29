@@ -4,8 +4,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
@@ -20,12 +23,16 @@ class VendorProfileScreen extends StatefulWidget {
 
   /// Whether the current user is the owner of this vendor profile.
   final bool isOwner;
+  
+  /// Whether to show a success message when the screen is loaded.
+  final bool showSuccessMessage;
 
   /// Creates a new [VendorProfileScreen] instance.
   const VendorProfileScreen({
     super.key,
     required this.vendorId,
     this.isOwner = false,
+    this.showSuccessMessage = false,
   });
 
   @override
@@ -34,16 +41,34 @@ class VendorProfileScreen extends StatefulWidget {
 
 class _VendorProfileScreenState extends State<VendorProfileScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
   bool _isLoading = true;
   String _errorMessage = '';
   Vendor? _vendor;
   List<Product> _products = [];
+  User? _currentUser;
+  String? _profileThumbnailUrl;
 
   @override
   void initState() {
     super.initState();
     Logger.lifecycle('VendorProfileScreen initialized');
     _loadVendorData();
+    
+    // Show success message if needed
+    if (widget.showSuccessMessage) {
+      // Use post-frame callback to ensure the context is ready
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vendor profile created successfully'),
+              backgroundColor: AppColors.successGreen,
+            ),
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -59,6 +84,27 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     });
 
     try {
+      // Load current user data
+      try {
+        _currentUser = await _databaseHelper.getUser();
+        if (_currentUser != null && _currentUser!.dashboard != null) {
+          _profileThumbnailUrl = _currentUser!.dashboard!.member.profilePictureThumbnail;
+          Logger.data('[VENDOR_PROFILE] User profile thumbnail URL: $_profileThumbnailUrl');
+          
+          // Additional logging to help debug profile image issues
+          if (_profileThumbnailUrl == null || _profileThumbnailUrl!.isEmpty) {
+            Logger.data('[VENDOR_PROFILE] Profile thumbnail URL is null or empty');
+          } else {
+            Logger.data('[VENDOR_PROFILE] Profile thumbnail URL is available: $_profileThumbnailUrl');
+          }
+        } else {
+          Logger.data('[VENDOR_PROFILE] User or dashboard is null, cannot get profile thumbnail');
+        }
+      } catch (e) {
+        Logger.error('[VENDOR_PROFILE] Error loading user data', e);
+        // Continue even if user data loading fails
+      }
+
       // Load vendor data
       final vendorResult = await _marketplaceRepository.getVendor(widget.vendorId);
       
@@ -70,27 +116,71 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           });
         },
         (vendor) async {
-          // Load vendor's products
+          List<Product> allProducts = [];
+          
+          // Load vendor's products from marketplace repository
           final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
           
           productsResult.fold(
             (failure) {
               Logger.error('Failed to load vendor products', failure);
-              // Still show the vendor profile even if products fail to load
-              setState(() {
-                _isLoading = false;
-                _vendor = vendor;
-                _products = [];
-              });
+              // Continue with empty products list
             },
             (products) {
-              setState(() {
-                _isLoading = false;
-                _vendor = vendor;
-                _products = products;
-              });
+              allProducts.addAll(products);
             },
           );
+          
+          // Load internal accounts of type PRODUCTION from user's dashboard
+          if (_currentUser != null && 
+              _currentUser!.dashboard != null && 
+              widget.isOwner) {
+            
+            final dashboard = _currentUser!.dashboard!;
+            final productionAccounts = dashboard.accountsInternal
+                .where((account) => account.accountType == 'PHYSICAL_ASSET')
+                .toList();
+            
+            Logger.data('[VENDOR_PROFILE] Found ${productionAccounts.length} PRODUCTION accounts');
+            
+            // Convert internal accounts to Product objects
+            final internalProducts = productionAccounts.map((account) {
+              // Create image URLs list with profile picture thumbnail if available
+              List<String> imageUrls = [];
+              if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+                Logger.data('[VENDOR_PROFILE] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
+                imageUrls.add(account.profilePictureThumbnail!);
+              } else {
+                Logger.data('[VENDOR_PROFILE] No profile picture thumbnail available for account: ${account.accountID}');
+              }
+              
+              // Create a Product from the internal account
+              return Product(
+                id: account.accountID,
+                vendorId: vendor.id,
+                name: account.accountName,
+                description: 'Internal production account',
+                price: 0, // Default price, would need to be updated from account balance
+                currency: 'CXX', // Default currency
+                imageUrls: imageUrls, // Include profile picture thumbnail if available
+                category: 'Internal',
+                tags: ['internal', 'production'],
+                isAvailable: true,
+                accountId: account.accountID,
+                createdAt: DateTime.now(), // We don't have creation date
+                updatedAt: DateTime.now(), // We don't have update date
+              );
+            }).toList();
+            
+            // Add internal products to the list
+            allProducts.addAll(internalProducts);
+          }
+          
+          setState(() {
+            _isLoading = false;
+            _vendor = vendor;
+            _products = allProducts;
+          });
         },
       );
     } catch (e) {
@@ -164,9 +254,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               children: [
                 _buildBusinessInfo(vendor),
                 const SizedBox(height: 24),
-                _buildContactInfo(vendor),
-                const SizedBox(height: 24),
-                _buildProductsSection(),
+                _buildAccountsSection(),
               ],
             ),
           ),
@@ -227,30 +315,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     child: SizedBox(
                       width: 76,
                       height: 76,
-                      child: vendor.profileImageUrl != null
-                          ? _buildImageFromUrl(
-                              vendor.profileImageUrl,
-                              placeholder: Container(
-                                color: AppColors.primary,
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.storefront,
-                                    size: 38,
-                                    color: AppColors.white,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: AppColors.primary,
-                              child: const Center(
-                                child: Icon(
-                                  Icons.storefront,
-                                  size: 38,
-                                  color: AppColors.white,
-                                ),
-                              ),
-                            ),
+                      child: _buildProfileImage(vendor),
                     ),
                   ),
                 ),
@@ -345,12 +410,32 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                 icon: const Icon(Icons.edit),
                 tooltip: 'Edit Profile',
                 onPressed: () {
-                  // TODO: Navigate to edit profile screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Edit profile functionality coming soon'),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditVendorProfileScreen(
+                        vendorId: widget.vendorId,
+                      ),
                     ),
-                  );
+                  ).then((result) {
+                    // Check if we got a success result
+                    if (result != null && result is Map && result['success'] == true) {
+                      // Show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'Vendor profile updated successfully'),
+                            backgroundColor: AppColors.successGreen,
+                          ),
+                        );
+                      }
+                    }
+                    
+                    // Refresh the vendor data
+                    if (mounted) {
+                      _loadVendorData();
+                    }
+                  });
                 },
               ),
             ],
@@ -427,52 +512,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  Widget _buildContactInfo(Vendor vendor) {
-    return SettingsContainer(
-      title: 'Contact',
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.email, size: 20, color: AppColors.textSecondary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      vendor.email,
-                      style: const TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.phone, size: 20, color: AppColors.textSecondary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      vendor.phone,
-                      style: const TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductsSection() {
+  Widget _buildAccountsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -480,7 +520,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Products',
+              'Accounts',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -489,7 +529,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             if (widget.isOwner)
               TextButton.icon(
                 icon: const Icon(Icons.add),
-                label: const Text('Add SKU'),
+                label: const Text('Add Account'),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -505,14 +545,56 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'SKU added successfully'),
+                            content: Text(result['message'] ?? 'Account added successfully'),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
+                      
+                      // Check if the result contains a product
+                      if (result.containsKey('product') && result['product'] != null) {
+                        final productMap = result['product'] as Map<String, dynamic>;
+                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
+                        
+                        try {
+                          // Create a new Product object from the data
+                          final retrievedProduct = Product(
+                            id: productMap['id'],
+                            vendorId: productMap['vendorId'],
+                            name: productMap['name'],
+                            description: productMap['description'],
+                            price: productMap['price'],
+                            currency: productMap['currency'],
+                            imageUrls: List<String>.from(productMap['imageUrls']),
+                            category: productMap['category'],
+                            tags: List<String>.from(productMap['tags']),
+                            isAvailable: productMap['isAvailable'],
+                            accountId: productMap['accountId'],
+                            createdAt: DateTime.parse(productMap['createdAt']),
+                            updatedAt: DateTime.parse(productMap['updatedAt']),
+                          );
+                          
+                          // Check if the product has image URLs
+                          if (retrievedProduct.imageUrls.isNotEmpty) {
+                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
+                            
+                            // Update the state with the new product
+                            setState(() {
+                              // Add the new product to the list
+                              _products.add(retrievedProduct);
+                            });
+                            
+                            // No need to reload all vendor data
+                            return;
+                          }
+                        } catch (e) {
+                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
+                          // Continue to reload all vendor data
+                        }
+                      }
                     }
                     
-                    // Refresh the product list when returning from add SKU screen
+                    // If we didn't get a product or it didn't have image URLs, refresh all data
                     if (mounted) {
                       _loadVendorData();
                     }
@@ -523,13 +605,13 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         ),
         const SizedBox(height: 16),
         _products.isEmpty
-            ? _buildEmptyProductsView()
-            : _buildProductsGrid(),
+            ? _buildEmptyAccountsView()
+            : _buildAccountsGrid(),
       ],
     );
   }
 
-  Widget _buildEmptyProductsView() {
+  Widget _buildEmptyAccountsView() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -544,8 +626,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             const SizedBox(height: 16),
             Text(
               widget.isOwner
-                  ? 'You haven\'t added any products yet'
-                  : 'This vendor hasn\'t added any products yet',
+                  ? 'You haven\'t added any accounts yet'
+                  : 'This vendor hasn\'t added any accounts yet',
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -570,21 +652,63 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'SKU added successfully'),
+                            content: Text(result['message'] ?? 'Account added successfully'),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
+                      
+                      // Check if the result contains a product
+                      if (result.containsKey('product') && result['product'] != null) {
+                        final productMap = result['product'] as Map<String, dynamic>;
+                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
+                        
+                        try {
+                          // Create a new Product object from the data
+                          final retrievedProduct = Product(
+                            id: productMap['id'],
+                            vendorId: productMap['vendorId'],
+                            name: productMap['name'],
+                            description: productMap['description'],
+                            price: productMap['price'],
+                            currency: productMap['currency'],
+                            imageUrls: List<String>.from(productMap['imageUrls']),
+                            category: productMap['category'],
+                            tags: List<String>.from(productMap['tags']),
+                            isAvailable: productMap['isAvailable'],
+                            accountId: productMap['accountId'],
+                            createdAt: DateTime.parse(productMap['createdAt']),
+                            updatedAt: DateTime.parse(productMap['updatedAt']),
+                          );
+                          
+                          // Check if the product has image URLs
+                          if (retrievedProduct.imageUrls.isNotEmpty) {
+                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
+                            
+                            // Update the state with the new product
+                            setState(() {
+                              // Add the new product to the list
+                              _products.add(retrievedProduct);
+                            });
+                            
+                            // No need to reload all vendor data
+                            return;
+                          }
+                        } catch (e) {
+                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
+                          // Continue to reload all vendor data
+                        }
+                      }
                     }
                     
-                    // Refresh the product list when returning from add SKU screen
+                    // If we didn't get a product or it didn't have image URLs, refresh all data
                     if (mounted) {
                       _loadVendorData();
                     }
                   });
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('Add Your First SKU'),
+                label: const Text('Add Your First Account'),
               ),
             ],
           ],
@@ -593,7 +717,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  Widget _buildProductsGrid() {
+  Widget _buildAccountsGrid() {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -671,25 +795,75 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     }
   }
 
+  /// Builds the profile image for the vendor, using the profile thumbnail URL if available.
+  Widget _buildProfileImage(Vendor vendor) {
+    // Use profile thumbnail URL if available
+    if (_profileThumbnailUrl != null && _profileThumbnailUrl!.isNotEmpty) {
+      Logger.data('[VENDOR_PROFILE] Using profile thumbnail URL: $_profileThumbnailUrl');
+      return _buildImageFromUrl(
+        _profileThumbnailUrl,
+        placeholder: Container(
+          color: AppColors.primary,
+          child: const Center(
+            child: Icon(
+              Icons.person,
+              size: 38,
+              color: AppColors.white,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Otherwise use vendor's profile image URL
+    return vendor.profileImageUrl != null
+        ? _buildImageFromUrl(
+            vendor.profileImageUrl,
+            placeholder: Container(
+              color: AppColors.primary,
+              child: const Center(
+                child: Icon(
+                  Icons.storefront,
+                  size: 38,
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+          )
+        : Container(
+            color: AppColors.primary,
+            child: const Center(
+              child: Icon(
+                Icons.storefront,
+                size: 38,
+                color: AppColors.white,
+              ),
+            ),
+          );
+  }
+
   /// Builds an image widget from a URL, handling both local and remote URLs.
   Widget _buildImageFromUrl(String? imageUrl, {Widget? placeholder}) {
-    if (imageUrl == null) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      Logger.data('[VENDOR_PROFILE] Image URL is null or empty, using placeholder');
       return placeholder ?? Container(color: AppColors.grey300);
     }
     
     if (imageUrl.startsWith('file://')) {
       // Show local file image
       final filePath = imageUrl.substring(7); // Remove 'file://' prefix
+      Logger.data('[VENDOR_PROFILE] Loading local image: $filePath');
       return Image.file(
         File(filePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          Logger.error('Error loading local image: $filePath', error);
+          Logger.error('[VENDOR_PROFILE] Error loading local image: $filePath', error);
           return placeholder ?? Container(color: AppColors.grey300);
         },
       );
     } else {
       // Show remote image
+      Logger.data('[VENDOR_PROFILE] Loading remote image: $imageUrl');
       return CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
@@ -697,7 +871,10 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           color: AppColors.grey200,
           child: const Center(child: CircularProgressIndicator()),
         ),
-        errorWidget: (context, url, error) => placeholder ?? Container(color: AppColors.grey300),
+        errorWidget: (context, url, error) {
+          Logger.error('[VENDOR_PROFILE] Error loading remote image: $url', error);
+          return placeholder ?? Container(color: AppColors.grey300);
+        },
       );
     }
   }

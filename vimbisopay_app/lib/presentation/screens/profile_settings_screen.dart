@@ -46,8 +46,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       });
       Logger.state('Set loading state to true');
 
-      Logger.state('Attempting to read User from Provider');
-      final user = context.read<User>();
+      Logger.state('Attempting to read User from database');
+      final user = await ServiceLocator.databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('User data is null');
+        throw Exception('User data not available. Please log in again.');
+      }
+      
       Logger.data('User data retrieved - MemberId: ${user.memberId}, Phone: ${user.phone}');
       
       // Validate dashboard data
@@ -178,14 +184,20 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           );
         },
         (vendor) {
-          Navigator.pushNamed(
+          Navigator.push(
             context,
-            '/vendor-profile',
-            arguments: {
-              'vendorId': vendor.id,
-              'isOwner': true,
-            },
-          );
+            MaterialPageRoute(
+              builder: (context) => VendorProfileScreen(
+                vendorId: vendor.id,
+                isOwner: true,
+              ),
+            ),
+          ).then((_) {
+            // Refresh vendor status when returning from profile
+            if (_user != null) {
+              _checkVendorStatus(_user!.memberId);
+            }
+          });
         },
       );
     } catch (e) {
@@ -341,7 +353,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                       ),
                                     );
 
-                                    await context.read<UpgradeMemberTier>()(sourceAccountId);
+                                    // Create UpgradeMemberTier instance using accountRepository from ServiceLocator
+                                    final upgradeMemberTier = UpgradeMemberTier(ServiceLocator.accountRepository);
+                                    await upgradeMemberTier(sourceAccountId);
                                     
                                     // Dismiss loading dialog
                                     if (!context.mounted) return;
@@ -484,7 +498,68 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
   
+  // Check if the user is allowed to become a vendor
+  bool _canBecomeVendor(User? user) {
+    // If there's no user, don't allow becoming a vendor
+    if (user == null) return false;
+    
+    // Check the activateMarket property directly on the User object
+    // This property is set from either the User.activateMarket field or
+    // from the Dashboard.activateMarket field for backward compatibility
+    // activateMarket == false means we should prompt the user to become a vendor
+    // activateMarket == true means the user is already a vendor
+    return !user.activateMarket;
+  }
+  
+  // Get user from database if not available from provider
+  Future<User?> _getUserFromDatabase() async {
+    try {
+      Logger.state('Getting user from database');
+      return await ServiceLocator.databaseHelper.getUser();
+    } catch (e) {
+      Logger.error('Error getting user from database', e);
+      return null;
+    }
+  }
+
   Widget _buildMarketplaceSection() {
+    // If user is already a vendor, show vendor profile management
+    if (_isVendor) {
+      return _buildMarketplaceSectionContent(isVendor: true, canBecomeVendor: false);
+    }
+    
+    // If user is null or we're not sure if they can become a vendor, check from database
+    if (_user == null) {
+      return FutureBuilder<User?>(
+        future: _getUserFromDatabase(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final user = snapshot.data;
+          final canBecomeVendor = _canBecomeVendor(user);
+          
+          return _buildMarketplaceSectionContent(
+            isVendor: false,
+            canBecomeVendor: canBecomeVendor,
+          );
+        },
+      );
+    }
+    
+    // Use the user from state
+    final canBecomeVendor = _canBecomeVendor(_user);
+    return _buildMarketplaceSectionContent(
+      isVendor: false,
+      canBecomeVendor: canBecomeVendor,
+    );
+  }
+  
+  Widget _buildMarketplaceSectionContent({
+    required bool isVendor,
+    required bool canBecomeVendor,
+  }) {
     return SettingsContainer(
       title: 'Marketplace Settings',
       children: [
@@ -508,7 +583,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                   ),
                 )
-              else if (_isVendor)
+              else if (isVendor)
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -533,7 +608,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _navigateToVendorProfile,
                 )
-              else
+              else if (canBecomeVendor)
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -557,6 +632,33 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _navigateToVendorRegistration,
+                )
+              else
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.textGray.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.info_outline,
+                      color: AppColors.textGray,
+                    ),
+                  ),
+                  title: const Text(
+                    'Marketplace Access',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textGray,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'You currently don\'t have access to become a vendor',
+                    style: TextStyle(
+                      color: AppColors.textGray,
+                    ),
+                  ),
                 ),
             ],
           ),

@@ -13,6 +13,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/invent
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
 
 /// Marketplace screen for the VimbisoPay app.
 ///
@@ -29,6 +30,7 @@ class MarketplaceScreen extends StatefulWidget {
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
   bool _isLoading = true;
+  bool _isInitializing = true; // Track initialization state
   String _errorMessage = '';
   List<Product> _products = [];
   List<String> _categories = [];
@@ -42,9 +44,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void initState() {
     super.initState();
     Logger.lifecycle('MarketplaceScreen initialized');
-    _loadProducts();
-    _checkVendorStatus();
-    _checkFirstTimeVisit();
+    _checkVendorStatus().then((_) {
+      // If user is a vendor, navigate to their vendor profile
+      if (_isVendor && _vendorId != null && mounted) {
+        Logger.data('[MARKETPLACE] User is a vendor, navigating to vendor profile');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _navigateToVendorProfile(replace: true);
+        });
+      } else {
+        // Otherwise load products for regular marketplace view
+        _loadProducts();
+        _checkFirstTimeVisit();
+        
+        // Only set _isInitializing to false if we're not navigating away
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+          });
+        }
+      }
+    });
   }
   
   Future<void> _checkFirstTimeVisit() async {
@@ -105,63 +124,51 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _isCheckingVendorStatus = true;
       });
 
-      // Get current user - using User? to handle nullable User
-      try {
-        final user = context.read<User?>();
-        
-        if (user == null) {
-          Logger.state('No user found in provider');
-          setState(() {
-            _isCheckingVendorStatus = false;
-            // We'll handle the null user case in the UI
-          });
-          return;
-        }
-        
-        _memberId = user.memberId;
+      // Get current user from database instead of Provider
+      final user = await ServiceLocator.databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.state('No user found in database');
+        setState(() {
+          _isCheckingVendorStatus = false;
+          // We'll handle the null user case in the UI
+        });
+        return;
+      }
+      
+      _memberId = user.memberId;
 
-        if (_memberId != null) {
-          // Check if user is a vendor
-          final isVendor = await _marketplaceRepository.isMemberVendor(_memberId!);
+      if (_memberId != null) {
+        // Check if user is a vendor
+        final isVendor = await _marketplaceRepository.isMemberVendor(_memberId!);
 
-          if (isVendor && mounted) {
-            // Get vendor ID if user is a vendor
-            final vendorResult = await _marketplaceRepository.getVendorByMemberId(_memberId!);
-            
-            vendorResult.fold(
-              (failure) {
-                Logger.error('Failed to get vendor details', failure);
-                setState(() {
-                  _isVendor = isVendor;
-                  _isCheckingVendorStatus = false;
-                });
-              },
-              (vendor) {
-                setState(() {
-                  _isVendor = true;
-                  _vendorId = vendor.id;
-                  _isCheckingVendorStatus = false;
-                });
-              },
-            );
-          } else if (mounted) {
-            setState(() {
-              _isVendor = false;
-              _isCheckingVendorStatus = false;
-            });
-          }
-        } else {
+        if (isVendor && mounted) {
+          // Get vendor ID if user is a vendor
+          final vendorResult = await _marketplaceRepository.getVendorByMemberId(_memberId!);
+          
+          vendorResult.fold(
+            (failure) {
+              Logger.error('Failed to get vendor details', failure);
+              setState(() {
+                _isVendor = isVendor;
+                _isCheckingVendorStatus = false;
+              });
+            },
+            (vendor) {
+              setState(() {
+                _isVendor = true;
+                _vendorId = vendor.id;
+                _isCheckingVendorStatus = false;
+              });
+            },
+          );
+        } else if (mounted) {
           setState(() {
+            _isVendor = false;
             _isCheckingVendorStatus = false;
           });
         }
-      } catch (providerError) {
-        // Handle the case where the provider is not available
-        Logger.state('Provider error: $providerError');
-        
-        // For development/testing purposes, we could set a hardcoded member ID
-        // _memberId = 'test_member_id';
-        
+      } else {
         setState(() {
           _isCheckingVendorStatus = false;
         });
@@ -177,67 +184,80 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _navigateToVendorRegistration() {
-    if (_memberId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please log in to become a vendor'),
-          backgroundColor: AppColors.error,
-          action: SnackBarAction(
-            label: 'Login',
-            textColor: AppColors.white,
-            onPressed: () {
-              // Navigate to login screen
-              Navigator.pushNamed(context, '/login');
-            },
+    // Get user data from database if available
+    ServiceLocator.databaseHelper.getUser().then((user) {
+      if (user == null) {
+        // Show login prompt if user is not logged in
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to become a vendor'),
+            backgroundColor: AppColors.errorRed,
+            duration: Duration(seconds: 3),
           ),
-          duration: const Duration(seconds: 5),
-        ),
-      );
-      
-      // For development/testing purposes, uncomment this to bypass the login requirement
-      // This is useful during development to test the vendor registration flow
-      if (const bool.fromEnvironment('dart.vm.product') == false) {
-        // Only in debug mode
-        Logger.data('DEBUG MODE: Using test member ID for vendor registration');
-        Navigator.pushNamed(
-          context,
-          '/vendor-registration',
-          arguments: {
-            'memberId': 'test_member_id',
-          },
-        ).then((_) {
-          // Refresh vendor status when returning from registration
-          _checkVendorStatus();
-        });
+        );
         return;
       }
       
-      return;
-    }
-    
-    Navigator.pushNamed(
-      context,
-      '/vendor-registration',
-      arguments: {
-        'memberId': _memberId!,
-      },
-    ).then((_) {
-      // Refresh vendor status when returning from registration
-      _checkVendorStatus();
+      // Navigate to vendor registration with user data
+      Navigator.pushNamed(
+        context,
+        '/vendor-registration',
+        arguments: {
+          'memberId': user.memberId,
+          'user': user, // Pass the entire user object to pre-populate fields
+        },
+      ).then((_) async {
+        // Refresh vendor status when returning from registration
+        _checkVendorStatus();
+        
+        // Force rebuild of the UI to reflect the updated vendor status
+        if (mounted) {
+          setState(() {
+            Logger.data('[MARKETPLACE] Forcing UI rebuild after vendor registration');
+          });
+        }
+      });
     });
   }
 
-  void _navigateToVendorProfile() {
+  // Check if the user is allowed to become a vendor
+  bool _canBecomeVendor(User? user) {
+    // If there's no user, don't allow becoming a vendor as guest
+    if (user == null) return false;
+    
+    // Check the activateMarket property directly on the User object
+    // This property is set from either the User.activateMarket field or
+    // from the Dashboard.activateMarket field for backward compatibility
+    // activateMarket == false means we should prompt the user to become a vendor
+    // activateMarket == true means the user is already a vendor
+    return !user.activateMarket;
+  }
+
+  void _navigateToVendorProfile({bool replace = false}) {
     if (_vendorId == null) return;
     
-    Navigator.pushNamed(
-      context,
-      '/vendor-profile',
-      arguments: {
-        'vendorId': _vendorId!,
-        'isOwner': true,
-      },
-    );
+    if (replace) {
+      // Replace current route to prevent back navigation to marketplace
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VendorProfileScreen(
+            vendorId: _vendorId!,
+            isOwner: true,
+          ),
+        ),
+      );
+    } else {
+      // Regular push for normal navigation
+      Navigator.pushNamed(
+        context,
+        '/vendor-profile',
+        arguments: {
+          'vendorId': _vendorId!,
+          'isOwner': true,
+        },
+      );
+    }
   }
 
   void _navigateToInventoryManagement() {
@@ -500,6 +520,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show a loading indicator during initialization
+    if (_isInitializing) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Marketplace'),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+        ),
+        body: const SafeArea(
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+    
+    // Only build the full UI once initialization is complete
     return Scaffold(
       appBar: AppBar(
         title: const Text('Marketplace'),
@@ -736,7 +773,31 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         ),
       );
     } else {
-      // Show CTA for non-vendors
+      // Always get the latest user data from the database
+      // This ensures we have the most up-to-date activateMarket status
+      Logger.data('[MARKETPLACE] Getting latest user data from database for vendor CTA');
+      return FutureBuilder<User?>(
+        future: ServiceLocator.databaseHelper.getUser(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final user = snapshot.data;
+          final canBecomeVendor = _canBecomeVendor(user);
+          
+          Logger.data('[MARKETPLACE] User activateMarket status: ${user?.activateMarket}');
+          Logger.data('[MARKETPLACE] Can become vendor: $canBecomeVendor');
+          
+          return _buildVendorCTAContent(canBecomeVendor);
+        },
+      );
+    }
+  }
+  
+  Widget _buildVendorCTAContent(bool canBecomeVendor) {
+    if (!canBecomeVendor) {
+      // If the user can't become a vendor, show a message
       return Card(
         margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
         child: Padding(
@@ -745,7 +806,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Sell in the Marketplace',
+                'Marketplace',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -753,44 +814,60 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Create a vendor profile to sell your products and services.',
+                'Browse products and services from vendors in the marketplace.',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    // Add debug logging to help troubleshoot
-                    Logger.data('Become a Vendor button tapped, memberId: $_memberId');
-                    _navigateToVendorRegistration();
-                  },
-                  icon: const Icon(Icons.storefront),
-                  label: const Text('Become a Vendor'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              if (_memberId == null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'You need to be logged in to become a vendor.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.error,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
       );
     }
+    
+    // Show CTA for non-vendors who can become vendors
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Sell in the Marketplace',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Create a vendor profile to sell your products and services.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Logger.data('Become a Vendor button tapped');
+                  _navigateToVendorRegistration();
+                },
+                icon: const Icon(Icons.storefront),
+                label: const Text('Become a Vendor'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Builds the product image widget based on the image URL type.
