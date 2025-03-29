@@ -49,6 +49,7 @@ class ServiceLocator {
     httpClient: _httpClient,
     baseUrl: ApiConfig.baseUrl,
     databaseHelper: _databaseHelper,
+    accountRepository: accountRepository,
   );
 
   // Private constructor to prevent instantiation
