@@ -87,7 +87,15 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
       // Load current user data
       try {
         _currentUser = await _databaseHelper.getUser();
-        if (_currentUser != null && _currentUser!.dashboard != null) {
+        if (_currentUser == null) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'User not found';
+          });
+          return;
+        }
+        
+        if (_currentUser!.dashboard != null) {
           _profileThumbnailUrl = _currentUser!.dashboard!.member.profilePictureThumbnail;
           Logger.data('[VENDOR_PROFILE] User profile thumbnail URL: $_profileThumbnailUrl');
           
@@ -98,91 +106,64 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             Logger.data('[VENDOR_PROFILE] Profile thumbnail URL is available: $_profileThumbnailUrl');
           }
         } else {
-          Logger.data('[VENDOR_PROFILE] User or dashboard is null, cannot get profile thumbnail');
+          Logger.data('[VENDOR_PROFILE] Dashboard is null, cannot get profile thumbnail');
         }
       } catch (e) {
         Logger.error('[VENDOR_PROFILE] Error loading user data', e);
-        // Continue even if user data loading fails
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data: $e';
+        });
+        return;
       }
 
-      // Load vendor data
-      final vendorResult = await _marketplaceRepository.getVendor(widget.vendorId);
+      // Check if user is a vendor
+      if (!_currentUser!.activateMarket) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'User is not a vendor';
+        });
+        return;
+      }
+
+      // Create a vendor object from the user data
+      final vendor = Vendor(
+        id: widget.vendorId,
+        memberId: _currentUser!.memberId,
+        businessName: _currentUser!.dashboard?.member.firstname != null && _currentUser!.dashboard?.member.lastname != null
+            ? '${_currentUser!.dashboard!.member.firstname} ${_currentUser!.dashboard!.member.lastname}'
+            : 'My Business',
+        description: 'Vendor profile',
+        email: '',
+        phone: _currentUser!.phone,
+        profileImageUrl: _currentUser!.dashboard?.member.profilePictureThumbnail,
+        bannerImageUrl: null,
+        rating: 0.0,
+        ratingCount: 0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Load vendor's products from marketplace repository
+      final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
       
-      vendorResult.fold(
+      List<Product> vendorProducts = [];
+      productsResult.fold(
         (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load vendor data';
-          });
+          Logger.error('[VENDOR_PROFILE] Failed to load vendor products', failure);
+          // Continue with empty products list
         },
-        (vendor) async {
-          List<Product> allProducts = [];
-          
-          // Load vendor's products from marketplace repository
-          final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
-          
-          productsResult.fold(
-            (failure) {
-              Logger.error('Failed to load vendor products', failure);
-              // Continue with empty products list
-            },
-            (products) {
-              allProducts.addAll(products);
-            },
-          );
-          
-          // Load internal accounts of type PRODUCTION from user's dashboard
-          if (_currentUser != null && 
-              _currentUser!.dashboard != null && 
-              widget.isOwner) {
-            
-            final dashboard = _currentUser!.dashboard!;
-            final productionAccounts = dashboard.accountsInternal
-                .where((account) => account.accountType == 'PHYSICAL_ASSET')
-                .toList();
-            
-            Logger.data('[VENDOR_PROFILE] Found ${productionAccounts.length} PRODUCTION accounts');
-            
-            // Convert internal accounts to Product objects
-            final internalProducts = productionAccounts.map((account) {
-              // Create image URLs list with profile picture thumbnail if available
-              List<String> imageUrls = [];
-              if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
-                Logger.data('[VENDOR_PROFILE] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
-                imageUrls.add(account.profilePictureThumbnail!);
-              } else {
-                Logger.data('[VENDOR_PROFILE] No profile picture thumbnail available for account: ${account.accountID}');
-              }
-              
-              // Create a Product from the internal account
-              return Product(
-                id: account.accountID,
-                vendorId: vendor.id,
-                name: account.accountName,
-                description: 'Internal production account',
-                price: 0, // Default price, would need to be updated from account balance
-                currency: 'CXX', // Default currency
-                imageUrls: imageUrls, // Include profile picture thumbnail if available
-                category: 'Internal',
-                tags: ['internal', 'production'],
-                isAvailable: true,
-                accountId: account.accountID,
-                createdAt: DateTime.now(), // We don't have creation date
-                updatedAt: DateTime.now(), // We don't have update date
-              );
-            }).toList();
-            
-            // Add internal products to the list
-            allProducts.addAll(internalProducts);
-          }
-          
-          setState(() {
-            _isLoading = false;
-            _vendor = vendor;
-            _products = allProducts;
-          });
+        (products) {
+          vendorProducts = products;
         },
       );
+      
+      setState(() {
+        _isLoading = false;
+        _vendor = vendor;
+        _products = vendorProducts;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;

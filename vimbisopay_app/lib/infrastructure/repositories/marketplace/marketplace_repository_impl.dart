@@ -1,6 +1,5 @@
 import 'package:dartz/dartz.dart';
 import 'package:http/http.dart' as http;
-import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
@@ -343,7 +342,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             final vendorData = responseData['data']['vendor'] as Map<String, dynamic>;
             
             final vendor = Vendor(
-              id: vendorData['id'] ?? 'v_temp_$memberId',
+              id: vendorData['id'] ?? memberId,
               memberId: vendorData['memberId'] ?? memberId,
               businessName: vendorData['businessName'] ?? 'Unknown Business',
               description: vendorData['description'] ?? '',
@@ -376,7 +375,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                 : 'My Business';
                 
             final vendor = Vendor(
-              id: 'v_temp_${user.memberId}',
+              id: user.memberId,
               memberId: user.memberId,
               businessName: businessName,
               description: 'Vendor profile',
@@ -413,7 +412,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             : 'My Business';
             
         final vendor = Vendor(
-          id: 'v_temp_${user.memberId}',
+          id: user.memberId,
           memberId: user.memberId,
           businessName: businessName,
           description: 'Vendor profile',
@@ -545,7 +544,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             final vendorData = responseData['data']['vendor'] as Map<String, dynamic>;
             
             final vendor = Vendor(
-              id: vendorData['id'] ?? 'v_temp_$memberId',
+              id: vendorData['id'] ?? memberId,
               memberId: vendorData['memberId'] ?? memberId,
               businessName: vendorData['businessName'] ?? businessName,
               description: vendorData['description'] ?? description,
@@ -571,7 +570,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             // If vendor data not found in response, create a temporary vendor object
             final now = DateTime.now();
             final vendor = Vendor(
-              id: 'v_temp_$memberId',
+              id: memberId,
               memberId: memberId,
               businessName: businessName,
               description: description,
@@ -825,21 +824,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             }
           } else {
             Logger.data('[MARKETPLACE] No profile picture URLs found in response');
-            
-            // Try to find the product in the mock products list
-            try {
-              final mockProduct = _mockProducts.firstWhere(
-                (p) => p.id == id,
-                orElse: () => throw NotFoundException('Product not found in mock data'),
-              );
-              
-              // Use the image URLs from the mock product
-              imageUrls = mockProduct.imageUrls;
-              Logger.data('[MARKETPLACE] Using image URLs from mock product: $imageUrls');
-            } catch (e) {
-              Logger.error('[MARKETPLACE] Error finding product in mock data', e);
-              // Continue with empty image URLs
-            }
           }
         } catch (e) {
           Logger.error('[MARKETPLACE] Error extracting profile picture URLs from response', e);
@@ -878,31 +862,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             Logger.data('[MARKETPLACE] Extracted product details from response: name=$name, description=$description');
           } else {
             Logger.data('[MARKETPLACE] No product details found in response');
-            
-            // Try to find the product in the mock products list
-            try {
-              final mockProduct = _mockProducts.firstWhere(
-                (p) => p.id == id,
-                orElse: () => throw NotFoundException('Product not found in mock data'),
-              );
-              
-              // Use the details from the mock product
-              productId = mockProduct.id;
-              vendorId = mockProduct.vendorId;
-              name = mockProduct.name;
-              description = mockProduct.description;
-              price = mockProduct.price;
-              currency = mockProduct.currency;
-              category = mockProduct.category;
-              tags = mockProduct.tags;
-              isAvailable = mockProduct.isAvailable;
-              accountId = mockProduct.accountId;
-              
-              Logger.data('[MARKETPLACE] Using details from mock product');
-            } catch (e) {
-              Logger.error('[MARKETPLACE] Error finding product in mock data', e);
-              // Continue with default values
-            }
           }
         } catch (e) {
           Logger.error('[MARKETPLACE] Error extracting product details from response', e);
@@ -933,62 +892,116 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       } else if (response.statusCode == 401) {
         Logger.error('[MARKETPLACE] Authentication failed with status code 401');
         return Left(AuthFailure(message: 'Authentication failed'));
+      } else if (response.statusCode == 404) {
+        Logger.error('[MARKETPLACE] Product not found with status code 404');
+        return Left(NotFoundFailure('Product not found'));
       } else {
         Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
-        
-        // Try to find the product in the mock products list as a fallback
-        try {
-          final product = _mockProducts.firstWhere(
-            (p) => p.id == id,
-            orElse: () => throw NotFoundException('Product not found'),
-          );
-          
-          Logger.data('[MARKETPLACE] Falling back to mock product data');
-          return Right(product);
-        } on NotFoundException catch (e) {
-          Logger.error('[MARKETPLACE] Product not found in mock data', e);
-          return Left(NotFoundFailure(e.message));
-        } catch (e) {
-          Logger.error('[MARKETPLACE] Error finding product in mock data', e);
-          return Left(ServerFailure('Failed to get product: ${response.body}'));
-        }
+        return Left(ServerFailure('Failed to get product: ${response.body}'));
       }
     } catch (e, stackTrace) {
       stopwatch.stop();
       Logger.error('[MARKETPLACE] Error getting product', e, stackTrace);
-      
-      // Try to find the product in the mock products list as a fallback
-      try {
-        final product = _mockProducts.firstWhere(
-          (p) => p.id == id,
-          orElse: () => throw NotFoundException('Product not found'),
-        );
-        
-        Logger.data('[MARKETPLACE] Falling back to mock product data due to error');
-        return Right(product);
-      } on NotFoundException catch (e) {
-        Logger.error('[MARKETPLACE] Product not found in mock data', e);
-        return Left(NotFoundFailure(e.message));
-      } catch (e) {
-        Logger.error('[MARKETPLACE] Error finding product in mock data', e);
-        return Left(ServerFailure('Failed to get product: $e'));
-      }
+      return Left(ServerFailure('Failed to get product: $e'));
     }
   }
 
   @override
   Future<Either<Failure, List<Product>>> getProductsByVendor(
       String vendorId) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting getProductsByVendor operation for vendor ID: $vendorId');
+    
     try {
-      Logger.data('Getting products for vendor ID: $vendorId');
-
-      // Mock implementation
-      final products =
-          _mockProducts.where((p) => p.vendorId == vendorId).toList();
-
-      return Right(products);
-    } catch (e) {
-      Logger.error('Error getting products by vendor', e);
+      // Get the user token from local storage
+      Logger.data('[MARKETPLACE] Retrieving user from database');
+      final user = await _databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('[MARKETPLACE] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
+      }
+      
+      if (user.token.isEmpty) {
+        Logger.error('[MARKETPLACE] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[MARKETPLACE] User retrieved successfully: ${user.memberId}');
+      
+      // Call the API endpoint to get products by vendor
+      Logger.data('[MARKETPLACE] Sending GET request to $_baseUrl/getProductsByVendor/$vendorId');
+      final response = await _httpClient.get(
+        Uri.parse('$_baseUrl/getProductsByVendor/$vendorId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+      );
+      
+      // Log response details
+      Logger.data('[MARKETPLACE] Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        // Parse the response body
+        final responseData = jsonDecode(response.body);
+        Logger.data('[MARKETPLACE] Response data received successfully');
+        
+        // Extract products from the response
+        try {
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('products') &&
+              responseData['data']['products'] is List) {
+            
+            final productsData = responseData['data']['products'] as List;
+            final products = productsData.map((productData) {
+              return Product(
+                id: productData['id'] ?? '',
+                vendorId: productData['vendorId'] ?? vendorId,
+                name: productData['name'] ?? '',
+                description: productData['description'] ?? '',
+                price: (productData['price'] as num?)?.toInt() ?? 0,
+                currency: productData['currency'] ?? 'USD',
+                imageUrls: (productData['imageUrls'] as List?)?.map((url) => url.toString()).toList() ?? [],
+                category: productData['category'] ?? '',
+                tags: (productData['tags'] as List?)?.map((tag) => tag.toString()).toList() ?? [],
+                isAvailable: productData['isAvailable'] as bool? ?? true,
+                accountId: productData['accountId'],
+                createdAt: productData['createdAt'] != null 
+                    ? DateTime.parse(productData['createdAt']) 
+                    : DateTime.now(),
+                updatedAt: productData['updatedAt'] != null 
+                    ? DateTime.parse(productData['updatedAt']) 
+                    : DateTime.now(),
+              );
+            }).toList();
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] getProductsByVendor completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(products);
+          } else {
+            // If no products found, return empty list
+            Logger.data('[MARKETPLACE] No products found for vendor ID: $vendorId');
+            return const Right([]);
+          }
+        } catch (e) {
+          Logger.error('[MARKETPLACE] Error parsing products data from response', e);
+          return Left(ServerFailure('Failed to parse products data: $e'));
+        }
+      } else if (response.statusCode == 401) {
+        Logger.error('[MARKETPLACE] Authentication failed with status code 401');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else if (response.statusCode == 404) {
+        Logger.error('[MARKETPLACE] Vendor not found with status code 404');
+        return Left(NotFoundFailure('Vendor not found'));
+      } else {
+        Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+        return Left(ServerFailure('Failed to get products by vendor: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[MARKETPLACE] Error getting products by vendor', e, stackTrace);
       return Left(ServerFailure('Failed to get products by vendor: $e'));
     }
   }
@@ -996,36 +1009,198 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   @override
   Future<Either<Failure, List<Product>>> getProductsByCategory(
       String category) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting getProductsByCategory operation for category: $category');
+    
     try {
-      Logger.data('Getting products for category: $category');
-
-      // Mock implementation
-      final products =
-          _mockProducts.where((p) => p.category == category).toList();
-
-      return Right(products);
-    } catch (e) {
-      Logger.error('Error getting products by category', e);
+      // Get the user token from local storage
+      Logger.data('[MARKETPLACE] Retrieving user from database');
+      final user = await _databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('[MARKETPLACE] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
+      }
+      
+      if (user.token.isEmpty) {
+        Logger.error('[MARKETPLACE] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[MARKETPLACE] User retrieved successfully: ${user.memberId}');
+      
+      // Call the API endpoint to get products by category
+      Logger.data('[MARKETPLACE] Sending GET request to $_baseUrl/getProductsByCategory/$category');
+      final response = await _httpClient.get(
+        Uri.parse('$_baseUrl/getProductsByCategory/$category'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+      );
+      
+      // Log response details
+      Logger.data('[MARKETPLACE] Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        // Parse the response body
+        final responseData = jsonDecode(response.body);
+        Logger.data('[MARKETPLACE] Response data received successfully');
+        
+        // Extract products from the response
+        try {
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('products') &&
+              responseData['data']['products'] is List) {
+            
+            final productsData = responseData['data']['products'] as List;
+            final products = productsData.map((productData) {
+              return Product(
+                id: productData['id'] ?? '',
+                vendorId: productData['vendorId'] ?? '',
+                name: productData['name'] ?? '',
+                description: productData['description'] ?? '',
+                price: (productData['price'] as num?)?.toInt() ?? 0,
+                currency: productData['currency'] ?? 'USD',
+                imageUrls: (productData['imageUrls'] as List?)?.map((url) => url.toString()).toList() ?? [],
+                category: productData['category'] ?? category,
+                tags: (productData['tags'] as List?)?.map((tag) => tag.toString()).toList() ?? [],
+                isAvailable: productData['isAvailable'] as bool? ?? true,
+                accountId: productData['accountId'],
+                createdAt: productData['createdAt'] != null 
+                    ? DateTime.parse(productData['createdAt']) 
+                    : DateTime.now(),
+                updatedAt: productData['updatedAt'] != null 
+                    ? DateTime.parse(productData['updatedAt']) 
+                    : DateTime.now(),
+              );
+            }).toList();
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] getProductsByCategory completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(products);
+          } else {
+            // If no products found, return empty list
+            Logger.data('[MARKETPLACE] No products found for category: $category');
+            return const Right([]);
+          }
+        } catch (e) {
+          Logger.error('[MARKETPLACE] Error parsing products data from response', e);
+          return Left(ServerFailure('Failed to parse products data: $e'));
+        }
+      } else if (response.statusCode == 401) {
+        Logger.error('[MARKETPLACE] Authentication failed with status code 401');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else {
+        Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+        return Left(ServerFailure('Failed to get products by category: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[MARKETPLACE] Error getting products by category', e, stackTrace);
       return Left(ServerFailure('Failed to get products by category: $e'));
     }
   }
 
   @override
   Future<Either<Failure, List<Product>>> searchProducts(String query) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting searchProducts operation for query: $query');
+    
     try {
-      Logger.data('Searching products with query: $query');
-
-      // Mock implementation
-      final lowercaseQuery = query.toLowerCase();
-      final products = _mockProducts.where((p) {
-        return p.name.toLowerCase().contains(lowercaseQuery) ||
-            p.description.toLowerCase().contains(lowercaseQuery) ||
-            p.tags.any((tag) => tag.toLowerCase().contains(lowercaseQuery));
-      }).toList();
-
-      return Right(products);
-    } catch (e) {
-      Logger.error('Error searching products', e);
+      // Get the user token from local storage
+      Logger.data('[MARKETPLACE] Retrieving user from database');
+      final user = await _databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('[MARKETPLACE] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
+      }
+      
+      if (user.token.isEmpty) {
+        Logger.error('[MARKETPLACE] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[MARKETPLACE] User retrieved successfully: ${user.memberId}');
+      
+      // Prepare request data
+      final requestBody = jsonEncode({
+        'query': query,
+      });
+      
+      // Call the API endpoint to search products
+      Logger.data('[MARKETPLACE] Sending POST request to $_baseUrl/searchProducts');
+      final response = await _httpClient.post(
+        Uri.parse('$_baseUrl/searchProducts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+        body: requestBody,
+      );
+      
+      // Log response details
+      Logger.data('[MARKETPLACE] Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        // Parse the response body
+        final responseData = jsonDecode(response.body);
+        Logger.data('[MARKETPLACE] Response data received successfully');
+        
+        // Extract products from the response
+        try {
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('products') &&
+              responseData['data']['products'] is List) {
+            
+            final productsData = responseData['data']['products'] as List;
+            final products = productsData.map((productData) {
+              return Product(
+                id: productData['id'] ?? '',
+                vendorId: productData['vendorId'] ?? '',
+                name: productData['name'] ?? '',
+                description: productData['description'] ?? '',
+                price: (productData['price'] as num?)?.toInt() ?? 0,
+                currency: productData['currency'] ?? 'USD',
+                imageUrls: (productData['imageUrls'] as List?)?.map((url) => url.toString()).toList() ?? [],
+                category: productData['category'] ?? '',
+                tags: (productData['tags'] as List?)?.map((tag) => tag.toString()).toList() ?? [],
+                isAvailable: productData['isAvailable'] as bool? ?? true,
+                accountId: productData['accountId'],
+                createdAt: productData['createdAt'] != null 
+                    ? DateTime.parse(productData['createdAt']) 
+                    : DateTime.now(),
+                updatedAt: productData['updatedAt'] != null 
+                    ? DateTime.parse(productData['updatedAt']) 
+                    : DateTime.now(),
+              );
+            }).toList();
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] searchProducts completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(products);
+          } else {
+            // If no products found, return empty list
+            Logger.data('[MARKETPLACE] No products found for query: $query');
+            return const Right([]);
+          }
+        } catch (e) {
+          Logger.error('[MARKETPLACE] Error parsing products data from response', e);
+          return Left(ServerFailure('Failed to parse products data: $e'));
+        }
+      } else if (response.statusCode == 401) {
+        Logger.error('[MARKETPLACE] Authentication failed with status code 401');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else {
+        Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+        return Left(ServerFailure('Failed to search products: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[MARKETPLACE] Error searching products', e, stackTrace);
       return Left(ServerFailure('Failed to search products: $e'));
     }
   }
@@ -1124,12 +1299,30 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required bool isAvailable,
     String? accountId,
   }) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting createProduct operation');
+    
     try {
-      Logger.data('Creating product for vendor ID: $vendorId');
-
+      // Get the user token from local storage
+      Logger.data('[MARKETPLACE] Retrieving user from database');
+      final user = await _databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('[MARKETPLACE] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
+      }
+      
+      if (user.token.isEmpty) {
+        Logger.error('[MARKETPLACE] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[MARKETPLACE] User retrieved successfully: ${user.memberId}');
+      
       // Create an internal account for the product if not provided
       String productAccountId = accountId ?? '';
       if (productAccountId.isEmpty) {
+        Logger.data('[MARKETPLACE] No account ID provided, creating internal account');
         final accountResult = await createInternalAccount(
           accountName: name,
           defaultDenom: currency,
@@ -1148,30 +1341,113 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           (_) => '',
           (id) => id,
         );
+        Logger.data('[MARKETPLACE] Created internal account with ID: $productAccountId');
       }
-
-      // Create the product with the account ID
-      final newProduct = Product(
-        id: 'p${_mockProducts.length + 1}',
-        vendorId: vendorId,
-        name: name,
-        description: description,
-        price: price,
-        currency: currency,
-        imageUrls: imageUrls,
-        category: category,
-        tags: tags,
-        isAvailable: isAvailable,
-        accountId: productAccountId,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+      
+      // Prepare request data
+      final Map<String, dynamic> requestBody = {
+        'vendorId': vendorId,
+        'name': name,
+        'description': description,
+        'price': price,
+        'currency': currency,
+        'imageUrls': imageUrls,
+        'category': category,
+        'tags': tags,
+        'isAvailable': isAvailable,
+        'accountId': productAccountId,
+      };
+      
+      final requestBodyJson = jsonEncode(requestBody);
+      Logger.data('[MARKETPLACE] Request body: $requestBodyJson');
+      
+      // Call the API endpoint to create product
+      Logger.data('[MARKETPLACE] Sending POST request to $_baseUrl/createProduct');
+      final response = await _httpClient.post(
+        Uri.parse('$_baseUrl/createProduct'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+        body: requestBodyJson,
       );
-
-      _mockProducts.add(newProduct);
-
-      return Right(newProduct);
-    } catch (e) {
-      Logger.error('Error creating product', e);
+      
+      // Log response details
+      Logger.data('[MARKETPLACE] Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Parse the response body
+        final responseData = jsonDecode(response.body);
+        Logger.data('[MARKETPLACE] Response data received successfully');
+        
+        // Extract product details from the response
+        try {
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('product')) {
+            
+            final productData = responseData['data']['product'] as Map<String, dynamic>;
+            
+            final product = Product(
+              id: productData['id'] ?? '',
+              vendorId: productData['vendorId'] ?? vendorId,
+              name: productData['name'] ?? name,
+              description: productData['description'] ?? description,
+              price: (productData['price'] as num?)?.toInt() ?? price,
+              currency: productData['currency'] ?? currency,
+              imageUrls: (productData['imageUrls'] as List?)?.map((url) => url.toString()).toList() ?? imageUrls,
+              category: productData['category'] ?? category,
+              tags: (productData['tags'] as List?)?.map((tag) => tag.toString()).toList() ?? tags,
+              isAvailable: productData['isAvailable'] as bool? ?? isAvailable,
+              accountId: productData['accountId'] ?? productAccountId,
+              createdAt: productData['createdAt'] != null 
+                  ? DateTime.parse(productData['createdAt']) 
+                  : DateTime.now(),
+              updatedAt: productData['updatedAt'] != null 
+                  ? DateTime.parse(productData['updatedAt']) 
+                  : DateTime.now(),
+            );
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] createProduct completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(product);
+          } else {
+            // If product data not found in response, create a temporary product object
+            final now = DateTime.now();
+            final product = Product(
+              id: 'p_temp_${DateTime.now().millisecondsSinceEpoch}',
+              vendorId: vendorId,
+              name: name,
+              description: description,
+              price: price,
+              currency: currency,
+              imageUrls: imageUrls,
+              category: category,
+              tags: tags,
+              isAvailable: isAvailable,
+              accountId: productAccountId,
+              createdAt: now,
+              updatedAt: now,
+            );
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] createProduct completed with temporary product in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(product);
+          }
+        } catch (e) {
+          Logger.error('[MARKETPLACE] Error parsing product data from response', e);
+          return Left(ServerFailure('Failed to parse product data: $e'));
+        }
+      } else if (response.statusCode == 401) {
+        Logger.error('[MARKETPLACE] Authentication failed with status code 401');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else {
+        Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+        return Left(ServerFailure('Failed to create product: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[MARKETPLACE] Error creating product', e, stackTrace);
       return Left(ServerFailure('Failed to create product: $e'));
     }
   }
@@ -1189,98 +1465,148 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     bool? isAvailable,
     String? accountId,
   }) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting updateProduct operation for ID: $id');
+    
     try {
-      Logger.data('Updating product with ID: $id');
-
-      // Find the product
-      final productIndex = _mockProducts.indexWhere((p) => p.id == id);
-      if (productIndex == -1) {
-        throw NotFoundException('Product not found');
+      // Get the user token from local storage
+      Logger.data('[MARKETPLACE] Retrieving user from database');
+      final user = await _databaseHelper.getUser();
+      
+      if (user == null) {
+        Logger.error('[MARKETPLACE] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
       }
-
-      // Get the existing product
-      final existingProduct = _mockProducts[productIndex];
-
-      // Create updated product
-      final updatedProduct = existingProduct.copyWith(
-        name: name,
-        description: description,
-        price: price,
-        currency: currency,
-        imageUrls: imageUrls,
-        category: category,
-        tags: tags,
-        isAvailable: isAvailable,
-        accountId: accountId,
-        updatedAt: DateTime.now(),
+      
+      if (user.token.isEmpty) {
+        Logger.error('[MARKETPLACE] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[MARKETPLACE] User retrieved successfully: ${user.memberId}');
+      
+      // Prepare request data with only the provided fields
+      final Map<String, dynamic> requestBody = {
+        'id': id,
+      };
+      
+      if (name != null) requestBody['name'] = name;
+      if (description != null) requestBody['description'] = description;
+      if (price != null) requestBody['price'] = price;
+      if (currency != null) requestBody['currency'] = currency;
+      if (imageUrls != null) requestBody['imageUrls'] = imageUrls;
+      if (category != null) requestBody['category'] = category;
+      if (tags != null) requestBody['tags'] = tags;
+      if (isAvailable != null) requestBody['isAvailable'] = isAvailable;
+      if (accountId != null) requestBody['accountId'] = accountId;
+      
+      final requestBodyJson = jsonEncode(requestBody);
+      Logger.data('[MARKETPLACE] Request body: $requestBodyJson');
+      
+      // Call the API endpoint to update product
+      Logger.data('[MARKETPLACE] Sending PUT request to $_baseUrl/updateProduct');
+      final response = await _httpClient.put(
+        Uri.parse('$_baseUrl/updateProduct'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+        body: requestBodyJson,
       );
-
-      // Update the product in the list
-      _mockProducts[productIndex] = updatedProduct;
-
-      return Right(updatedProduct);
-    } on NotFoundException catch (e) {
-      Logger.error('Product not found for update', e);
-      return Left(NotFoundFailure(e.message));
-    } catch (e) {
-      Logger.error('Error updating product', e);
+      
+      // Log response details
+      Logger.data('[MARKETPLACE] Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // For 204 No Content response, we need to get the product again to return the updated data
+        if (response.statusCode == 204 || response.body.isEmpty) {
+          Logger.data('[MARKETPLACE] No content in response, fetching updated product');
+          
+          // Get the updated product
+          final getProductResult = await getProduct(id);
+          
+          return getProductResult;
+        }
+        
+        // Parse the response body for 200 OK response
+        final responseData = jsonDecode(response.body);
+        Logger.data('[MARKETPLACE] Response data received successfully');
+        
+        // Extract product details from the response
+        try {
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('product')) {
+            
+            final productData = responseData['data']['product'] as Map<String, dynamic>;
+            
+            final product = Product(
+              id: productData['id'] ?? id,
+              vendorId: productData['vendorId'] ?? '',
+              name: productData['name'] ?? name ?? '',
+              description: productData['description'] ?? description ?? '',
+              price: (productData['price'] as num?)?.toInt() ?? price ?? 0,
+              currency: productData['currency'] ?? currency ?? 'USD',
+              imageUrls: (productData['imageUrls'] as List?)?.map((url) => url.toString()).toList() ?? imageUrls ?? [],
+              category: productData['category'] ?? category ?? '',
+              tags: (productData['tags'] as List?)?.map((tag) => tag.toString()).toList() ?? tags ?? [],
+              isAvailable: productData['isAvailable'] as bool? ?? isAvailable ?? true,
+              accountId: productData['accountId'] ?? accountId,
+              createdAt: productData['createdAt'] != null 
+                  ? DateTime.parse(productData['createdAt']) 
+                  : DateTime.now(),
+              updatedAt: productData['updatedAt'] != null 
+                  ? DateTime.parse(productData['updatedAt']) 
+                  : DateTime.now(),
+            );
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] updateProduct completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(product);
+          } else {
+            Logger.error('[MARKETPLACE] Product data not found in response');
+            return Left(NotFoundFailure('Product not found in response'));
+          }
+        } catch (e) {
+          Logger.error('[MARKETPLACE] Error parsing product data from response', e);
+          return Left(ServerFailure('Failed to parse product data: $e'));
+        }
+      } else if (response.statusCode == 401) {
+        Logger.error('[MARKETPLACE] Authentication failed with status code 401');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else if (response.statusCode == 404) {
+        Logger.error('[MARKETPLACE] Product not found with status code 404');
+        return Left(NotFoundFailure('Product not found'));
+      } else {
+        Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+        return Left(ServerFailure('Failed to update product: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[MARKETPLACE] Error updating product', e, stackTrace);
       return Left(ServerFailure('Failed to update product: $e'));
     }
   }
 
   @override
   Future<Either<Failure, Invoice>> getInvoice(String id) async {
-    try {
-      Logger.data('Getting invoice with ID: $id');
-
-      // Mock implementation
-      final invoice = _mockInvoices.firstWhere(
-        (i) => i.id == id,
-        orElse: () => throw NotFoundException('Invoice not found'),
-      );
-
-      return Right(invoice);
-    } on NotFoundException catch (e) {
-      Logger.error('Invoice not found', e);
-      return Left(NotFoundFailure(e.message));
-    } catch (e) {
-      Logger.error('Error getting invoice', e);
-      return Left(ServerFailure('Failed to get invoice: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getInvoice called with ID: $id');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
-  Future<Either<Failure, List<Invoice>>> getInvoicesByBuyer(
-      String buyerId) async {
-    try {
-      Logger.data('Getting invoices for buyer ID: $buyerId');
-
-      // Mock implementation
-      final invoices =
-          _mockInvoices.where((i) => i.buyerId == buyerId).toList();
-
-      return Right(invoices);
-    } catch (e) {
-      Logger.error('Error getting invoices by buyer', e);
-      return Left(ServerFailure('Failed to get invoices by buyer: $e'));
-    }
+  Future<Either<Failure, List<Invoice>>> getInvoicesByBuyer(String buyerId) async {
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getInvoicesByBuyer called with buyer ID: $buyerId');
+    return const Right([]);
   }
 
   @override
-  Future<Either<Failure, List<Invoice>>> getInvoicesByVendor(
-      String vendorId) async {
-    try {
-      Logger.data('Getting invoices for vendor ID: $vendorId');
-
-      // Mock implementation
-      final invoices =
-          _mockInvoices.where((i) => i.vendorId == vendorId).toList();
-
-      return Right(invoices);
-    } catch (e) {
-      Logger.error('Error getting invoices by vendor', e);
-      return Left(ServerFailure('Failed to get invoices by vendor: $e'));
-    }
+  Future<Either<Failure, List<Invoice>>> getInvoicesByVendor(String vendorId) async {
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getInvoicesByVendor called with vendor ID: $vendorId');
+    return const Right([]);
   }
 
   @override
@@ -1293,32 +1619,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String paymentMethod,
     String? notes,
   }) async {
-    try {
-      Logger.data(
-          'Creating invoice for buyer ID: $buyerId and vendor ID: $vendorId');
-
-      // Mock implementation
-      final newInvoice = Invoice(
-        id: 'i${_mockInvoices.length + 1}',
-        buyerId: buyerId,
-        vendorId: vendorId,
-        lineItems: lineItems,
-        totalAmount: totalAmount,
-        currency: currency,
-        status: InvoiceStatus.pending,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      _mockInvoices.add(newInvoice);
-
-      return Right(newInvoice);
-    } catch (e) {
-      Logger.error('Error creating invoice', e);
-      return Left(ServerFailure('Failed to create invoice: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] createInvoice called');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1328,92 +1631,30 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     String? notes,
     DateTime? paidAt,
   }) async {
-    try {
-      Logger.data('Updating invoice with ID: $id');
-
-      // Find the invoice
-      final invoiceIndex = _mockInvoices.indexWhere((i) => i.id == id);
-      if (invoiceIndex == -1) {
-        throw NotFoundException('Invoice not found');
-      }
-
-      // Get the existing invoice
-      final existingInvoice = _mockInvoices[invoiceIndex];
-
-      // Create updated invoice
-      final updatedInvoice = existingInvoice.copyWith(
-        status: status,
-        notes: notes,
-        paidAt: paidAt,
-        updatedAt: DateTime.now(),
-      );
-
-      // Update the invoice in the list
-      _mockInvoices[invoiceIndex] = updatedInvoice;
-
-      return Right(updatedInvoice);
-    } on NotFoundException catch (e) {
-      Logger.error('Invoice not found for update', e);
-      return Left(NotFoundFailure(e.message));
-    } catch (e) {
-      Logger.error('Error updating invoice', e);
-      return Left(ServerFailure('Failed to update invoice: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] updateInvoice called with ID: $id');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
   Future<Either<Failure, AssetMarker>> getAssetMarker(String id) async {
-    try {
-      Logger.data('Getting asset marker with ID: $id');
-
-      // Mock implementation
-      final assetMarker = _mockAssetMarkers.firstWhere(
-        (a) => a.id == id,
-        orElse: () => throw NotFoundException('Asset marker not found'),
-      );
-
-      return Right(assetMarker);
-    } on NotFoundException catch (e) {
-      Logger.error('Asset marker not found', e);
-      return Left(NotFoundFailure(e.message));
-    } catch (e) {
-      Logger.error('Error getting asset marker', e);
-      return Left(ServerFailure('Failed to get asset marker: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getAssetMarker called with ID: $id');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
-  Future<Either<Failure, List<AssetMarker>>> getAssetMarkersByProduct(
-      String productId) async {
-    try {
-      Logger.data('Getting asset markers for product ID: $productId');
-
-      // Mock implementation
-      final assetMarkers =
-          _mockAssetMarkers.where((a) => a.productId == productId).toList();
-
-      return Right(assetMarkers);
-    } catch (e) {
-      Logger.error('Error getting asset markers by product', e);
-      return Left(ServerFailure('Failed to get asset markers by product: $e'));
-    }
+  Future<Either<Failure, List<AssetMarker>>> getAssetMarkersByProduct(String productId) async {
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getAssetMarkersByProduct called with product ID: $productId');
+    return const Right([]);
   }
 
   @override
-  Future<Either<Failure, List<AssetMarker>>> getAssetMarkersByOwner(
-      String ownerId) async {
-    try {
-      Logger.data('Getting asset markers for owner ID: $ownerId');
-
-      // Mock implementation
-      final assetMarkers =
-          _mockAssetMarkers.where((a) => a.ownerId == ownerId).toList();
-
-      return Right(assetMarkers);
-    } catch (e) {
-      Logger.error('Error getting asset markers by owner', e);
-      return Left(ServerFailure('Failed to get asset markers by owner: $e'));
-    }
+  Future<Either<Failure, List<AssetMarker>>> getAssetMarkersByOwner(String ownerId) async {
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] getAssetMarkersByOwner called with owner ID: $ownerId');
+    return const Right([]);
   }
 
   @override
@@ -1424,28 +1665,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required int quantity,
     required AssetMarkerStatus status,
   }) async {
-    try {
-      Logger.data('Creating asset marker for product ID: $productId');
-
-      // Mock implementation
-      final newAssetMarker = AssetMarker(
-        id: 'a${_mockAssetMarkers.length + 1}',
-        productId: productId,
-        ownerId: ownerId,
-        creatorId: creatorId,
-        quantity: quantity,
-        status: status,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      _mockAssetMarkers.add(newAssetMarker);
-
-      return Right(newAssetMarker);
-    } catch (e) {
-      Logger.error('Error creating asset marker', e);
-      return Left(ServerFailure('Failed to create asset marker: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] createAssetMarker called');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1456,38 +1678,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     AssetMarkerStatus? status,
     DateTime? lastTransferredAt,
   }) async {
-    try {
-      Logger.data('Updating asset marker with ID: $id');
-
-      // Find the asset marker
-      final assetMarkerIndex = _mockAssetMarkers.indexWhere((a) => a.id == id);
-      if (assetMarkerIndex == -1) {
-        throw NotFoundException('Asset marker not found');
-      }
-
-      // Get the existing asset marker
-      final existingAssetMarker = _mockAssetMarkers[assetMarkerIndex];
-
-      // Create updated asset marker
-      final updatedAssetMarker = existingAssetMarker.copyWith(
-        ownerId: ownerId,
-        quantity: quantity,
-        status: status,
-        lastTransferredAt: lastTransferredAt,
-        updatedAt: DateTime.now(),
-      );
-
-      // Update the asset marker in the list
-      _mockAssetMarkers[assetMarkerIndex] = updatedAssetMarker;
-
-      return Right(updatedAssetMarker);
-    } on NotFoundException catch (e) {
-      Logger.error('Asset marker not found for update', e);
-      return Left(NotFoundFailure(e.message));
-    } catch (e) {
-      Logger.error('Error updating asset marker', e);
-      return Left(ServerFailure('Failed to update asset marker: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] updateAssetMarker called with ID: $id');
+    return Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1495,45 +1688,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String id,
     required String newOwnerId,
   }) async {
-    try {
-      Logger.data(
-          'Transferring asset marker with ID: $id to owner ID: $newOwnerId');
-
-      // Find the asset marker
-      final assetMarkerIndex = _mockAssetMarkers.indexWhere((a) => a.id == id);
-      if (assetMarkerIndex == -1) {
-        throw NotFoundException('Asset marker not found');
-      }
-
-      // Get the existing asset marker
-      final existingAssetMarker = _mockAssetMarkers[assetMarkerIndex];
-
-      // Check if the asset marker is transferable
-      if (!existingAssetMarker.isTransferable) {
-        throw const ServerException('Asset marker is not transferable');
-      }
-
-      // Create updated asset marker
-      final updatedAssetMarker = existingAssetMarker.copyWith(
-        ownerId: newOwnerId,
-        lastTransferredAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      // Update the asset marker in the list
-      _mockAssetMarkers[assetMarkerIndex] = updatedAssetMarker;
-
-      return Right(updatedAssetMarker);
-    } on NotFoundException catch (e) {
-      Logger.error('Asset marker not found for transfer', e);
-      return Left(NotFoundFailure(e.message));
-    } on ServerException catch (e) {
-      Logger.error('Asset marker not transferable', e);
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      Logger.error('Error transferring asset marker', e);
-      return Left(ServerFailure('Failed to transfer asset marker: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] transferAssetMarker called with ID: $id to owner ID: $newOwnerId');
+    return Left(ServerFailure('API not yet implemented'));
   }
   
   @override
@@ -1778,58 +1935,8 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required int amount,
     String? note,
   }) async {
-    try {
-      Logger.data(
-          'Creating Credex offer for invoice ID: $invoiceId from account ID: $accountId');
-
-      // Find the invoice
-      final invoiceIndex = _mockInvoices.indexWhere((i) => i.id == invoiceId);
-      if (invoiceIndex == -1) {
-        throw NotFoundException('Invoice not found');
-      }
-
-      // Get the existing invoice
-      final existingInvoice = _mockInvoices[invoiceIndex];
-
-      // Check if the invoice is already paid
-      if (existingInvoice.status != InvoiceStatus.pending) {
-        throw const ServerException('Invoice is not in pending status');
-      }
-
-      // Check if the amount matches the invoice total
-      if (amount != existingInvoice.totalAmount) {
-        throw const ServerException(
-            'Payment amount does not match invoice total');
-      }
-
-      // Create updated invoice with paid status
-      final updatedInvoice = existingInvoice.copyWith(
-        status: InvoiceStatus.paid,
-        notes: note != null
-            ? (existingInvoice.notes != null
-                ? '${existingInvoice.notes}\n$note'
-                : note)
-            : existingInvoice.notes,
-        paidAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      // Update the invoice in the list
-      _mockInvoices[invoiceIndex] = updatedInvoice;
-
-      // Create asset markers for the purchased products (in a real implementation)
-      // This would involve creating asset markers for each line item in the invoice
-
-      return Right(updatedInvoice);
-    } on NotFoundException catch (e) {
-      Logger.error('Invoice not found for payment', e);
-      return Left(NotFoundFailure(e.message));
-    } on ServerException catch (e) {
-      Logger.error('Error processing payment', e);
-      return Left(ServerFailure(e.message));
-    } catch (e) {
-      Logger.error('Error creating Credex offer', e);
-      return Left(ServerFailure('Failed to create Credex offer: $e'));
-    }
+    // Empty implementation - API not yet available
+    Logger.data('[MARKETPLACE] createCredexOffer called with invoice ID: $invoiceId, account ID: $accountId, amount: $amount');
+    return Left(ServerFailure('API not yet implemented'));
   }
 }
