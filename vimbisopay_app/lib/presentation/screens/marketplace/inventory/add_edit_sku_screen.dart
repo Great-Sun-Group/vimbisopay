@@ -399,7 +399,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
           }
         }
         
-        // Update existing product
+        // Update existing product TODO
         final result = await _marketplaceRepository.updateProduct(
           id: widget.skuId!,
           name: name,
@@ -433,33 +433,45 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
           },
         );
       } else {
-        // For new products, we need to create the product first to get the account ID
-        final result = await _marketplaceRepository.createProduct(
-          vendorId: widget.vendorId,
-          name: name,
-          description: description,
-          price: price,
-          currency: _currency,
-          imageUrls: imageUrls.isEmpty ? ['https://example.com/product_placeholder.jpg'] : imageUrls,
-          category: category,
-          tags: tags,
-          isAvailable: _isAvailable,
+        // For new products, create an internal account first
+        final accountResult = await _marketplaceRepository.createInternalAccount(
+          accountName: name,
+          defaultDenom: _currency,
+          accountType: 'PHYSICAL_ASSET',
         );
 
-        await result.fold(
+        await accountResult.fold(
           (failure) {
             if (mounted) {
               // Dismiss loading dialog
               Navigator.pop(context); // Dismiss loading dialog
               
               setState(() {
-                _errorMessage = failure.message ?? 'Failed to create Product Account';
+                _errorMessage = failure.message ?? 'Failed to create internal account';
               });
             }
           },
-          (product) async {
-            // Now we have the product with its account ID
-            if (_selectedImage != null && product.accountId != null) {
+          (accountId) async {
+            // Create a Product object manually
+            final now = DateTime.now();
+            var product = Product(
+              id: accountId, // Use account ID as product ID
+              vendorId: widget.vendorId,
+              name: name,
+              description: description,
+              price: price,
+              currency: _currency,
+              imageUrls: imageUrls.isEmpty ? ['https://example.com/product_placeholder.jpg'] : imageUrls,
+              category: category,
+              tags: tags,
+              isAvailable: _isAvailable,
+              accountId: accountId,
+              createdAt: now,
+              updatedAt: now,
+            );
+            
+            // Handle image upload if needed
+            if (_selectedImage != null) {
               // Update the loading dialog message
               if (mounted) {
                 Navigator.pop(context); // Dismiss previous loading dialog
@@ -472,45 +484,27 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                 );
               }
               
-              // Upload the image using the product's account ID
-              final imageUrl = await _uploadImage(product.accountId!);
+              // Upload the image using the account ID
+              final imageUrl = await _uploadImage(accountId);
               
               if (imageUrl != null) {
-                // Update the product with the new image URL
-                final updateResult = await _marketplaceRepository.updateProduct(
+                // Update the product's image URLs
+                product = Product(
                   id: product.id,
+                  vendorId: product.vendorId,
+                  name: product.name,
+                  description: product.description,
+                  price: product.price,
+                  currency: product.currency,
                   imageUrls: [imageUrl],
+                  category: product.category,
+                  tags: product.tags,
+                  isAvailable: product.isAvailable,
+                  accountId: product.accountId,
+                  createdAt: product.createdAt,
+                  updatedAt: product.updatedAt,
                 );
-                
-                // Log the result
-                updateResult.fold(
-                  (failure) {
-                    Logger.error('[ADD_EDIT_PRODUCT] Failed to update product with image URL', failure);
-                  },
-                  (updatedProduct) {
-                    Logger.data('[ADD_EDIT_PRODUCT] Product updated with image URL: $imageUrl');
-                  },
-                );
-                
-                // After uploading the image and updating the product, get the product again to get the profile picture URLs
-                Logger.data('[ADD_EDIT_PRODUCT] Getting product to retrieve profile picture URLs');
-                final getProductResult = await _marketplaceRepository.getProduct(product.id);
-                
-                Product? retrievedProduct;
-                getProductResult.fold(
-                  (failure) {
-                    Logger.error('[ADD_EDIT_PRODUCT] Failed to get product after image upload', failure);
-                  },
-                  (fetchedProduct) {
-                    retrievedProduct = fetchedProduct;
-                    // Check if the response contains profile picture URLs in the dashboard.product.profilePictureUrls
-                    if (fetchedProduct.imageUrls.isNotEmpty) {
-                      Logger.data('[ADD_EDIT_PRODUCT] Retrieved product has image URLs: ${fetchedProduct.imageUrls}');
-                    } else {
-                      Logger.error('[ADD_EDIT_PRODUCT] Retrieved product does not have image URLs');
-                    }
-                  },
-                );
+                Logger.data('[ADD_EDIT_PRODUCT] Product updated with image URL: $imageUrl');
               }
             }
             
@@ -518,8 +512,26 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             if (mounted) {
               Navigator.pop(context); // Dismiss loading dialog
               
-              // First pop the context, then let the parent handle the success message
-              Navigator.pop(context, {'success': true, 'message': 'Product Account created successfully'});
+              // Return success with the product
+              Navigator.pop(context, {
+                'success': true, 
+                'message': 'Product Account created successfully',
+                'product': {
+                  'id': product.id,
+                  'vendorId': product.vendorId,
+                  'name': product.name,
+                  'description': product.description,
+                  'price': product.price,
+                  'currency': product.currency,
+                  'imageUrls': product.imageUrls,
+                  'category': product.category,
+                  'tags': product.tags,
+                  'isAvailable': product.isAvailable,
+                  'accountId': product.accountId,
+                  'createdAt': product.createdAt.toIso8601String(),
+                  'updatedAt': product.updatedAt.toIso8601String(),
+                },
+              });
             }
           },
         );

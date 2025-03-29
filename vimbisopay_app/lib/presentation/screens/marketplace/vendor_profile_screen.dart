@@ -145,19 +145,43 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         updatedAt: DateTime.now(),
       );
 
-      // Load vendor's products from marketplace repository
-      final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
-      
+      // Load internal accounts from the user's dashboard
       List<Product> vendorProducts = [];
-      productsResult.fold(
-        (failure) {
-          Logger.error('[VENDOR_PROFILE] Failed to load vendor products', failure);
-          // Continue with empty products list
-        },
-        (products) {
-          vendorProducts = products;
-        },
-      );
+      if (_currentUser?.dashboard != null) {
+        // Filter for PHYSICAL_ASSET accounts
+        final physicalAssetAccounts = _currentUser!.dashboard!.accountsInternal
+            .where((account) => account.accountType == 'PHYSICAL_ASSET')
+            .toList();
+        
+        Logger.data('[VENDOR_PROFILE] Found ${physicalAssetAccounts.length} PHYSICAL_ASSET accounts');
+        
+        // Map internal accounts to Product objects
+        vendorProducts = physicalAssetAccounts.map((account) {
+          // Create image URLs list with profile picture thumbnail if available
+          List<String> imageUrls = [];
+          if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+            imageUrls.add(account.profilePictureThumbnail!);
+            Logger.data('[VENDOR_PROFILE] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
+          }
+          
+          // Create a Product from the internal account
+          return Product(
+            id: account.accountID,
+            vendorId: vendor.id,
+            name: account.accountName,
+            description: 'Internal physical asset account',
+            price: 0, // Default price
+            currency: 'CXX', // Default currency
+            imageUrls: imageUrls,
+            category: 'Internal',
+            tags: ['internal', 'physical_asset'],
+            isAvailable: true,
+            accountId: account.accountID,
+            createdAt: DateTime.now(), // We don't have creation date
+            updatedAt: DateTime.now(), // We don't have update date
+          );
+        }).toList();
+      }
       
       setState(() {
         _isLoading = false;

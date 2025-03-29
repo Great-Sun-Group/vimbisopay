@@ -65,41 +65,51 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
     });
 
     try {
-      // Get current user to check for profile image
-      final userResult = await ServiceLocator.databaseHelper.getUser();
-      if (userResult?.dashboard?.member.profilePictureThumbnail != null) {
-        _profileImageUrl = userResult!.dashboard!.member.profilePictureThumbnail;
+      // Get current user
+      final currentUser = await ServiceLocator.databaseHelper.getUser();
+      if (currentUser == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data';
+        });
+        return;
+      }
+
+      // Set profile image URL if available
+      if (currentUser.dashboard?.member.profilePictureThumbnail != null) {
+        _profileImageUrl = currentUser.dashboard!.member.profilePictureThumbnail;
         Logger.data('[EDIT_VENDOR] Found profile image URL: $_profileImageUrl');
       }
 
-      // Load vendor data
-      final vendorResult = await _marketplaceRepository.getVendor(widget.vendorId);
-      
-      vendorResult.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load vendor data';
-          });
-        },
-        (vendor) {
-          // Populate form fields with vendor data
-          _businessNameController.text = vendor.businessName;
-          _descriptionController.text = vendor.description;
-          _emailController.text = vendor.email;
-          _phoneController.text = vendor.phone;
-          
-          // Use vendor profile image if available and we don't have one from the user
-          if (_profileImageUrl == null && vendor.profileImageUrl != null) {
-            _profileImageUrl = vendor.profileImageUrl;
-          }
-          
-          setState(() {
-            _isLoading = false;
-            _vendor = vendor;
-          });
-        },
+      // Create a vendor object from the current user
+      final vendor = Vendor(
+        id: widget.vendorId,
+        memberId: currentUser.memberId,
+        businessName: currentUser.dashboard?.member.firstname ?? 'My Business',
+        description: '', // Will be populated from form or previous data
+        email: '', // Will be populated from form or previous data
+        phone: currentUser.phone,
+        profileImageUrl: _profileImageUrl,
+        rating: 0,
+        ratingCount: 0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
+
+      // Populate form fields with vendor data
+      // If we have existing data in the controllers, keep it
+      if (_businessNameController.text.isEmpty) {
+        _businessNameController.text = vendor.businessName;
+      }
+      
+      // Phone is always updated from the current user
+      _phoneController.text = vendor.phone;
+      
+      setState(() {
+        _isLoading = false;
+        _vendor = vendor;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;

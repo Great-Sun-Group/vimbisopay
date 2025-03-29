@@ -23,17 +23,6 @@ abstract class MarketplaceRepository {
     String? vendorBio,
   });
   
-  /// Gets a vendor by ID.
-  ///
-  /// Returns a [Vendor] if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, Vendor>> getVendor(String id);
-
-  /// Gets a vendor by member ID.
-  ///
-  /// Returns a [Vendor] if found, or a [Failure] if an error occurs.
-  /// If the member is not a vendor, returns a NotFoundFailure.
-  Future<Either<Failure, Vendor>> getVendorByMemberId(String memberId);
-  
   /// Checks if a member is a vendor.
   ///
   /// Returns true if the member is a vendor, false otherwise.
@@ -71,10 +60,6 @@ abstract class MarketplaceRepository {
   /// Returns a [Product] if found, or a [Failure] if an error occurs.
   Future<Either<Failure, Product>> getProduct(String id);
 
-  /// Gets products by vendor ID.
-  ///
-  /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> getProductsByVendor(String vendorId);
 
   /// Gets products by category.
   ///

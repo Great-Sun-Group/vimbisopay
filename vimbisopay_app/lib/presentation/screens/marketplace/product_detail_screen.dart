@@ -55,16 +55,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _product = product;
           
           // Load vendor details
-          final vendorResult = await _marketplaceRepository.getVendor(product.vendorId);
+          // final vendorResult = await _marketplaceRepository.getVendor(product.vendorId);
           
-          vendorResult.fold(
-            (failure) {
-              Logger.error('Failed to load vendor', failure);
-            },
-            (vendor) {
-              _vendor = vendor;
-            },
-          );
+          // vendorResult.fold(
+          //   (failure) {
+          //     Logger.error('Failed to load vendor', failure);
+          //   },
+          //   (vendor) {
+          //     _vendor = vendor;
+          //   },
+          // );
           
           // Load related products (same category)
           final relatedResult = await _marketplaceRepository.getProductsByCategory(product.category);

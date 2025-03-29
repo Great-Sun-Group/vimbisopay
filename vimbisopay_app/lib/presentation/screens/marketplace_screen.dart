@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -143,25 +142,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         final isVendor = await _marketplaceRepository.isMemberVendor(_memberId!);
 
         if (isVendor && mounted) {
-          // Get vendor ID if user is a vendor
-          final vendorResult = await _marketplaceRepository.getVendorByMemberId(_memberId!);
-          
-          vendorResult.fold(
-            (failure) {
-              Logger.error('Failed to get vendor details', failure);
-              setState(() {
-                _isVendor = isVendor;
-                _isCheckingVendorStatus = false;
-              });
-            },
-            (vendor) {
-              setState(() {
-                _isVendor = true;
-                _vendorId = vendor.id;
-                _isCheckingVendorStatus = false;
-              });
-            },
-          );
+          // If user is a vendor, set the vendor ID to the member ID
+          // We don't need to call getVendorByMemberId as the logged in user is already a vendor
+          setState(() {
+            _isVendor = true;
+            _vendorId = _memberId; // Use member ID as vendor ID
+            _isCheckingVendorStatus = false;
+          });
         } else if (mounted) {
           setState(() {
             _isVendor = false;

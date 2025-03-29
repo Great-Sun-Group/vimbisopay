@@ -46,38 +46,38 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
 
     try {
       // Load invoice data
-      final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
+      // final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
       
-      invoiceResult.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load invoice data';
-          });
-        },
-        (invoice) async {
-          // Load vendor data
-          final vendorResult = await _marketplaceRepository.getVendor(invoice.vendorId);
+      // invoiceResult.fold(
+      //   (failure) {
+      //     setState(() {
+      //       _isLoading = false;
+      //       _errorMessage = failure.message ?? 'Failed to load invoice data';
+      //     });
+      //   },
+      //   (invoice) async {
+      //     // Load vendor data
+      //     final vendorResult = await _marketplaceRepository.getVendor(invoice.vendorId);
           
-          vendorResult.fold(
-            (failure) {
-              Logger.error('Failed to load vendor data', failure);
-              setState(() {
-                _isLoading = false;
-                _invoice = invoice;
-                _errorMessage = 'Failed to load vendor data';
-              });
-            },
-            (vendor) {
-              setState(() {
-                _isLoading = false;
-                _invoice = invoice;
-                _vendor = vendor;
-              });
-            },
-          );
-        },
-      );
+      //     vendorResult.fold(
+      //       (failure) {
+      //         Logger.error('Failed to load vendor data', failure);
+      //         setState(() {
+      //           _isLoading = false;
+      //           _invoice = invoice;
+      //           _errorMessage = 'Failed to load vendor data';
+      //         });
+      //       },
+      //       (vendor) {
+      //         setState(() {
+      //           _isLoading = false;
+      //           _invoice = invoice;
+      //           _vendor = vendor;
+      //         });
+      //       },
+      //     );
+      //   },
+      // );
     } catch (e) {
       setState(() {
         _isLoading = false;

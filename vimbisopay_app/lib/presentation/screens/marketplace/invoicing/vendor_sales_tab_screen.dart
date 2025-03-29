@@ -14,13 +14,9 @@ import 'package:vimbisopay_app/presentation/widgets/marketplace/product_selectio
 /// This screen displays the vendor's products and allows them to add
 /// products to a basket for checkout.
 class VendorSalesTabScreen extends StatefulWidget {
-  /// The ID of the vendor creating the sales tab.
-  final String vendorId;
-
   /// Creates a new [VendorSalesTabScreen] instance.
   const VendorSalesTabScreen({
     super.key,
-    required this.vendorId,
   });
 
   @override
@@ -32,7 +28,6 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   
   bool _isLoading = true;
   String _errorMessage = '';
-  Vendor? _vendor;
   List<Product> _products = [];
   SalesBasket? _basket;
   
@@ -61,90 +56,80 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     });
 
     try {
-      // Load vendor data
-      final vendorResult = await _marketplaceRepository.getVendor(widget.vendorId);
+      // Get current user
+      final currentUser = await ServiceLocator.databaseHelper.getUser();
+      if (currentUser == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data';
+        });
+        return;
+      }
+
+      // Create a vendor object from the current user
+      final vendor = Vendor(
+        id: currentUser.memberId,
+        memberId: currentUser.memberId,
+        businessName: currentUser.dashboard?.member.firstname ?? 'My Business',
+        description: 'Vendor account',
+        email: '',
+        phone: currentUser.phone,
+        rating: 0,
+        ratingCount: 0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
       
-      vendorResult.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load vendor data';
-          });
-        },
-        (vendor) async {
-          List<Product> allProducts = [];
-          
-          // Load vendor's products
-          final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
-          
-          productsResult.fold(
-            (failure) {
-              Logger.error('Failed to load vendor products', failure);
-              // Continue with empty products list
-            },
-            (products) {
-              allProducts.addAll(products);
-            },
-          );
-          
-          // Load internal accounts of type PHYSICAL_ASSET from user's dashboard
-          try {
-            final currentUser = await ServiceLocator.databaseHelper.getUser();
-            if (currentUser != null && 
-                currentUser.dashboard != null) {
-              
-              final dashboard = currentUser.dashboard!;
-              final physicalAsssetAccounts = dashboard.accountsInternal
-                  .where((account) => account.accountType == 'PHYSICAL_ASSET')
-                  .toList();
-              
-              Logger.data('[VENDOR_SALES] Found ${physicalAsssetAccounts.length} PHYSICAL_ASSET accounts');
-              
-              // Convert internal accounts to Product objects
-              final internalProducts = physicalAsssetAccounts.map((account) {
-                // Create image URLs list with profile picture thumbnail if available
-                List<String> imageUrls = [];
-                if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
-                  Logger.data('[VENDOR_SALES] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
-                  imageUrls.add(account.profilePictureThumbnail!);
-                } else {
-                  Logger.data('[VENDOR_SALES] No profile picture thumbnail available for account: ${account.accountID}');
-                }
-                
-                // Create a Product from the internal account
-                return Product(
-                  id: account.accountID,
-                  vendorId: vendor.id,
-                  name: account.accountName,
-                  description: 'Internal physical asset account',
-                  price: 0, // Default price, would need to be updated from account balance
-                  currency: 'CXX', // Default currency
-                  imageUrls: imageUrls, // Include profile picture thumbnail if available
-                  category: 'Internal',
-                  tags: ['internal', 'physical_asset'],
-                  isAvailable: true,
-                  accountId: account.accountID,
-                  createdAt: DateTime.now(), // We don't have creation date
-                  updatedAt: DateTime.now(), // We don't have update date
-                );
-              }).toList();
-              
-              // Add internal products to the list
-              allProducts.addAll(internalProducts);
-            }
-          } catch (e) {
-            Logger.error('[VENDOR_SALES] Error loading internal accounts', e);
-            // Continue even if internal accounts loading fails
+      List<Product> allProducts = [];
+      
+      // Load internal accounts of type PHYSICAL_ASSET from user's dashboard
+      if (currentUser.dashboard != null) {
+        final dashboard = currentUser.dashboard!;
+        final physicalAsssetAccounts = dashboard.accountsInternal
+            .where((account) => account.accountType == 'PHYSICAL_ASSET')
+            .toList();
+        
+        Logger.data('[VENDOR_SALES] Found ${physicalAsssetAccounts.length} PHYSICAL_ASSET accounts');
+        
+        // Convert internal accounts to Product objects
+        final internalProducts = physicalAsssetAccounts.map((account) {
+          // Create image URLs list with profile picture thumbnail if available
+          List<String> imageUrls = [];
+          if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+            Logger.data('[VENDOR_SALES] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
+            imageUrls.add(account.profilePictureThumbnail!);
+          } else {
+            Logger.data('[VENDOR_SALES] No profile picture thumbnail available for account: ${account.accountID}');
           }
           
-          setState(() {
-            _isLoading = false;
-            _vendor = vendor;
-            _products = allProducts;
-            _basket = SalesBasket(vendor: vendor);
-          });
-        },
-      );
+          // Create a Product from the internal account
+          return Product(
+            id: account.accountID,
+            vendorId: vendor.id,
+            name: account.accountName,
+            description: 'Internal physical asset account',
+            price: 0, // Default price, would need to be updated from account balance
+            currency: 'CXX', // Default currency
+            imageUrls: imageUrls, // Include profile picture thumbnail if available
+            category: 'Internal',
+            tags: ['internal', 'physical_asset'],
+            isAvailable: true,
+            accountId: account.accountID,
+            createdAt: DateTime.now(), // We don't have creation date
+            updatedAt: DateTime.now(), // We don't have update date
+          );
+        }).toList();
+        
+        // Add internal products to the list
+        allProducts.addAll(internalProducts);
+      }
+      
+      setState(() {
+        _isLoading = false;
+        _products = allProducts;
+        _basket = SalesBasket(vendor: vendor);
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;

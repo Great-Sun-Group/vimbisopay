@@ -157,64 +157,64 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   void _navigateToVendorProfile() async {
-    if (_user == null) return;
+    // if (_user == null) return;
     
-    try {
-      setState(() {
-        _isLoading = true;
-      });
+    // try {
+    //   setState(() {
+    //     _isLoading = true;
+    //   });
       
-      final marketplaceRepository = ServiceLocator.marketplaceRepository;
-      final result = await marketplaceRepository.getVendorByMemberId(_user!.memberId);
+    //   final marketplaceRepository = ServiceLocator.marketplaceRepository;
+    //   final result = await marketplaceRepository.getVendorByMemberId(_user!.memberId);
       
-      setState(() {
-        _isLoading = false;
-      });
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
       
-      result.fold(
-        (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                failure.message ?? 'Failed to load vendor profile',
-                style: const TextStyle(color: AppColors.lightCream),
-              ),
-              backgroundColor: AppColors.errorRed,
-            ),
-          );
-        },
-        (vendor) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => VendorProfileScreen(
-                vendorId: vendor.id,
-                isOwner: true,
-              ),
-            ),
-          ).then((_) {
-            // Refresh vendor status when returning from profile
-            if (_user != null) {
-              _checkVendorStatus(_user!.memberId);
-            }
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+    //   result.fold(
+    //     (failure) {
+    //       ScaffoldMessenger.of(context).showSnackBar(
+    //         SnackBar(
+    //           content: Text(
+    //             failure.message ?? 'Failed to load vendor profile',
+    //             style: const TextStyle(color: AppColors.lightCream),
+    //           ),
+    //           backgroundColor: AppColors.errorRed,
+    //         ),
+    //       );
+    //     },
+    //     (vendor) {
+    //       Navigator.push(
+    //         context,
+    //         MaterialPageRoute(
+    //           builder: (context) => VendorProfileScreen(
+    //             vendorId: vendor.id,
+    //             isOwner: true,
+    //           ),
+    //         ),
+    //       ).then((_) {
+    //         // Refresh vendor status when returning from profile
+    //         if (_user != null) {
+    //           _checkVendorStatus(_user!.memberId);
+    //         }
+    //       });
+    //     },
+    //   );
+    // } catch (e) {
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'An error occurred: $e',
-            style: const TextStyle(color: AppColors.lightCream),
-          ),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
-    }
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text(
+    //         'An error occurred: $e',
+    //         style: const TextStyle(color: AppColors.lightCream),
+    //       ),
+    //       backgroundColor: AppColors.errorRed,
+    //     ),
+    //   );
+    // }
   }
 
   @override

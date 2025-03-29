@@ -44,34 +44,58 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
     });
     
     try {
-      // Fetch products from the repository
-      final result = await _marketplaceRepository.getProductsByVendor(widget.vendorId);
+      // Get current user from the database
+      final currentUser = await ServiceLocator.databaseHelper.getUser();
+      if (currentUser == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data';
+          _skus = [];
+        });
+        return;
+      }
+
+      // Check if user has a dashboard with internal accounts
+      if (currentUser.dashboard == null || currentUser.dashboard!.accountsInternal.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _skus = [];
+        });
+        return;
+      }
+
+      // Filter for PHYSICAL_ASSET accounts
+      final physicalAssetAccounts = currentUser.dashboard!.accountsInternal
+          .where((account) => account.accountType == 'PHYSICAL_ASSET')
+          .toList();
       
-      result.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load SKUs';
-            _skus = [];
-          });
-        },
-        (products) {
-          setState(() {
-            // Convert products to a format that can be used by the UI
-            _skus = products.map((product) => {
-              'id': product.id,
-              'name': product.name,
-              'description': product.description,
-              'price': product.price,
-              'currency': product.currency,
-              'category': product.category,
-              'accountId': product.accountId,
-              'isAvailable': product.isAvailable,
-            }).toList();
-            _isLoading = false;
-          });
-        },
-      );
+      Logger.data('[INVENTORY_MANAGEMENT] Found ${physicalAssetAccounts.length} PHYSICAL_ASSET accounts');
+      
+      // Map internal accounts to products format for UI
+      final mappedSkus = physicalAssetAccounts.map((account) {
+        // Create image URLs list with profile picture thumbnail if available
+        List<String> imageUrls = [];
+        if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+          imageUrls.add(account.profilePictureThumbnail!);
+        }
+        
+        // Create a product from the internal account
+        return {
+          'id': account.accountID,
+          'name': account.accountName,
+          'description': 'Internal physical asset account',
+          'price': 0, // Default price
+          'currency': 'CXX', // Default currency
+          'category': 'Internal',
+          'accountId': account.accountID,
+          'isAvailable': true,
+        };
+      }).toList();
+      
+      setState(() {
+        _skus = mappedSkus;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
