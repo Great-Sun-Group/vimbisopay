@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:vimbisopay_app/presentation/models/basket_item.dart';
 import 'package:vimbisopay_app/presentation/models/sales_basket.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 /// A screen for generating invoices from a sales basket.
 ///
-/// This screen allows vendors to review the items in their basket,
-/// add buyer information, and generate an invoice for the customer.
+/// This screen allows vendors to review the items in their basket
+/// and generate an invoice for the customer.
 class InvoiceGenerationScreen extends StatefulWidget {
   /// The sales basket containing the items to be invoiced.
   final SalesBasket basket;
@@ -23,61 +21,58 @@ class InvoiceGenerationScreen extends StatefulWidget {
   });
 
   @override
-  State<InvoiceGenerationScreen> createState() => _InvoiceGenerationScreenState();
+  State<InvoiceGenerationScreen> createState() =>
+      _InvoiceGenerationScreenState();
 }
 
 class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
-  final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
-  
+  final MarketplaceRepository _marketplaceRepository =
+      ServiceLocator.marketplaceRepository;
+
   final _formKey = GlobalKey<FormState>();
-  final _buyerNameController = TextEditingController();
-  final _buyerEmailController = TextEditingController();
-  final _buyerPhoneController = TextEditingController();
   final _notesController = TextEditingController();
-  
+
   bool _isLoading = false;
   String? _errorMessage;
   String? _invoiceId;
   String? _invoiceQrData;
-  
+
   @override
   void dispose() {
-    _buyerNameController.dispose();
-    _buyerEmailController.dispose();
-    _buyerPhoneController.dispose();
     _notesController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _generateInvoice() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       // Get line items from the basket
       final lineItems = widget.basket.toInvoiceLineItems();
-      
+
       // Get buyer ID (in a real app, this would be the logged-in user's ID)
       // For now, we'll use a mock buyer ID
       const buyerId = 'm3'; // Mock buyer ID
-      
+
       // Create invoice using repository
       final result = await _marketplaceRepository.createInvoice(
         buyerId: buyerId,
         vendorId: widget.basket.vendor.id,
         lineItems: lineItems,
         totalAmount: widget.basket.totalPrice,
-        currency: widget.basket.items.first.product.currency, // Assuming all items have the same currency
+        currency: widget.basket.items.first.product
+            .currency, // Assuming all items have the same currency
         paymentMethod: 'credex', // Default payment method
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       );
-      
+
       result.fold(
         (failure) {
           setState(() {
@@ -88,13 +83,13 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
         (invoice) {
           // Generate QR code data
           final qrData = 'vimbisopay://invoice/${invoice.id}';
-          
+
           setState(() {
             _isLoading = false;
             _invoiceId = invoice.id;
             _invoiceQrData = qrData;
           });
-          
+
           // Log success
           Logger.data('Invoice generated successfully: ${invoice.id}');
         },
@@ -107,19 +102,49 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
       Logger.error('Error generating invoice', e);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Generate Invoice'),
       ),
-      body: _invoiceId != null
-          ? _buildInvoiceSuccess()
-          : _buildInvoiceForm(),
+      body: _invoiceId != null ? _buildInvoiceSuccess() : _buildInvoiceForm(),
+      bottomNavigationBar: _invoiceId == null ? _buildBottomBar() : null,
     );
   }
-  
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: FilledButton(
+          onPressed: _isLoading ? null : _generateInvoice,
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                  ),
+                )
+              : const Text('Generate Invoice'),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInvoiceForm() {
     return Form(
       key: _formKey,
@@ -143,28 +168,13 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
           ],
           _buildBasketSummary(),
           const SizedBox(height: 24.0),
-          _buildBuyerInfoSection(),
-          const SizedBox(height: 24.0),
           _buildNotesSection(),
           const SizedBox(height: 32.0),
-          FilledButton(
-            onPressed: _isLoading ? null : _generateInvoice,
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
-                    ),
-                  )
-                : const Text('Generate Invoice'),
-          ),
         ],
       ),
     );
   }
-  
+
   Widget _buildBasketSummary() {
     return Card(
       child: Padding(
@@ -186,25 +196,29 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
               itemCount: widget.basket.items.length,
               itemBuilder: (context, index) {
                 final item = widget.basket.items[index];
-                return ListTile(
-                  title: Text(
-                    item.product.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${item.quantity} x ${item.product.formattedPrice}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Text(
-                    item.formattedTotalPrice,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    title: Text(
+                      item.product.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 16.0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    trailing: Text(
+                      item.formattedTotalPrice,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        fontSize: 16.0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 );
               },
@@ -240,65 +254,7 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
       ),
     );
   }
-  
-  Widget _buildBuyerInfoSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Buyer Information (Optional)',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            TextFormField(
-              controller: _buyerNameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                hintText: 'Enter buyer\'s name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            TextFormField(
-              controller: _buyerEmailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'Enter buyer\'s email',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value != null && value.isNotEmpty) {
-                  // Simple email validation
-                  if (!value.contains('@') || !value.contains('.')) {
-                    return 'Please enter a valid email';
-                  }
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16.0),
-            TextFormField(
-              controller: _buyerPhoneController,
-              decoration: const InputDecoration(
-                labelText: 'Phone',
-                hintText: 'Enter buyer\'s phone number',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
+
   Widget _buildNotesSection() {
     return Card(
       child: Padding(
@@ -329,7 +285,7 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
       ),
     );
   }
-  
+
   Widget _buildInvoiceSuccess() {
     return Center(
       child: SingleChildScrollView(

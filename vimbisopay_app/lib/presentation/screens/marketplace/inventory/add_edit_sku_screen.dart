@@ -69,6 +69,12 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
   void initState() {
     super.initState();
     _isEditing = widget.skuId != null;
+    
+    // Set default values for simplified form
+    _priceController.text = '0'; // Default price is 0
+    _categoryController.text = 'Other'; // Default category is 'Other'
+    _tagsController.text = 'product'; // Default tag
+    
     if (_isEditing) {
       _loadSkuData();
     }
@@ -766,7 +772,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a name';
+                  return 'Please enter a product name';
                 }
                 return null;
               },
@@ -783,7 +789,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
               maxLines: 5,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a description';
+                  return 'Please enter a product description';
                 }
                 return null;
               },
