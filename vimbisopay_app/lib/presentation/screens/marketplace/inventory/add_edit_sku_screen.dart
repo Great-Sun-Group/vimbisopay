@@ -585,10 +585,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
           _buildBasicInfoSection(),
           const SizedBox(height: 24.0),
           _buildImageSection(),
-          const SizedBox(height: 24.0),
-          _buildPricingSection(),
-          const SizedBox(height: 24.0),
-          _buildCategorySection(),
           const SizedBox(height: 32.0),
           FilledButton(
             onPressed: _saveProductAccount,

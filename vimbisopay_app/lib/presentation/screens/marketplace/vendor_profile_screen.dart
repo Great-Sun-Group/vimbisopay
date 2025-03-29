@@ -171,7 +171,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             name: account.accountName,
             description: 'Internal physical asset account',
             price: 0, // Default price
-            currency: 'CXX', // Default currency
+            currency: 'USD', // Default currency
             imageUrls: imageUrls,
             category: 'Internal',
             tags: ['internal', 'physical_asset'],
@@ -204,6 +204,23 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           : _errorMessage.isNotEmpty
               ? _buildErrorView()
               : _buildVendorProfile(),
+      // Add FloatingActionButton here, only visible if user is the owner AND products list is not empty
+      floatingActionButton: (widget.isOwner && _products.isNotEmpty)
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/vendor-sales-tab',
+                  arguments: {
+                    'vendorId': widget.vendorId,
+                  },
+                );
+              },
+              icon: const Icon(Icons.point_of_sale),
+              label: const Text('New Sale'),
+              backgroundColor: AppColors.primary,
+            )
+          : null,
     );
   }
 
@@ -395,19 +412,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                         vendorId: widget.vendorId,
                       ),
                     ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.point_of_sale),
-                tooltip: 'New Sale',
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/vendor-sales-tab',
-                    arguments: {
-                      'vendorId': widget.vendorId,
-                    },
                   );
                 },
               ),

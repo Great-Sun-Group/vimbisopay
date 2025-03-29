@@ -261,14 +261,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _navigateToNewSale() {
-    if (_vendorId == null) return;
-    
+    // No need to check for vendorId or pass it as an argument
+    // since VendorSalesTabScreen now uses the current user
     Navigator.pushNamed(
       context,
       '/vendor-sales-tab',
-      arguments: {
-        'vendorId': _vendorId!,
-      },
     );
   }
 

@@ -41,20 +41,6 @@ abstract class MarketplaceRepository {
     String? bannerImageUrl,
   });
 
-  /// Updates an existing vendor.
-  ///
-  /// Returns the updated [Vendor] if successful, or a [Failure] if an error occurs.
-  Future<Either<Failure, Vendor>> updateVendor({
-    required String id,
-    String? businessName,
-    String? description,
-    String? email,
-    String? phone,
-    String? profileImageUrl,
-    String? bannerImageUrl,
-    bool? isActive,
-  });
-
   /// Gets a product by ID.
   ///
   /// Returns a [Product] if found, or a [Failure] if an error occurs.

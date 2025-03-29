@@ -269,14 +269,6 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
                   _profileImageUrl = updatedUser!.dashboard!.member.profilePictureThumbnail;
                 });
               }
-              
-              // Update vendor with new profile image URL
-              if (_profileImageUrl != null) {
-                await _marketplaceRepository.updateVendor(
-                  id: widget.vendorId,
-                  profileImageUrl: _profileImageUrl,
-                );
-              }
             },
           );
         },
@@ -309,14 +301,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
     );
 
     try {
-      // Update vendor details
-      final updateResult = await _marketplaceRepository.updateVendor(
-        id: widget.vendorId,
-        businessName: _businessNameController.text,
-        description: _descriptionController.text,
-      );
-      
-      // Update member profile with vendor bio
+      // Update vendor details with updateMemberWithVendorDetails only
       final updateMemberResult = await _marketplaceRepository.updateMemberWithVendorDetails(
         vendorBio: _descriptionController.text,
       );
@@ -325,29 +310,22 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       if (!mounted) return;
       Navigator.pop(context); // Dismiss loading dialog
       
-      // Check results and navigate back
-      final success = updateResult.isRight() && updateMemberResult.isRight();
-      
-      if (success) {
-        // Navigate back with success result
-        Navigator.pop(context, {
-          'success': true,
-          'message': 'Vendor profile updated successfully',
-        });
-      } else {
-        // Show error message
-        final errorMessage = updateResult.fold(
-          (failure) => failure.message,
-          (_) => updateMemberResult.fold(
-            (failure) => failure.message,
-            (_) => null,
-          ),
-        );
-        
-        setState(() {
-          _errorMessage = errorMessage ?? 'Failed to update vendor profile';
-        });
-      }
+      // Check result and navigate back
+      updateMemberResult.fold(
+        (failure) {
+          // Show error message
+          setState(() {
+            _errorMessage = failure.message ?? 'Failed to update vendor profile';
+          });
+        },
+        (_) {
+          // Navigate back with success result
+          Navigator.pop(context, {
+            'success': true,
+            'message': 'Vendor profile updated successfully',
+          });
+        },
+      );
     } catch (e) {
       // Dismiss loading dialog
       if (!mounted) return;

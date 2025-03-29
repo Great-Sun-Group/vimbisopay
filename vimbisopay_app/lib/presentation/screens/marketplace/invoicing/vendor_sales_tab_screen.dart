@@ -17,6 +17,7 @@ class VendorSalesTabScreen extends StatefulWidget {
   /// Creates a new [VendorSalesTabScreen] instance.
   const VendorSalesTabScreen({
     super.key,
+    String? vendorId, // Make vendorId optional since we use the current user
   });
 
   @override
@@ -31,22 +32,38 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   List<Product> _products = [];
   SalesBasket? _basket;
   
-  late TabController _tabController;
+  late  TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  
+  // Track the current tab index
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Add listener to track tab changes
+    _tabController.addListener(_handleTabChange);
     _loadVendorData();
   }
 
   @override
   void dispose() {
+    // Remove the listener when disposing
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+  
+  // Handle tab changes
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging || _tabController.index != _currentTabIndex) {
+      setState(() {
+        _currentTabIndex = _tabController.index;
+      });
+    }
   }
 
   Future<void> _loadVendorData() async {
@@ -110,7 +127,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             name: account.accountName,
             description: 'Internal physical asset account',
             price: 0, // Default price, would need to be updated from account balance
-            currency: 'CXX', // Default currency
+            currency: 'USD', // Default currency
             imageUrls: imageUrls, // Include profile picture thumbnail if available
             category: 'Internal',
             tags: ['internal', 'physical_asset'],
@@ -190,6 +207,16 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
       );
       return;
     }
+    
+    // Check if all items have a positive amount
+    if (!_allItemsHavePositiveAmount()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All items must have a positive amount'),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -231,6 +258,9 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
 
   @override
   Widget build(BuildContext context) {
+    // Check if basket has items
+    final bool hasItems = _basket != null && _basket!.isNotEmpty;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Sale'),
@@ -247,9 +277,65 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
           : _errorMessage.isNotEmpty
               ? _buildErrorView()
               : _buildTabView(),
-      bottomNavigationBar: _basket != null && _basket!.isNotEmpty
-          ? _buildBottomBar()
-          : null,
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+  
+  /// Formats a price string to ensure it has exactly 2 decimal places.
+  /// 
+  /// Takes a formatted price string like "$12.5" and returns "$12.50".
+  /// Also handles prices like "$12" and returns "$12.00".
+  String _formatPriceWithTwoDecimals(String formattedPrice) {
+    // Extract the currency symbol and numeric value
+    RegExp regex = RegExp(r'([^\d.]+)?([\d.]+)');
+    Match? match = regex.firstMatch(formattedPrice);
+    
+    if (match != null) {
+      String symbol = match.group(1) ?? '';
+      String numericPart = match.group(2) ?? '0';
+      
+      // Parse the numeric part and format to 2 decimal places
+      double value = double.tryParse(numericPart) ?? 0.0;
+      return '$symbol${value.toStringAsFixed(2)}';
+    }
+    
+    // Fallback if regex doesn't match
+    return formattedPrice;
+  }
+
+  /// Checks if all items in the basket have a positive amount set.
+  bool _allItemsHavePositiveAmount() {
+    if (_basket == null || _basket!.isEmpty) return false;
+    return _basket!.items.every((item) => item.amount > 0);
+  }
+  
+  Widget _buildFloatingActionButton() {
+    // Early return if basket is null or empty
+    if (_basket == null || _basket!.isEmpty) {
+      return FloatingActionButton.extended(
+        onPressed: null, // Disabled when basket is empty
+        icon: const Icon(Icons.receipt_long),
+        label: const Text('Generate Invoice'),
+        backgroundColor: Colors.grey, // Use a muted color for disabled state
+      );
+    }
+    
+    // Check if all items have a positive amount
+    final bool allItemsValid = _allItemsHavePositiveAmount();
+    
+    return FloatingActionButton.extended(
+      onPressed: allItemsValid ? _proceedToInvoice : null, // Disable if any item has zero amount
+      icon: const Icon(Icons.receipt_long),
+      label: Row(
+        children: [
+          // Format the price to ensure 2 decimal places
+          Text(_formatPriceWithTwoDecimals(_basket!.formattedTotalPrice)),
+          const SizedBox(width: 8),
+          const Text('Generate Invoice'),
+        ],
+      ),
+      backgroundColor: allItemsValid ? AppColors.primary : Colors.grey, // Gray out if any item has zero amount
+      elevation: allItemsValid ? 4 : 2, // Reduce elevation for disabled state
     );
   }
 
@@ -462,7 +548,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Items: ${_basket!.totalQuantity}',
+                'Products: ${_basket!.itemCount}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -503,6 +589,11 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   }
 
   Widget _buildBottomBar() {
+    // Early return with an empty container if basket is null or empty
+    if (_basket == null || _basket!.isEmpty) {
+      return Container(height: 0);
+    }
+    
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -531,7 +622,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
                     ),
                   ),
                   Text(
-                    _basket!.formattedTotalPrice,
+                    _formatPriceWithTwoDecimals(_basket!.formattedTotalPrice),
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,

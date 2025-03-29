@@ -85,7 +85,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
           'name': account.accountName,
           'description': 'Internal physical asset account',
           'price': 0, // Default price
-          'currency': 'CXX', // Default currency
+          'currency': 'USD', // Default currency
           'category': 'Internal',
           'accountId': account.accountID,
           'isAvailable': true,
