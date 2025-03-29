@@ -1122,7 +1122,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<Either<Failure, Invoice>> createInvoice({
-    required String buyerId,
     required String vendorId,
     required List<InvoiceLineItem> lineItems,
     required int totalAmount,
@@ -1130,9 +1129,308 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String paymentMethod,
     String? notes,
   }) async {
-    // Empty implementation - API not yet available
-    Logger.data('[MARKETPLACE] createInvoice called');
-    return Left(ServerFailure('API not yet implemented'));
+    final stopwatch = Stopwatch()..start();
+    final correlationId = 'inv_api_${DateTime.now().millisecondsSinceEpoch}';
+    Logger.data('[INVOICE_API] [$correlationId] Starting createInvoice operation');
+    
+    try {
+      // Log detailed input parameters
+      Logger.data('[INVOICE_API] [$correlationId] Input parameters:');
+      Logger.data('[INVOICE_API] [$correlationId] - vendorId: $vendorId');
+      Logger.data('[INVOICE_API] [$correlationId] - lineItems count: ${lineItems.length}');
+      Logger.data('[INVOICE_API] [$correlationId] - totalAmount: $totalAmount (${totalAmount / 100} in dollars)');
+      Logger.data('[INVOICE_API] [$correlationId] - currency: $currency');
+      Logger.data('[INVOICE_API] [$correlationId] - paymentMethod: $paymentMethod');
+      Logger.data('[INVOICE_API] [$correlationId] - notes: ${notes != null ? '${notes.length} characters' : 'null'}');
+      
+      // Log line items details
+      for (var i = 0; i < lineItems.length; i++) {
+        final item = lineItems[i];
+        Logger.data('[INVOICE_API] [$correlationId] Line item #${i + 1}: productId=${item.productId}, name=${item.productName}, quantity=${item.quantity}, unitPrice=${item.unitPrice}, totalPrice=${item.totalPrice}');
+      }
+      
+      // Get the user token from local storage
+      Logger.data('[INVOICE_API] [$correlationId] Retrieving user from database');
+      final userRetrievalStart = DateTime.now();
+      final user = await _databaseHelper.getUser();
+      final userRetrievalDuration = DateTime.now().difference(userRetrievalStart).inMilliseconds;
+      Logger.data('[INVOICE_API] [$correlationId] User retrieval took $userRetrievalDuration ms');
+      
+      if (user == null) {
+        Logger.error('[INVOICE_API] [$correlationId] User not found in database');
+        return Left(AuthFailure(message: 'User not authenticated - user not found'));
+      }
+      
+      if (user.token.isEmpty) {
+        Logger.error('[INVOICE_API] [$correlationId] User token is empty');
+        return Left(AuthFailure(message: 'User not authenticated - empty token'));
+      }
+      
+      Logger.data('[INVOICE_API] [$correlationId] User retrieved successfully: ${user.memberId}');
+      
+      // Get payment account ID from the user's personal account
+      String paymentAccountId = '';
+      
+      // Check if user has a dashboard with accounts
+      if (user.dashboard != null && user.dashboard!.accounts.isNotEmpty) {
+        Logger.data('[INVOICE_API] [$correlationId] User has ${user.dashboard!.accounts.length} accounts');
+        
+        // Try to find an account with accountType PERSONAL
+        for (final account in user.dashboard!.accounts) {
+          if (account.accountType == 'PERSONAL') {
+            paymentAccountId = account.accountID;
+            Logger.data('[INVOICE_API] [$correlationId] Found PERSONAL account: $paymentAccountId (${account.accountName})');
+            break;
+          }
+        }
+        
+        // If no account with accountType PERSONAL found, try to find by name
+        if (paymentAccountId.isEmpty) {
+          for (final account in user.dashboard!.accounts) {
+            if (account.accountName.toUpperCase().contains('PERSONAL')) {
+              paymentAccountId = account.accountID;
+              Logger.data('[INVOICE_API] [$correlationId] Found account with PERSONAL in name: $paymentAccountId (${account.accountName})');
+              break;
+            }
+          }
+        }
+      }
+      
+      // Check if a valid payment account ID was found
+      if (paymentAccountId.isEmpty) {
+        Logger.error('[INVOICE_API] [$correlationId] No personal account found for invoice generation');
+        return Left(ValidationFailure('Personal account required for invoice generation. Please set up a personal account first.'));
+      }
+      
+      Logger.data('[INVOICE_API] [$correlationId] Using payment account ID: $paymentAccountId');
+      
+      // Prepare the items array for the API request
+      Logger.data('[INVOICE_API] [$correlationId] Converting line items to API format');
+      final items = lineItems.map((item) => {
+        'accountID': item.productId,
+        'amount': item.totalPrice / 100, // Convert from cents to dollars
+      }).toList();
+      
+      // Log currency conversion
+      Logger.data('[INVOICE_API] [$correlationId] Currency conversion: $totalAmount cents -> ${totalAmount / 100} dollars');
+      
+      // Prepare request data with the correct format (InvoiceData with capital 'I')
+      final requestData = {
+        'paymentAccountID': paymentAccountId,
+        'InvoiceData': {
+          'items': items,
+          'total': totalAmount / 100, // Convert from cents to dollars
+          'denomination': currency,
+          'notes': notes,
+        },
+      };
+      
+      final requestBody = jsonEncode(requestData);
+      Logger.data('[INVOICE_API] [$correlationId] Request body prepared: ${requestBody.length} characters');
+      
+      // Log request headers (with sensitive data redacted)
+      Logger.data('[INVOICE_API] [$correlationId] Request headers:');
+      Logger.data('[INVOICE_API] [$correlationId] - Content-Type: application/json');
+      Logger.data('[INVOICE_API] [$correlationId] - Authorization: Bearer [REDACTED]');
+      
+      // Call the /generateInvoice API endpoint with authentication
+      Logger.data('[INVOICE_API] [$correlationId] Sending POST request to $_baseUrl/generateInvoice');
+      final apiCallStart = DateTime.now();
+      final response = await _httpClient.post(
+        Uri.parse('$_baseUrl/generateInvoice'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}',
+        },
+        body: requestBody,
+      );
+      final apiCallDuration = DateTime.now().difference(apiCallStart).inMilliseconds;
+      
+      // Log response details
+      Logger.data('[INVOICE_API] [$correlationId] API call completed in $apiCallDuration ms');
+      Logger.data('[INVOICE_API] [$correlationId] Response status code: ${response.statusCode}');
+      Logger.data('[INVOICE_API] [$correlationId] Response content length: ${response.contentLength ?? 'unknown'} bytes');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        Logger.data('[INVOICE_API] [$correlationId] Response successful (${response.statusCode})');
+        
+        // Parse the response body
+        final responseBodyStart = DateTime.now();
+        final responseData = jsonDecode(response.body);
+        final responseBodyDuration = DateTime.now().difference(responseBodyStart).inMilliseconds;
+        Logger.data('[INVOICE_API] [$correlationId] Response body parsing took $responseBodyDuration ms');
+        
+        // Log response structure
+        Logger.data('[INVOICE_API] [$correlationId] Response structure: ${_getResponseStructure(responseData)}');
+        
+        // Extract invoice details from the response according to the specified format
+        String invoiceId = '';
+        String invoiceQrLink = '';
+        DateTime createdAt = DateTime.now();
+        int extractedTotalAmount = totalAmount; // Default to the input total amount
+        String extractedDenomination = currency; // Default to the input currency
+        
+        try {
+          Logger.data('[INVOICE_API] [$correlationId] Starting response data extraction');
+          
+          if (responseData.containsKey('data') && 
+              responseData['data'] is Map<String, dynamic> && 
+              responseData['data'].containsKey('action') &&
+              responseData['data']['action'] is Map<String, dynamic>) {
+            
+            Logger.data('[INVOICE_API] [$correlationId] Found data.action structure in response');
+            final action = responseData['data']['action'] as Map<String, dynamic>;
+            
+            // Extract timestamp
+            if (action.containsKey('timestamp') && action['timestamp'] is String) {
+              createdAt = DateTime.parse(action['timestamp']);
+              Logger.data('[INVOICE_API] [$correlationId] Extracted timestamp: ${action['timestamp']}');
+            } else {
+              Logger.data('[INVOICE_API] [$correlationId] No timestamp found in response, using current time');
+            }
+            
+            // Extract details
+            if (action.containsKey('details') && action['details'] is Map<String, dynamic>) {
+              Logger.data('[INVOICE_API] [$correlationId] Found details object in response');
+              final details = action['details'] as Map<String, dynamic>;
+              
+              // Log all available fields in details for debugging
+              Logger.data('[INVOICE_API] [$correlationId] Available fields in details: ${details.keys.join(', ')}');
+              
+              // Extract invoice ID
+              if (details.containsKey('invoiceID')) {
+                invoiceId = details['invoiceID']?.toString() ?? '';
+                Logger.data('[INVOICE_API] [$correlationId] Extracted invoice ID: $invoiceId');
+              } else {
+                Logger.error('[INVOICE_API] [$correlationId] No invoiceID field found in details');
+              }
+              
+              // Extract invoice QR link
+              if (details.containsKey('invoiceQRLink')) {
+                invoiceQrLink = details['invoiceQRLink']?.toString() ?? '';
+                Logger.data('[INVOICE_API] [$correlationId] Extracted invoice QR link: $invoiceQrLink');
+              } else {
+                Logger.data('[INVOICE_API] [$correlationId] No invoiceQRLink field found in details');
+              }
+              
+              // Extract total amount
+              if (details.containsKey('totalAmount') && details['totalAmount'] is num) {
+                // Convert from dollars to cents (API returns dollars, we store cents)
+                final rawAmount = details['totalAmount'] as num;
+                extractedTotalAmount = (rawAmount * 100).round();
+                Logger.data('[INVOICE_API] [$correlationId] Extracted total amount: $rawAmount dollars -> $extractedTotalAmount cents');
+              } else {
+                Logger.data('[INVOICE_API] [$correlationId] No totalAmount field found in details, using input amount: $totalAmount cents');
+              }
+              
+              // Extract denomination (currency)
+              if (details.containsKey('denomination')) {
+                extractedDenomination = details['denomination']?.toString() ?? currency;
+                Logger.data('[INVOICE_API] [$correlationId] Extracted denomination: $extractedDenomination');
+              } else {
+                Logger.data('[INVOICE_API] [$correlationId] No denomination field found in details, using input currency: $currency');
+              }
+            } else {
+              Logger.error('[INVOICE_API] [$correlationId] No details object found in action');
+            }
+          } else {
+            Logger.error('[INVOICE_API] [$correlationId] Response does not contain expected data.action structure');
+            Logger.error('[INVOICE_API] [$correlationId] Response top-level keys: ${responseData.keys.join(', ')}');
+          }
+          
+          // Validate extracted data
+          if (invoiceId.isEmpty) {
+            Logger.error('[INVOICE_API] [$correlationId] Failed to extract invoice ID from response');
+            return Left(ServerFailure('Failed to extract invoice ID from response'));
+          }
+          
+          Logger.data('[INVOICE_API] [$correlationId] Data extraction completed successfully');
+          
+        } catch (e, stackTrace) {
+          Logger.error('[INVOICE_API] [$correlationId] Error extracting invoice details from response', e, stackTrace);
+          Logger.error('[INVOICE_API] [$correlationId] Error type: ${e.runtimeType}');
+          Logger.error('[INVOICE_API] [$correlationId] Response body: ${response.body}');
+          return Left(ServerFailure('Failed to parse invoice response: $e'));
+        }
+        
+        // Create an Invoice object from the response data
+        Logger.data('[INVOICE_API] [$correlationId] Creating Invoice object with extracted data');
+        final invoice = Invoice(
+          id: invoiceId,
+          vendorId: vendorId,
+          lineItems: lineItems,
+          totalAmount: extractedTotalAmount,
+          currency: extractedDenomination,
+          status: InvoiceStatus.pending,
+          paymentMethod: paymentMethod,
+          notes: notes,
+          createdAt: createdAt,
+          updatedAt: createdAt,
+          paidAt: null,
+          invoiceQrLink: invoiceQrLink,
+        );
+        
+        stopwatch.stop();
+        Logger.performance('[INVOICE_API] [$correlationId] createInvoice completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+        
+        // Return the invoice with the QR link as an additional property
+        return Right(invoice);
+      } else if (response.statusCode == 400) {
+        Logger.error('[INVOICE_API] [$correlationId] Invalid input data with status code 400');
+        Logger.error('[INVOICE_API] [$correlationId] Response body: ${response.body}');
+        
+        // Try to parse error details
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData.containsKey('error') && errorData['error'] is String) {
+            Logger.error('[INVOICE_API] [$correlationId] Error message: ${errorData['error']}');
+          }
+        } catch (e) {
+          Logger.error('[INVOICE_API] [$correlationId] Could not parse error response', e);
+        }
+        
+        return Left(ValidationFailure('Invalid input data: ${response.body}'));
+      } else if (response.statusCode == 401) {
+        Logger.error('[INVOICE_API] [$correlationId] Authentication failed with status code 401');
+        Logger.error('[INVOICE_API] [$correlationId] Response body: ${response.body}');
+        return Left(AuthFailure(message: 'Authentication failed'));
+      } else {
+        Logger.error('[INVOICE_API] [$correlationId] Server error with status code ${response.statusCode}');
+        Logger.error('[INVOICE_API] [$correlationId] Response body: ${response.body}');
+        return Left(ServerFailure('Failed to create invoice: ${response.body}'));
+      }
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      Logger.error('[INVOICE_API] [$correlationId] Unhandled exception during invoice creation', e, stackTrace);
+      Logger.error('[INVOICE_API] [$correlationId] Exception type: ${e.runtimeType}');
+      Logger.error('[INVOICE_API] [$correlationId] Exception message: $e');
+      return Left(ServerFailure('Failed to create invoice: $e'));
+    }
+  }
+  
+  /// Helper method to log the structure of a response without exposing sensitive data
+  String _getResponseStructure(dynamic data, {int level = 0}) {
+    if (data == null) {
+      return 'null';
+    }
+    
+    if (data is Map) {
+      final keys = data.keys.map((k) {
+        final value = data[k];
+        if (value is Map) {
+          return '$k: {${_getResponseStructure(value, level: level + 1)}}';
+        } else if (value is List) {
+          return '$k: [${value.length} items]';
+        } else {
+          return '$k: ${value.runtimeType}';
+        }
+      }).join(', ');
+      return keys;
+    } else if (data is List) {
+      return '[${data.length} items]';
+    } else {
+      return data.runtimeType.toString();
+    }
   }
 
   @override

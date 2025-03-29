@@ -44,62 +44,168 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
   }
 
   Future<void> _generateInvoice() async {
+    Logger.data('[INVOICE_GENERATION] Starting invoice generation process');
+    
+    // Generate a correlation ID for tracking this specific invoice generation flow
+    final correlationId = 'inv_${DateTime.now().millisecondsSinceEpoch}';
+    Logger.data('[INVOICE_GENERATION] [$correlationId] Correlation ID assigned');
+    
+    // Log form validation
     if (!_formKey.currentState!.validate()) {
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Form validation failed, aborting invoice generation');
       return;
     }
+    Logger.data('[INVOICE_GENERATION] [$correlationId] Form validation successful');
 
+    // Log UI state change
+    Logger.data('[INVOICE_GENERATION] [$correlationId] Setting UI to loading state');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
+      // Log basket details
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Basket details: ${widget.basket.items.length} items, total price: ${widget.basket.totalPrice}');
+      
       // Get line items from the basket
       final lineItems = widget.basket.toInvoiceLineItems();
+      
+      // Log line items details
+      for (var i = 0; i < lineItems.length; i++) {
+        final item = lineItems[i];
+        Logger.data('[INVOICE_GENERATION] [$correlationId] Line item #${i + 1}: productId=${item.productId}, name=${item.productName}, quantity=${item.quantity}, unitPrice=${item.unitPrice}, totalPrice=${item.totalPrice}');
+      }
 
-      // Get buyer ID (in a real app, this would be the logged-in user's ID)
-      // For now, we'll use a mock buyer ID
-      const buyerId = 'm3'; // Mock buyer ID
+      // Log user authentication attempt
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Retrieving authenticated user');
+      final user = await ServiceLocator.databaseHelper.getUser();
+      if (user == null) {
+        Logger.error('[INVOICE_GENERATION] [$correlationId] User authentication failed: user not found in database');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'User not authenticated';
+        });
+        return;
+      }
+      
+      // Log basket validation
+      if (widget.basket.items.isEmpty) {
+        Logger.error('[INVOICE_GENERATION] [$correlationId] Validation failed: Basket is empty');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Basket is empty';
+        });
+        return;
+      }
+      
+      // Log currency validation
+      final currency = widget.basket.items.first.product.currency;
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Starting currency validation, base currency: $currency');
+      
+      for (var i = 0; i < widget.basket.items.length; i++) {
+        final item = widget.basket.items[i];
+        final itemCurrency = item.product.currency;
+        Logger.data('[INVOICE_GENERATION] [$correlationId] Item #${i + 1} currency: $itemCurrency');
+        
+        if (itemCurrency != currency) {
+          Logger.error('[INVOICE_GENERATION] [$correlationId] Currency validation failed: Item #${i + 1} has currency $itemCurrency, expected $currency');
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'All items must have the same currency';
+          });
+          return;
+        }
+      }
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Currency validation successful: all items have currency $currency');
 
+      // Log repository call parameters
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Preparing to call createInvoice with parameters:');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - vendorId: ${widget.basket.vendor.id}');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - lineItems: ${lineItems.length} items');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - totalAmount: ${widget.basket.totalPrice}');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - currency: $currency');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - paymentMethod: credex');
+      Logger.data('[INVOICE_GENERATION] [$correlationId] - notes: ${_notesController.text.isNotEmpty ? '${_notesController.text.length} characters' : 'null'}');
+      
+      // Start timing the API call
+      final stopwatch = Stopwatch()..start();
+      
       // Create invoice using repository
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Calling repository.createInvoice()');
       final result = await _marketplaceRepository.createInvoice(
-        buyerId: buyerId,
         vendorId: widget.basket.vendor.id,
         lineItems: lineItems,
         totalAmount: widget.basket.totalPrice,
-        currency: widget.basket.items.first.product
-            .currency, // Assuming all items have the same currency
+        currency: currency,
         paymentMethod: 'credex', // Default payment method
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       );
 
+      // Log API call duration
+      stopwatch.stop();
+      Logger.performance('[INVOICE_GENERATION] [$correlationId] Repository call completed in ${stopwatch.elapsedMilliseconds}ms');
+
+      // Process result
       result.fold(
         (failure) {
+          // Log failure details
+          Logger.error('[INVOICE_GENERATION] [$correlationId] Failed to generate invoice', failure);
+          Logger.error('[INVOICE_GENERATION] [$correlationId] Failure type: ${failure.runtimeType}');
+          Logger.error('[INVOICE_GENERATION] [$correlationId] Failure message: ${failure.message}');
+          
+          // Update UI state
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Updating UI to show error');
           setState(() {
             _isLoading = false;
             _errorMessage = failure.message ?? 'Failed to generate invoice';
           });
         },
         (invoice) {
-          // Generate QR code data
-          final qrData = 'vimbisopay://invoice/${invoice.id}';
-
+          // Log success details
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice generated successfully');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice ID: ${invoice.id}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice buyer ID: ${invoice.buyerId}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice vendor ID: ${invoice.vendorId}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice total amount: ${invoice.totalAmount}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice currency: ${invoice.currency}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice status: ${invoice.status}');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice created at: ${invoice.createdAt}');
+          
+          // Log QR code generation
+          final hasQrLink = invoice.invoiceQrLink != null && invoice.invoiceQrLink!.isNotEmpty;
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice QR link from API: ${hasQrLink ? 'available' : 'not available'}');
+          
+          // Use the QR link from the API response if available, otherwise fall back to a deep link format
+          final qrData = invoice.invoiceQrLink ?? 'vimbisopay://invoice/${invoice.id}';
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Using QR data: $qrData');
+          Logger.data('[INVOICE_GENERATION] [$correlationId] QR data source: ${hasQrLink ? 'API response' : 'local deep link fallback'}');
+          
+          // Update UI state
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Updating UI to show success');
           setState(() {
             _isLoading = false;
             _invoiceId = invoice.id;
             _invoiceQrData = qrData;
           });
-
-          // Log success
-          Logger.data('Invoice generated successfully: ${invoice.id}');
+          
+          Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice generation process completed successfully');
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Log detailed error information
+      Logger.error('[INVOICE_GENERATION] [$correlationId] Unhandled exception during invoice generation', e, stackTrace);
+      Logger.error('[INVOICE_GENERATION] [$correlationId] Exception type: ${e.runtimeType}');
+      Logger.error('[INVOICE_GENERATION] [$correlationId] Exception message: $e');
+      
+      // Update UI state
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Updating UI to show error from exception');
       setState(() {
         _isLoading = false;
         _errorMessage = 'Failed to generate invoice: $e';
       });
-      Logger.error('Error generating invoice', e);
+      
+      Logger.data('[INVOICE_GENERATION] [$correlationId] Invoice generation process failed');
     }
   }
 

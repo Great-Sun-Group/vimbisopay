@@ -117,7 +117,6 @@ abstract class MarketplaceRepository {
   ///
   /// Returns the created [Invoice] if successful, or a [Failure] if an error occurs.
   Future<Either<Failure, Invoice>> createInvoice({
-    required String buyerId,
     required String vendorId,
     required List<InvoiceLineItem> lineItems,
     required int totalAmount,

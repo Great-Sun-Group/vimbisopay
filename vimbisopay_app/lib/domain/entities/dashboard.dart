@@ -339,6 +339,7 @@ class DashboardAccount {
   final PendingData pendingInData;
   final PendingData pendingOutData;
   final SendOffersTo sendOffersTo;
+  final String? accountType;
 
   const DashboardAccount({
     required this.accountID,
@@ -350,6 +351,7 @@ class DashboardAccount {
     required this.pendingInData,
     required this.pendingOutData,
     required this.sendOffersTo,
+    this.accountType,
   });
 
   Map<String, dynamic> toMap() => {
@@ -362,6 +364,7 @@ class DashboardAccount {
     'pendingInData': pendingInData.toMap(),
     'pendingOutData': pendingOutData.toMap(),
     'sendOffersTo': sendOffersTo.toMap(),
+    'accountType': accountType,
   };
 
   factory DashboardAccount.fromMap(Map<String, dynamic> map) => DashboardAccount(
@@ -374,6 +377,7 @@ class DashboardAccount {
     pendingInData: PendingData.fromMap(map['pendingInData']),
     pendingOutData: PendingData.fromMap(map['pendingOutData']),
     sendOffersTo: SendOffersTo.fromMap(map['sendOffersTo']),
+    accountType: map['accountType'] as String?,
   );
 }
 
