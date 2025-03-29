@@ -47,9 +47,9 @@ class SalesBasket {
         symbol = '£';
         break;
       default:
-        return '$currency ${totalPrice / 100}';
+        return '$currency ${(totalPrice / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalPrice / 100}';
+    return '$symbol${(totalPrice / 100).toStringAsFixed(2)}';
   }
 
   /// Gets the number of items in the basket.

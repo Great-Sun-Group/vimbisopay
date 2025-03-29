@@ -121,9 +121,9 @@ class Invoice extends Entity {
         symbol = '£';
         break;
       default:
-        return '$currency ${totalAmount / 100}';
+        return '$currency ${(totalAmount / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalAmount / 100}';
+    return '$symbol${(totalAmount / 100).toStringAsFixed(2)}';
   }
 
   /// Creates a copy of this [Invoice] with the given fields replaced.

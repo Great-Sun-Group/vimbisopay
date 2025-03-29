@@ -154,6 +154,7 @@ class AccountRepositoryImpl implements AccountRepository {
                     'accountHandle': accountData['accountHandle'],
                     'defaultDenom': accountData['defaultDenom'],
                     'isOwnedAccount': accountData['isOwnedAccount'],
+                    'accountType': accountData['accountType'], // Include accountType field
                     'balanceData': {
                       'securedNetBalancesByDenom': accountData['balanceData']
                           ['securedNetBalancesByDenom'],
@@ -1585,6 +1586,7 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                         'accountHandle': accountData['accountHandle'],
                         'defaultDenom': accountData['defaultDenom'],
                         'isOwnedAccount': accountData['isOwnedAccount'],
+                        'accountType': accountData['accountType'], // Include accountType field
                         'balanceData': {
                           'securedNetBalancesByDenom': accountData['balanceData']
                               ['securedNetBalancesByDenom'],

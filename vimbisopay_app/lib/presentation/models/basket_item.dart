@@ -46,9 +46,9 @@ class BasketItem {
         symbol = '£';
         break;
       default:
-        return '${product.currency} ${totalPrice / 100}';
+        return '${product.currency} ${(totalPrice / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalPrice / 100}';
+    return '$symbol${(totalPrice / 100).toStringAsFixed(2)}';
   }
 
   /// Increments the quantity by 1.
