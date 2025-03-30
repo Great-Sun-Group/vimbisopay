@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repos
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
 /// A screen that allows buyers to pay for invoices.
 ///
@@ -37,7 +38,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String? _errorMessage;
   List<DashboardAccount> _accounts = [];
   DashboardAccount? _selectedAccount;
-  final _noteController = TextEditingController();
   String? _memberId;
 
   @override
@@ -49,7 +49,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
-    _noteController.dispose();
     super.dispose();
   }
 
@@ -175,17 +174,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to add funds screen
-              Navigator.pushNamed(context, '/add-funds').then((_) {
-                // Refresh accounts when returning from add funds
-                _loadAccounts();
-              });
-            },
-            child: const Text('Add Funds'),
-          ),
         ],
       ),
     );
@@ -295,6 +283,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
+    // Validate that paymentAccountId is not null
+    if (widget.invoice.paymentAccountId == null) {
+      setState(() {
+        _errorMessage = 'Cannot process payment: Missing payment account ID';
+      });
+      Logger.error('[PAYMENT_SCREEN] Payment failed: Missing payment account ID');
+      return;
+    }
+
+    // Show loading dialog with Lottie animation
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const LoadingDialog(
+        message: 'Processing payment...',
+      ),
+    );
+
     setState(() {
       _isProcessingPayment = true;
       _errorMessage = null;
@@ -304,12 +310,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
       // Create a Credex request for the invoice payment
       final credexRequest = CredexRequest(
         issuerAccountID: _selectedAccount!.accountID,
-        receiverAccountID: widget.invoice.vendorId.isNotEmpty ? widget.invoice.vendorId : 'unknown', // Use invoice's vendorId
+        receiverAccountID: widget.invoice.paymentAccountId!, // Use non-null assertion since we've validated
         denomination: widget.invoice.currency,
         initialAmount: widget.invoice.totalAmount / 100, // Convert from smallest unit to decimal
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
         securedCredex: true,
+        invoiceID: widget.invoice.id, // Include the invoice ID in the request
       );
       
       Logger.data('[PAYMENT_SCREEN] Creating Credex payment:');
@@ -320,6 +327,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       
       // Create the Credex transaction
       final result = await _accountRepository.createCredex(credexRequest);
+      
+      // Close loading dialog before showing result
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
       
       result.fold(
         (failure) {
@@ -333,7 +345,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           final invoiceResult = await _marketplaceRepository.updateInvoice(
             id: widget.invoice.id,
             status: InvoiceStatus.paid,
-            notes: _noteController.text.isNotEmpty ? _noteController.text : null,
             paidAt: DateTime.now(),
           );
           
@@ -355,6 +366,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       );
     } catch (e) {
+      // Close loading dialog on error
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      
       setState(() {
         _isProcessingPayment = false;
         _errorMessage = 'An unexpected error occurred: $e';
@@ -392,8 +408,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
         actions: [
           FilledButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context, true); // Return to invoice screen with success result
+              // Close the dialog first
+              Navigator.pop(context);
+              
+              // Navigate to home screen and remove all previous screens from the stack
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/home', // Home screen route
+                (route) => false, // Remove all previous routes
+              );
             },
             child: const Text('Done'),
           ),
@@ -406,7 +429,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment'),
+        title: const Text('Complete Payment'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -521,9 +544,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 24),
           
           _buildAccountSelection(),
-          
-          const SizedBox(height: 24),
-          _buildNoteField(),
         ],
       ),
     );
@@ -565,7 +585,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Invoice #${widget.invoice.id.substring(0, 8)}',
+                        'Invoice #${widget.invoice.id.substring(0, 8) }****',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -647,29 +667,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     
                     return DropdownMenuItem(
                       value: account,
+                      // Simplified dropdown item to prevent overflow
                       child: Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  account.accountName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '@${account.accountHandle}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              account.accountName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
@@ -738,39 +746,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildNoteField() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Add Note (Optional)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              decoration: InputDecoration(
-                hintText: 'Add a note to the vendor',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: AppColors.surface,
-              ),
-              maxLines: 3,
-              maxLength: 100,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildBottomBar() {
     return Container(
@@ -815,7 +790,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             FilledButton.icon(
               icon: const Icon(Icons.payment),
-              label: const Text('Pay Now'),
+              label: const Text('Sign & Send'),
               onPressed: _isProcessingPayment || _isLoading ? null : _processPayment,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
