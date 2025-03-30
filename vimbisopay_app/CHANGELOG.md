@@ -140,3 +140,5 @@ Example entry format:
 -e 
 ## [1.0.0+44] - 2025-03-30
 - Market place functionality
+-e 
+## [minor fix-- preserving stor open close state] - 2025-03-30
