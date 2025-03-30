@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
@@ -43,7 +44,7 @@ class VendorProfileScreen extends StatefulWidget {
 class _VendorProfileScreenState extends State<VendorProfileScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
   final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
-  final StoreStatusService _storeStatusService = ServiceLocator.storeStatusService;
+  final LocationService _locationService = ServiceLocator.locationService;
   bool _isLoading = true;
   bool _isUpdatingStoreStatus = false;
   String _errorMessage = '';
@@ -62,7 +63,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     // Proactively request location permission when the screen is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.isOwner) {
-        _storeStatusService.requestLocationPermission(context);
+        _requestLocationPermission();
       }
     });
     
@@ -467,226 +468,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  /// Updates the store status and location.
-  Future<void> _updateStoreStatus(bool value) async {
-    if (_isUpdatingStoreStatus) return;
-    
-    setState(() {
-      _isUpdatingStoreStatus = true;
-    });
-    
-    try {
-      Logger.data('[VENDOR_PROFILE] Updating store status to: ${value ? 'Open' : 'Closed'}');
-      
-      // Get current location if opening the store
-      double? latitude;
-      double? longitude;
-      
-      if (value) {
-        // First check if location services are enabled
-        final servicesEnabled = await _storeStatusService.checkLocationServicesEnabled(context);
-        if (!servicesEnabled) {
-          Logger.error('[VENDOR_PROFILE] Location services are disabled');
-          if (mounted) {
-            // Ask if the user wants to continue without location
-            final continueWithoutLocation = await showDialog<bool>(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: const Text('Location Services Disabled'),
-                content: const Text(
-                  'Your store will be marked as open, but customers won\'t be able to see your location. '
-                  'Would you like to continue without location?'
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Continue Without Location'),
-                  ),
-                ],
-              ),
-            ) ?? false;
-            
-            if (!continueWithoutLocation) {
-              Logger.data('[VENDOR_PROFILE] User cancelled store status update due to disabled location services');
-              setState(() {
-                _isUpdatingStoreStatus = false;
-              });
-              return;
-            }
-            
-            // User chose to continue without location
-            Logger.data('[VENDOR_PROFILE] User chose to continue without location');
-          } else {
-            setState(() {
-              _isUpdatingStoreStatus = false;
-            });
-            return;
-          }
-        } else {
-          // Location services are enabled, now check and request permission if needed
-          final hasPermission = await _storeStatusService.requestLocationPermission(context);
-          if (!hasPermission) {
-            Logger.error('[VENDOR_PROFILE] Location permission not granted');
-            if (mounted) {
-              // Ask if the user wants to continue without location
-              final continueWithoutLocation = await showDialog<bool>(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => AlertDialog(
-                  title: const Text('Location Permission Denied'),
-                  content: const Text(
-                    'Your store will be marked as open, but customers won\'t be able to see your location. '
-                    'Would you like to continue without location?'
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Continue Without Location'),
-                    ),
-                  ],
-                ),
-              ) ?? false;
-              
-              if (!continueWithoutLocation) {
-                Logger.data('[VENDOR_PROFILE] User cancelled store status update due to denied location permission');
-                setState(() {
-                  _isUpdatingStoreStatus = false;
-                });
-                return;
-              }
-              
-              // User chose to continue without location
-              Logger.data('[VENDOR_PROFILE] User chose to continue without location');
-            } else {
-              setState(() {
-                _isUpdatingStoreStatus = false;
-              });
-              return;
-            }
-          } else {
-            // Permission granted, get current location
-            final location = await _storeStatusService.getCurrentLocation();
-            if (location != null) {
-              (latitude, longitude) = location;
-              Logger.data('[VENDOR_PROFILE] Got location: ($latitude, $longitude)');
-            } else {
-              Logger.error('[VENDOR_PROFILE] Failed to get location');
-              // Ask if the user wants to continue without location
-              if (mounted) {
-                final continueWithoutLocation = await showDialog<bool>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Location Not Available'),
-                    content: const Text(
-                      'We couldn\'t get your current location. Your store will be marked as open, '
-                      'but customers won\'t be able to see your location. '
-                      'Would you like to continue without location?'
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Continue Without Location'),
-                      ),
-                    ],
-                  ),
-                ) ?? false;
-                
-                if (!continueWithoutLocation) {
-                  Logger.data('[VENDOR_PROFILE] User cancelled store status update due to location not available');
-                  setState(() {
-                    _isUpdatingStoreStatus = false;
-                  });
-                  return;
-                }
-                
-                // User chose to continue without location
-                Logger.data('[VENDOR_PROFILE] User chose to continue without location');
-              } else {
-                setState(() {
-                  _isUpdatingStoreStatus = false;
-                });
-                return;
-              }
-            }
-          }
-        }
-      }
-      
-      // Update store status
-      final (success, errorMessage) = await _storeStatusService.updateStoreStatus(
-        storeOpen: value,
-        latitude: latitude,
-        longitude: longitude,
-      );
-      
-      if (success) {
-        Logger.data('[VENDOR_PROFILE] Store status updated successfully');
-        // Update local state
-        if (mounted) {
-          setState(() {
-            _storeOpen = value;
-          });
-          
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Store is now ${value ? 'open' : 'closed'}${latitude != null ? ' with location' : ''}'),
-              backgroundColor: AppColors.successGreen,
-            ),
-          );
-        }
-      } else {
-        Logger.error('[VENDOR_PROFILE] Failed to update store status: $errorMessage');
-        // Show error message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to update store status: ${errorMessage ?? 'Unknown error'}',
-                style: const TextStyle(color: AppColors.white),
-              ),
-              backgroundColor: AppColors.errorRed,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      Logger.error('[VENDOR_PROFILE] Error updating store status', e);
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error updating store status: $e',
-              style: const TextStyle(color: AppColors.white),
-            ),
-            backgroundColor: AppColors.errorRed,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUpdatingStoreStatus = false;
-        });
-      }
-    }
-  }
-
   Widget _buildBusinessInfo(Vendor vendor) {
     return SettingsContainer(
       title: 'About',
@@ -897,364 +678,243 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  Widget _buildEmptyAccountsView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.inventory_2_outlined,
-              size: 64,
-              color: AppColors.textSecondary,
+  /// Checks if location services are enabled and prompts the user to enable them if not.
+  Future<bool> _checkLocationServicesEnabled() async {
+    Logger.data('[VENDOR_PROFILE] Checking if location services are enabled');
+    
+    // Check if location services are enabled
+    bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
+    if (servicesEnabled) {
+      Logger.data('[VENDOR_PROFILE] Location services are enabled');
+      return true;
+    }
+    
+    // Show a dialog explaining why we need location services enabled
+    if (mounted) {
+      final shouldOpenSettings = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Services Disabled'),
+          content: const Text(
+            'Your device\'s location services are turned off. To mark your store as open, '
+            'we need your location to help customers find you.\n\n'
+            'Would you like to open settings to enable location services?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Now'),
             ),
-            const SizedBox(height: 16),
-            Text(
-              widget.isOwner
-                  ? 'You haven\'t added any accounts yet'
-                  : 'This vendor hasn\'t added any accounts yet',
-              style: const TextStyle(
-                fontSize: 16,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Open Settings'),
             ),
-            if (widget.isOwner) ...[
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AddEditSkuScreen(
-                        vendorId: widget.vendorId,
-                      ),
-                    ),
-                  ).then((result) {
-                    // Check if we got a success result
-                    if (result != null && result is Map && result['success'] == true) {
-                      // Show success message
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(result['message'] ?? 'Account added successfully'),
-                            backgroundColor: AppColors.successGreen,
-                          ),
-                        );
-                      }
-                      
-                      // Check if the result contains a product
-                      if (result.containsKey('product') && result['product'] != null) {
-                        final productMap = result['product'] as Map<String, dynamic>;
-                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
-                        
-                        try {
-                          // Create a new Product object from the data
-                          final retrievedProduct = Product(
-                            id: productMap['id'],
-                            vendorId: productMap['vendorId'],
-                            name: productMap['name'],
-                            description: productMap['description'],
-                            price: productMap['price'],
-                            currency: productMap['currency'],
-                            imageUrls: List<String>.from(productMap['imageUrls']),
-                            category: productMap['category'],
-                            tags: List<String>.from(productMap['tags']),
-                            isAvailable: productMap['isAvailable'],
-                            accountId: productMap['accountId'],
-                            createdAt: DateTime.parse(productMap['createdAt']),
-                            updatedAt: DateTime.parse(productMap['updatedAt']),
-                          );
-                          
-                          // Check if the product has image URLs
-                          if (retrievedProduct.imageUrls.isNotEmpty) {
-                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
-                            
-                            // Update the state with the new product
-                            setState(() {
-                              // Add the new product to the list
-                              _products.add(retrievedProduct);
-                            });
-                            
-                            // No need to reload all vendor data
-                            return;
-                          }
-                        } catch (e) {
-                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
-                          // Continue to reload all vendor data
-                        }
-                      }
-                    }
-                    
-                    // If we didn't get a product or it didn't have image URLs, refresh all data
-                    if (mounted) {
-                      _loadVendorData();
-                    }
-                  });
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add Your First Account'),
-              ),
-            ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildAccountsGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: _products.length,
-      itemBuilder: (context, index) {
-        final product = _products[index];
-        return _buildProductCard(product);
-      },
-    );
-  }
-
-  /// Builds the product image widget based on the image URL type.
-  Widget _buildProductImage(Product product) {
-    if (product.imageUrls.isEmpty || product.imageUrls.first == 'https://example.com/product_placeholder.jpg') {
-      // Show placeholder if no image
-      return Container(
-        color: AppColors.grey300,
-        child: const Center(
-          child: Icon(
-            Icons.image,
-            color: AppColors.grey,
-          ),
-        ),
-      );
+      ) ?? false;
+      
+      if (shouldOpenSettings) {
+        Logger.data('[VENDOR_PROFILE] Opening location settings');
+        await _locationService.openLocationSettings();
+        
+        // Give the user some time to change settings
+        await Future.delayed(const Duration(seconds: 2));
+        
+        // Check again if location services are now enabled
+        servicesEnabled = await _locationService.checkLocationServicesEnabled();
+        if (servicesEnabled) {
+          Logger.data('[VENDOR_PROFILE] Location services are now enabled');
+          return true;
+        } else {
+          Logger.data('[VENDOR_PROFILE] Location services are still disabled');
+          return false;
+        }
+      } else {
+        Logger.data('[VENDOR_PROFILE] User declined to open location settings');
+        return false;
+      }
     }
     
-    final imageUrl = product.imageUrls.first;
-    
-    if (imageUrl.startsWith('file://')) {
-      // Show local file image
-      final filePath = imageUrl.substring(7); // Remove 'file://' prefix
-      return Image.file(
-        File(filePath),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          Logger.error('Error loading local image: $filePath', error);
-          return Container(
-            color: AppColors.grey300,
-            child: const Center(
-              child: Icon(
-                Icons.image_not_supported,
-                color: AppColors.grey,
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // Show remote image
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: AppColors.grey200,
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: AppColors.grey300,
-          child: const Center(
-            child: Icon(
-              Icons.image_not_supported,
-              color: AppColors.grey,
-            ),
-          ),
-        ),
-      );
-    }
+    return false;
   }
 
-  /// Builds the profile image for the vendor, using the profile thumbnail URL if available.
-  Widget _buildProfileImage(Vendor vendor) {
-    // Use profile thumbnail URL if available
-    if (_profileThumbnailUrl != null && _profileThumbnailUrl!.isNotEmpty) {
-      Logger.data('[VENDOR_PROFILE] Using profile thumbnail URL: $_profileThumbnailUrl');
-      return _buildImageFromUrl(
-        _profileThumbnailUrl,
-        placeholder: Container(
-          color: AppColors.primary,
-          child: const Center(
-            child: Icon(
-              Icons.person,
-              size: 38,
-              color: AppColors.white,
-            ),
-          ),
-        ),
-      );
+  /// Requests location permission with a clear explanation to the user.
+  Future<bool> _requestLocationPermission() async {
+    Logger.data('[VENDOR_PROFILE] Requesting location permission');
+    
+    // First check if location services are enabled
+    bool servicesEnabled = await _checkLocationServicesEnabled();
+    if (!servicesEnabled) {
+      Logger.data('[VENDOR_PROFILE] Location services are disabled, cannot proceed with permission request');
+      return false;
     }
     
-    // Otherwise use vendor's profile image URL
-    return vendor.profileImageUrl != null
-        ? _buildImageFromUrl(
-            vendor.profileImageUrl,
-            placeholder: Container(
-              color: AppColors.primary,
-              child: const Center(
-                child: Icon(
-                  Icons.storefront,
-                  size: 38,
-                  color: AppColors.white,
+    // Check if permission is already granted
+    bool hasPermission = await _locationService.checkLocationPermission();
+    if (hasPermission) {
+      Logger.data('[VENDOR_PROFILE] Location permission already granted');
+      return true;
+    }
+    
+    // Show a dialog explaining why we need location permission
+    if (mounted) {
+      final shouldRequest = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Permission'),
+          content: const Text(
+            'To mark your store as open, we need your location to help customers find you. '
+            'Would you like to grant location permission?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Grant Permission'),
+            ),
+          ],
+        ),
+      ) ?? false;
+      
+      if (!shouldRequest) {
+        Logger.data('[VENDOR_PROFILE] User declined to request location permission');
+        return false;
+      }
+    }
+    
+    // Request permission
+    final permissionGranted = await _locationService.requestLocationPermission();
+    Logger.data('[VENDOR_PROFILE] Location permission request result: $permissionGranted');
+    
+    return permissionGranted;
+  }
+
+  /// Updates the store status and location.
+  Future<void> _updateStoreStatus(bool value) async {
+    if (_isUpdatingStoreStatus) return;
+    
+    setState(() {
+      _isUpdatingStoreStatus = true;
+    });
+    
+    try {
+      Logger.data('[VENDOR_PROFILE] Updating store status to: ${value ? 'Open' : 'Closed'}');
+      
+      // Get current location if opening the store
+      double? latitude;
+      double? longitude;
+      
+      if (value) {
+        // First check if location services are enabled
+        final servicesEnabled = await _checkLocationServicesEnabled();
+        if (!servicesEnabled) {
+          Logger.error('[VENDOR_PROFILE] Location services are disabled');
+          if (mounted) {
+            // Ask if the user wants to continue without location
+            final continueWithoutLocation = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('Location Services Disabled'),
+                content: const Text(
+                  'Your store will be marked as open, but customers won\'t be able to see your location. '
+                  'Would you like to continue without location?'
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Continue Without Location'),
+                  ),
+                ],
               ),
-            ),
-          )
-        : Container(
-            color: AppColors.primary,
-            child: const Center(
-              child: Icon(
-                Icons.storefront,
-                size: 38,
-                color: AppColors.white,
-              ),
-            ),
-          );
-  }
-
-  /// Builds an image widget from a URL, handling both local and remote URLs.
-  Widget _buildImageFromUrl(String? imageUrl, {Widget? placeholder}) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      Logger.data('[VENDOR_PROFILE] Image URL is null or empty, using placeholder');
-      return placeholder ?? Container(color: AppColors.grey300);
-    }
-    
-    if (imageUrl.startsWith('file://')) {
-      // Show local file image
-      final filePath = imageUrl.substring(7); // Remove 'file://' prefix
-      Logger.data('[VENDOR_PROFILE] Loading local image: $filePath');
-      return Image.file(
-        File(filePath),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          Logger.error('[VENDOR_PROFILE] Error loading local image: $filePath', error);
-          return placeholder ?? Container(color: AppColors.grey300);
-        },
-      );
-    } else {
-      // Show remote image
-      Logger.data('[VENDOR_PROFILE] Loading remote image: $imageUrl');
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => placeholder ?? Container(
-          color: AppColors.grey200,
-          child: const Center(child: CircularProgressIndicator()),
-        ),
-        errorWidget: (context, url, error) {
-          Logger.error('[VENDOR_PROFILE] Error loading remote image: $url', error);
-          return placeholder ?? Container(color: AppColors.grey300);
-        },
-      );
-    }
-  }
-
-  Widget _buildProductCard(Product product) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: InkWell(
-        onTap: () {
-          // TODO: Navigate to product detail screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Selected: ${product.name}'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product image
-            AspectRatio(
-              aspectRatio: 1.0,
-              child: _buildProductImage(product),
-            ),
-            // Product info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            ) ?? false;
+            
+            if (!continueWithoutLocation) {
+              Logger.data('[VENDOR_PROFILE] User cancelled store status update due to disabled location services');
+              setState(() {
+                _isUpdatingStoreStatus = false;
+              });
+              return;
+            }
+            
+            // User chose to continue without location
+            Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+          } else {
+            setState(() {
+              _isUpdatingStoreStatus = false;
+            });
+            return;
+          }
+        } else {
+          // Location services are enabled, now check and request permission if needed
+          final hasPermission = await _requestLocationPermission();
+          if (!hasPermission) {
+            Logger.error('[VENDOR_PROFILE] Location permission not granted');
+            if (mounted) {
+              // Ask if the user wants to continue without location
+              final continueWithoutLocation = await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('Location Permission Denied'),
+                  content: const Text(
+                    'Your store will be marked as open, but customers won\'t be able to see your location. '
+                    'Would you like to continue without location?'
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.formattedPrice,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Flexible(
-                      child: Row(
-                        children: [
-                          Icon(
-                            product.isAvailable
-                                ? Icons.check_circle
-                                : Icons.cancel,
-                            size: 16,
-                            color: product.isAvailable
-                                ? AppColors.successGreen
-                                : AppColors.errorRed,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              product.isAvailable
-                                  ? 'Available'
-                                  : 'Unavailable',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: product.isAvailable
-                                    ? AppColors.successGreen
-                                    : AppColors.errorRed,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Continue Without Location'),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+              ) ?? false;
+              
+              if (!continueWithoutLocation) {
+                Logger.data('[VENDOR_PROFILE] User cancelled store status update due to denied location permission');
+                setState(() {
+                  _isUpdatingStoreStatus = false;
+                });
+                return;
+              }
+              
+              // User chose to continue without location
+              Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+            } else {
+              setState(() {
+                _isUpdatingStoreStatus = false;
+              });
+              return;
+            }
+          } else {
+            // Permission granted, get current location
+            final position = await _locationService.getCurrentPosition();
+            if (position != null) {
+              latitude = position.latitude;
+              longitude = position.longitude;
+              Logger.data('[VENDOR_PROFILE] Got location: ($latitude, $longitude)');
+            } else {
+              Logger.error('[VENDOR_PROFILE] Failed to get location');
+              // Ask if the user wants to continue without location
+              if (mounted) {
+                final continueWithoutLocation = await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Location Not Available'),
+                    content: const Text(
+                      'We couldn\'t get your current location. Your store will be marked as open, '
+                      'but customers won\'t be

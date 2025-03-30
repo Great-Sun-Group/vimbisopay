@@ -8,11 +8,13 @@ import 'package:vimbisopay_app/infrastructure/repositories/account_repository_im
 import 'package:vimbisopay_app/infrastructure/repositories/marketplace/marketplace_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/config_manager.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/remote_config_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class ServiceLocator {
@@ -23,6 +25,7 @@ class ServiceLocator {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
   static final http.Client _httpClient = http.Client();
   static final NotificationService _notificationService = NotificationService();
+  static final LocationService _locationService = LocationService();
   static final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   
@@ -51,6 +54,12 @@ class ServiceLocator {
     databaseHelper: _databaseHelper,
     accountRepository: accountRepository,
   );
+  
+  static final StoreStatusService _storeStatusService = StoreStatusService(
+    marketplaceRepository: marketplaceRepository,
+    databaseHelper: _databaseHelper,
+    locationService: _locationService,
+  );
 
   // Private constructor to prevent instantiation
   ServiceLocator._();
@@ -61,6 +70,8 @@ class ServiceLocator {
   static DatabaseHelper get databaseHelper => _databaseHelper;
   static http.Client get httpClient => _httpClient;
   static NotificationService get notificationService => _notificationService;
+  static LocationService get locationService => _locationService;
+  static StoreStatusService get storeStatusService => _storeStatusService;
   static FirebaseAnalytics get analytics => _analytics;
   
   // Getter for FeatureFlagService with lazy initialization

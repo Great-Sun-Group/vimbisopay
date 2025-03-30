@@ -1429,7 +1429,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     Logger.data('[PROFILE_IMAGE] Image file size: ${fileSizeKB.toStringAsFixed(2)} KB (${fileSizeMB.toStringAsFixed(2)} MB)');
     
     // Check if file is too large before even trying to encode it
-    if (fileSizeKB > 80) { // Reduced from 5MB to 80KB based on server limits
+    if (fileSizeKB > 160) { // Reduced from 5MB to 80KB based on server limits
       Logger.error('[PROFILE_IMAGE] Image file is too large: ${fileSizeKB.toStringAsFixed(2)} KB');
       return Left(ServerFailure('Image file is too large. Please use an image smaller than 80KB.'));
     }
@@ -1632,5 +1632,86 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     // Empty implementation - API not yet available
     Logger.data('[MARKETPLACE] createCredexOffer called with invoice ID: $invoiceId, account ID: $accountId, amount: $amount');
     return Left(ServerFailure('API not yet implemented'));
+  }
+  
+  @override
+  Future<Either<Failure, bool>> updateStoreStatus({
+    required String accountId,
+    required bool storeOpen,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[STORE_STATUS] Starting updateStoreStatus operation');
+    Logger.data('[STORE_STATUS] Parameters: accountId=$accountId, storeOpen=$storeOpen, location=(${latitude ?? 'null'}, ${longitude ?? 'null'})');
+    
+    return _executeAuthenticatedRequest<bool>(
+      request: (token) async {
+        // Prepare request data
+        final Map<String, dynamic> requestBody = {
+          'storeOpen': storeOpen,
+        };
+        
+        // Add location if provided
+        if (latitude != null && longitude != null) {
+          requestBody['location'] = {
+            'latitude': latitude,
+            'longitude': longitude,
+          };
+        }
+        
+        final requestBodyJson = jsonEncode(requestBody);
+        Logger.data('[STORE_STATUS] Request body: $requestBodyJson');
+        
+        // Call the API endpoint to update store status
+        Logger.data('[STORE_STATUS] Sending POST request to $_baseUrl/storeStatus/$accountId');
+        final response = await _loggedRequest(
+          () => _httpClient.post(
+            Uri.parse('$_baseUrl/storeStatus/$accountId'),
+            headers: _authHeaders(token),
+            body: requestBodyJson,
+          ),
+          '$_baseUrl/storeStatus/$accountId',
+          'POST',
+          headers: _authHeaders(token),
+          body: requestBodyJson,
+        );
+        
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          // Parse the response body
+          final responseData = jsonDecode(response.body);
+          Logger.data('[STORE_STATUS] Response data received successfully');
+          
+          // Log the response message
+          if (responseData.containsKey('message')) {
+            Logger.data('[STORE_STATUS] Response message: ${responseData['message']}');
+          }
+          
+          // Update the user record in the database with the new store status
+          try {
+            final user = await _databaseHelper.getUser();
+            if (user != null) {
+              final updatedUser = user.copyWith(
+                storeOpen: storeOpen,
+                latitude: latitude,
+                longitude: longitude,
+              );
+              await _databaseHelper.saveUser(updatedUser);
+              Logger.data('[STORE_STATUS] Updated user with storeOpen: $storeOpen and location: (${latitude ?? 'null'}, ${longitude ?? 'null'})');
+            }
+          } catch (e) {
+            Logger.error('[STORE_STATUS] Error updating user with store status', e);
+            // Continue even if update fails, as the API call was successful
+          }
+          
+          stopwatch.stop();
+          Logger.performance('[STORE_STATUS] updateStoreStatus completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+          return const Right(true);
+        } else {
+          Logger.error('[STORE_STATUS] Server error with status code ${response.statusCode}');
+          return Left(ServerFailure('Failed to update store status: ${response.body}'));
+        }
+      },
+    );
   }
 }

@@ -20,7 +20,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 17,
+      version: 19,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -35,6 +35,34 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 19) {
+      Logger.data('Starting database upgrade to version 19');
+      
+      // Add store_open, latitude, and longitude columns to users table
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN store_open INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE users ADD COLUMN latitude REAL');
+        await db.execute('ALTER TABLE users ADD COLUMN longitude REAL');
+        Logger.data('Added store_open, latitude, and longitude columns to users table');
+      } catch (e) {
+        Logger.error('Failed to add store status columns to users table', e);
+        // Don't throw here as the columns might already exist
+      }
+    }
+    
+    if (oldVersion < 18) {
+      Logger.data('Starting database upgrade to version 18');
+      
+      // Add accountType column to accounts table
+      try {
+        await db.execute('ALTER TABLE accounts ADD COLUMN accountType TEXT');
+        Logger.data('Added accountType column to accounts table');
+      } catch (e) {
+        Logger.error('Failed to add accountType column to accounts table', e);
+        // Don't throw here as the column might already exist
+      }
+    }
+    
     if (oldVersion < 17) {
       Logger.data('Starting database upgrade to version 17');
       
@@ -276,7 +304,10 @@ class DatabaseHelper {
         version TEXT,
         authMethod TEXT,
         otpVerified INTEGER DEFAULT 0,
-        activate_market INTEGER DEFAULT 0
+        activate_market INTEGER DEFAULT 0,
+        store_open INTEGER DEFAULT 0,
+        latitude REAL,
+        longitude REAL
       )
     ''');
     
@@ -312,6 +343,7 @@ class DatabaseHelper {
         accountHandle TEXT NOT NULL,
         defaultDenom TEXT NOT NULL,
         isOwnedAccount INTEGER NOT NULL,
+        accountType TEXT,
         FOREIGN KEY (memberId) REFERENCES users (memberId)
       )
     ''');
@@ -449,6 +481,9 @@ class DatabaseHelper {
           'authMethod': user.authMethod,
           'otpVerified': user.otpVerified ? 1 : 0,
           'activate_market': user.activateMarket ? 1 : 0,
+          'store_open': user.storeOpen ? 1 : 0,
+          'latitude': user.latitude,
+          'longitude': user.longitude,
         };
         Logger.data('[DATABASE] Inserting user data: ${userData.map((k, v) => MapEntry(k, k == 'token' ? '[REDACTED]' : v))}');
         await txn.insert('users', userData);
@@ -553,6 +588,7 @@ class DatabaseHelper {
               'accountHandle': account.accountHandle,
               'defaultDenom': account.defaultDenom ?? '',
               'isOwnedAccount': account.isOwnedAccount ? 1 : 0,
+              'accountType': account.accountType,
             });
             
             await txn.insert('balance_data', {
@@ -673,6 +709,7 @@ class DatabaseHelper {
             accountHandle: account['accountHandle'] as String,
             defaultDenom: account['defaultDenom'] as String,
             isOwnedAccount: account['isOwnedAccount'] == 1,
+            accountType: account['accountType'] as String?,
             balanceData: dash.BalanceData(
               securedNetBalancesByDenom: securedBalances,
               unsecuredBalances: dash.UnsecuredBalances(
@@ -894,6 +931,9 @@ class DatabaseHelper {
         otpVerified: (userData['otpVerified'] as int? ?? 0) == 1,
         dashboard: dashboardData,
         activateMarket: (userData['activate_market'] as int? ?? 0) == 1,
+        storeOpen: (userData['store_open'] as int? ?? 0) == 1,
+        latitude: userData['latitude'] != null ? (userData['latitude'] as num).toDouble() : null,
+        longitude: userData['longitude'] != null ? (userData['longitude'] as num).toDouble() : null,
       );
       
       Logger.data('[DATABASE] Returning user with token: ${user.token}');

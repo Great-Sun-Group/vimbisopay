@@ -11,6 +11,9 @@ class User {
   final DateTime? passwordChanged;  // When the password was last changed
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
   final bool activateMarket;  // Whether the user is already a vendor in the marketplace
+  final bool storeOpen;  // Whether the vendor's store is currently open
+  final double? latitude;  // The vendor's current location (latitude)
+  final double? longitude;  // The vendor's current location (longitude)
 
   const User({
     required this.memberId,
@@ -23,6 +26,9 @@ class User {
     this.passwordChanged,
     this.dashboard,
     this.activateMarket = false,
+    this.storeOpen = false,
+    this.latitude,
+    this.longitude,
   });
 
   MemberTier? get tier => dashboard?.memberTier;
@@ -44,6 +50,9 @@ class User {
       'password_changed': passwordChanged?.millisecondsSinceEpoch,
       'dashboard': dashboard?.toMap(),
       'activate_market': activateMarket,
+      'store_open': storeOpen,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -73,6 +82,9 @@ class User {
           : null,
       dashboard: dashboard,
       activateMarket: activateMarket,
+      storeOpen: map['store_open'] as bool? ?? false,
+      latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
+      longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
     );
   }
 
@@ -87,6 +99,9 @@ class User {
     DateTime? passwordChanged,
     Dashboard? dashboard,
     bool? activateMarket,
+    bool? storeOpen,
+    double? latitude,
+    double? longitude,
   }) {
     return User(
       memberId: memberId ?? this.memberId,
@@ -99,6 +114,9 @@ class User {
       passwordChanged: passwordChanged ?? this.passwordChanged,
       dashboard: dashboard ?? this.dashboard,
       activateMarket: activateMarket ?? this.activateMarket,
+      storeOpen: storeOpen ?? this.storeOpen,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 
@@ -115,7 +133,10 @@ class User {
         other.passwordHash == passwordHash &&
         other.passwordChanged == passwordChanged &&
         other.dashboard == dashboard &&
-        other.activateMarket == activateMarket;
+        other.activateMarket == activateMarket &&
+        other.storeOpen == storeOpen &&
+        other.latitude == latitude &&
+        other.longitude == longitude;
   }
 
   @override
@@ -127,6 +148,9 @@ class User {
         passwordChanged,
         dashboard,
         activateMarket,
+        storeOpen,
+        latitude,
+        longitude,
       );
 
   @override
@@ -140,7 +164,9 @@ class User {
   passwordHash: ${passwordHash != null ? '[REDACTED]' : 'null'},
   passwordChanged: $passwordChanged,
   dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'},
-  activateMarket: $activateMarket
+  activateMarket: $activateMarket,
+  storeOpen: $storeOpen,
+  location: ${latitude != null && longitude != null ? '($latitude, $longitude)' : 'null'}
 }''';
   }
 }

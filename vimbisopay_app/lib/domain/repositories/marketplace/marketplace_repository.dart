@@ -212,4 +212,14 @@ abstract class MarketplaceRepository {
     required String asset200Id,
     required String asset600Id,
   });
+  
+  /// Updates a vendor's store status and location.
+  ///
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateStoreStatus({
+    required String accountId,
+    required bool storeOpen,
+    double? latitude,
+    double? longitude,
+  });
 }
