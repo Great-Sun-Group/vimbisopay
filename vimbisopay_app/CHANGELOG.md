@@ -137,3 +137,6 @@ Example entry format:
 -e 
 ## [1.0.0+43] - 2025-03-22
 - UI cosmetic enhancements, hustler10k and app update ground work
+-e 
+## [1.0.0+44] - 2025-03-30
+- Market place functionality
