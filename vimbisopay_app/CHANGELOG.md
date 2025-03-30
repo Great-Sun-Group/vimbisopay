@@ -142,3 +142,6 @@ Example entry format:
 - Market place functionality
 -e 
 ## [minor fix-- preserving stor open close state] - 2025-03-30
+-e 
+## [1.0.0+46] - 2025-03-30
+- minor fix  .. preserving store open close state
