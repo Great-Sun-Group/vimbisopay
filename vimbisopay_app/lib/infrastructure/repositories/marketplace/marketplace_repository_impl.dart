@@ -627,33 +627,29 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     
     return _executeAuthenticatedRequest<List<Product>>(
       request: (token) async {
-        // Prepare request data
-        final Map<String, dynamic> requestData = {
-          'query': effectiveQuery,
+        // Build URL with query parameters
+        final queryParams = <String, String>{
+          'keyword': effectiveQuery,
         };
         
-        // Add location if provided
-        if (latitude != null && longitude != null) {
-          requestData['location'] = {
-            'latitude': latitude,
-            'longitude': longitude,
-          };
-        }
+        // Add location parameters if provided
+        if (latitude != null) queryParams['latitude'] = latitude.toString();
+        if (longitude != null) queryParams['longitude'] = longitude.toString();
         
-        final requestBody = jsonEncode(requestData);
+        final uri = Uri.parse('$_baseUrl/searchProducts').replace(
+          queryParameters: queryParams,
+        );
         
-        // Call the API endpoint to search products
-        Logger.data('[MARKETPLACE] Sending POST request to $_baseUrl/searchProducts');
+        // Call the API endpoint to search products using GET
+        Logger.data('[MARKETPLACE] Sending GET request to $uri');
         final response = await _loggedRequest(
-          () => _httpClient.post(
-            Uri.parse('$_baseUrl/searchProducts'),
+          () => _httpClient.get(
+            uri,
             headers: _authHeaders(token),
-            body: requestBody,
           ),
-          '$_baseUrl/searchProducts',
-          'POST',
+          uri.toString(),
+          'GET',
           headers: _authHeaders(token),
-          body: requestBody,
         );
         
         if (response.statusCode == 200) {
