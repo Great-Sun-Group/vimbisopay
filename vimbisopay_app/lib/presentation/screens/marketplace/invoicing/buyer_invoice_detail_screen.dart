@@ -46,38 +46,42 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
 
     try {
       // Load invoice data
-      // final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
+      final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
       
-      // invoiceResult.fold(
-      //   (failure) {
-      //     setState(() {
-      //       _isLoading = false;
-      //       _errorMessage = failure.message ?? 'Failed to load invoice data';
-      //     });
-      //   },
-      //   (invoice) async {
-      //     // Load vendor data
-      //     final vendorResult = await _marketplaceRepository.getVendor(invoice.vendorId);
+      invoiceResult.fold(
+        (failure) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = failure.message ?? 'Failed to load invoice data';
+          });
+        },
+        (invoice) async {
+          // Set the invoice data and create a mock vendor
+          setState(() {
+            _invoice = invoice;
+            
+            // Create a mock vendor using the invoice's vendorId
+            // This prevents null check errors when navigating to PaymentScreen
+            _vendor = Vendor(
+              id: invoice.vendorId.isNotEmpty ? invoice.vendorId : 'unknown',
+              memberId: invoice.vendorId.isNotEmpty ? invoice.vendorId : 'unknown',
+              businessName: 'Vendor', // Default name
+              description: 'Vendor description',
+              email: 'vendor@example.com',
+              phone: '+1234567890',
+              rating: 0.0,
+              ratingCount: 0,
+              isActive: true,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            
+            _isLoading = false;
+          });
           
-      //     vendorResult.fold(
-      //       (failure) {
-      //         Logger.error('Failed to load vendor data', failure);
-      //         setState(() {
-      //           _isLoading = false;
-      //           _invoice = invoice;
-      //           _errorMessage = 'Failed to load vendor data';
-      //         });
-      //       },
-      //       (vendor) {
-      //         setState(() {
-      //           _isLoading = false;
-      //           _invoice = invoice;
-      //           _vendor = vendor;
-      //         });
-      //       },
-      //     );
-      //   },
-      // );
+          Logger.data('[INVOICE_DETAIL] Created mock vendor with ID: ${_vendor?.id}');
+        },
+      );
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -94,8 +98,6 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
       MaterialPageRoute(
         builder: (context) => PaymentScreen(
           invoice: _invoice!,
-          vendor: _vendor!,
-          showDebugOptions: true, // Enable debug options for development
         ),
       ),
     ).then((result) {
@@ -525,7 +527,7 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
             ),
             FilledButton.icon(
               icon: const Icon(Icons.payment),
-              label: const Text('Pay Now'),
+              label: const Text('Sign and Pay'),
               onPressed: _proceedToPayment,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(

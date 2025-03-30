@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:http/http.dart' as http;
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
@@ -42,6 +43,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   Map<String, String> _authHeaders(String token) => {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer $token',
+    'x-client-api-key': ApiConfig.apiKey,
   };
 
   /// Helper method to log API requests and responses.
@@ -1011,9 +1013,190 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<Either<Failure, Invoice>> getInvoice(String id) async {
-    // Empty implementation - API not yet available
-    Logger.data('[MARKETPLACE] getInvoice called with ID: $id');
-    return Left(ServerFailure('API not yet implemented'));
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[MARKETPLACE] Starting getInvoice operation for ID: $id');
+    
+    return _executeAuthenticatedRequest<Invoice>(
+      request: (token) async {
+        // Call the /getInvoice/{id} API endpoint with authentication
+        Logger.data('[MARKETPLACE] Sending GET request to $_baseUrl/getInvoice/$id');
+        final response = await _loggedRequest(
+          () => _httpClient.get(
+            Uri.parse('$_baseUrl/getInvoice/$id'),
+            headers: _authHeaders(token),
+          ),
+          '$_baseUrl/getInvoice/$id',
+          'GET',
+          headers: _authHeaders(token),
+        );
+        
+        if (response.statusCode == 200) {
+          // Parse the response body
+          final responseData = jsonDecode(response.body);
+          Logger.data('[MARKETPLACE] Response data received successfully');
+          
+          try {
+            // Extract invoice details from the response
+            // The response structure is:
+            // {
+            //   "message": "Invoice retrieved successfully",
+            //   "data": {
+            //     "action": {
+            //       "id": "...",
+            //       "type": "INVOICE_RETRIEVED",
+            //       "timestamp": "...",
+            //       "actor": "...",
+            //       "details": {
+            //         "invoiceID": "...",
+            //         "invoiceQRLink": "...",
+            //         "totalAmount": 0,
+            //         "denomination": "...",
+            //         "paymentAccountID": "...",
+            //         "lines": [
+            //           {
+            //             "accountName": "...",
+            //             "amount": 0
+            //           }
+            //         ],
+            //         "notes": "..."
+            //       }
+            //     },
+            //     "dashboard": {
+            //       "invoice": {
+            //         "invoiceID": "...",
+            //         "invoiceQRLink": "...",
+            //         "totalAmount": 0,
+            //         "denomination": "...",
+            //         "paymentAccountID": "...",
+            //         "lines": [
+            //           {
+            //             "accountName": "...",
+            //             "amount": 0
+            //           }
+            //         ],
+            //         "notes": "..."
+            //       }
+            //     }
+            //   }
+            // }
+            
+            // First, try to get the invoice details from data.action.details
+            Map<String, dynamic>? invoiceDetails;
+            if (responseData.containsKey('data') && 
+                responseData['data'] is Map<String, dynamic> && 
+                responseData['data'].containsKey('action') &&
+                responseData['data']['action'] is Map<String, dynamic> &&
+                responseData['data']['action'].containsKey('details')) {
+              invoiceDetails = responseData['data']['action']['details'] as Map<String, dynamic>;
+              Logger.data('[MARKETPLACE] Found invoice details in data.action.details');
+            }
+            
+            // If not found, try to get from data.dashboard.invoice
+            if (invoiceDetails == null && 
+                responseData.containsKey('data') && 
+                responseData['data'] is Map<String, dynamic> && 
+                responseData['data'].containsKey('dashboard') &&
+                responseData['data']['dashboard'] is Map<String, dynamic> &&
+                responseData['data']['dashboard'].containsKey('invoice')) {
+              invoiceDetails = responseData['data']['dashboard']['invoice'] as Map<String, dynamic>;
+              Logger.data('[MARKETPLACE] Found invoice details in data.dashboard.invoice');
+            }
+            
+            // If still not found, return an error
+            if (invoiceDetails == null) {
+              Logger.error('[MARKETPLACE] Invoice details not found in response');
+              return Left(ServerFailure('Invoice details not found in response'));
+            }
+            
+            // Extract invoice ID
+            final invoiceId = invoiceDetails['invoiceID'] ?? id;
+            
+            // Extract invoice QR link
+            final invoiceQrLink = invoiceDetails['invoiceQRLink'];
+            
+            // Extract total amount (convert from dollars to cents)
+            final totalAmount = invoiceDetails['totalAmount'] != null
+                ? (invoiceDetails['totalAmount'] as num).toDouble() * 100
+                : 0.0;
+            
+            // Extract denomination (currency)
+            final currency = invoiceDetails['denomination'] ?? 'USD';
+            
+            // Extract payment account ID
+            final paymentAccountId = invoiceDetails['paymentAccountID'];
+            
+            // Extract notes
+            final notes = invoiceDetails['notes'];
+            
+            // Extract timestamp from action if available
+            DateTime createdAt = DateTime.now();
+            if (responseData.containsKey('data') && 
+                responseData['data'] is Map<String, dynamic> && 
+                responseData['data'].containsKey('action') &&
+                responseData['data']['action'] is Map<String, dynamic> &&
+                responseData['data']['action'].containsKey('timestamp')) {
+              try {
+                createdAt = DateTime.parse(responseData['data']['action']['timestamp']);
+              } catch (e) {
+                Logger.error('[MARKETPLACE] Error parsing timestamp', e);
+              }
+            }
+            
+            // Extract line items
+            final List<InvoiceLineItem> lineItems = [];
+            if (invoiceDetails.containsKey('lines') && invoiceDetails['lines'] is List) {
+              final lines = invoiceDetails['lines'] as List;
+              for (final line in lines) {
+                if (line is Map<String, dynamic>) {
+                  // Convert the API line format to our InvoiceLineItem format
+                  final accountName = line['accountName'] ?? '';
+                  final amount = line['amount'] != null
+                      ? (line['amount'] as num).toDouble() * 100
+                      : 0.0;
+                  
+                  lineItems.add(InvoiceLineItem(
+                    productId: accountName, // Use accountName as productId
+                    productName: accountName,
+                    quantity: 1, // Default to 1
+                    unitPrice: amount.toInt(), // Use amount as unitPrice
+                    totalPrice: amount.toInt(), // Use amount as totalPrice
+                  ));
+                }
+              }
+            }
+            
+            // Create the invoice object
+            final invoice = Invoice(
+              id: invoiceId,
+              vendorId: '', // Not provided in the API response
+              lineItems: lineItems,
+              totalAmount: totalAmount.toInt(),
+              currency: currency,
+              status: InvoiceStatus.pending, // Default to pending
+              paymentMethod: 'CREDEX', // Default to CREDEX
+              notes: notes,
+              createdAt: createdAt,
+              updatedAt: createdAt, // Use createdAt as updatedAt
+              invoiceQrLink: invoiceQrLink,
+              paymentAccountId: paymentAccountId,
+            );
+            
+            stopwatch.stop();
+            Logger.performance('[MARKETPLACE] getInvoice completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(invoice);
+          } catch (e) {
+            Logger.error('[MARKETPLACE] Error parsing invoice data from response', e);
+            return Left(ServerFailure('Failed to parse invoice data: $e'));
+          }
+        } else if (response.statusCode == 404) {
+          Logger.error('[MARKETPLACE] Invoice not found with status code 404');
+          return Left(NotFoundFailure('Invoice not found'));
+        } else {
+          Logger.error('[MARKETPLACE] Server error with status code ${response.statusCode}');
+          return Left(ServerFailure('Failed to get invoice: ${response.body}'));
+        }
+      },
+    );
   }
 
   @override
@@ -1471,20 +1654,12 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         final response = await _loggedRequest(
           () => _httpClient.post(
             Uri.parse('$_baseUrl/uploadAndOptimizeJpg'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'x-client-api-key': 'gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb', // TODO: Get from config
-            },
+            headers: _authHeaders(token),
             body: requestBodyJson,
           ),
           '$_baseUrl/uploadAndOptimizeJpg',
           'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            'x-client-api-key': 'gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb', // TODO: Get from config
-          },
+          headers: _authHeaders(token),
           body: requestBodyJson,
         );
         
@@ -1589,20 +1764,12 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         final response = await _loggedRequest(
           () => _httpClient.post(
             Uri.parse('$_baseUrl/updateProfilePics'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'x-client-api-key': 'gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb', // TODO: Get from config
-            },
+            headers: _authHeaders(token),
             body: requestBody,
           ),
           '$_baseUrl/updateProfilePics',
           'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            'x-client-api-key': 'gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb', // TODO: Get from config
-          },
+          headers: _authHeaders(token),
           body: requestBody,
         );
         

@@ -335,23 +335,45 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       // Navigate to the QR scanner screen
       final result = await Navigator.of(context).push<String>(
         MaterialPageRoute(
-          builder: (context) => const ScanQRScreen(),
+          builder: (context) => const ScanQRScreen(
+            showDebugOptions: false, // Disable debug options for production
+          ),
           fullscreenDialog: true,
         ),
       );
       
       if (result != null && mounted) {
-        // Check if the QR code is a valid invoice QR code
+        String? invoiceId;
+        
+        // Check if the QR code is a valid invoice QR code in the old format
         if (result.startsWith('vimbisopay://invoice/')) {
           // Extract the invoice ID from the QR code
-          final invoiceId = result.substring('vimbisopay://invoice/'.length);
+          invoiceId = result.substring('vimbisopay://invoice/'.length);
+          Logger.data('QR code scanned in old format: $result, extracted invoice ID: $invoiceId');
+        } 
+        // Check if the QR code is in the new URL format
+        else if (result.startsWith('https://mycredex.app/getInvoice/')) {
+          // Extract the invoice ID from the URL
+          invoiceId = result.substring('https://mycredex.app/getInvoice/'.length);
+          Logger.data('QR code scanned in new format: $result, extracted invoice ID: $invoiceId');
+        }
+        
+        if (invoiceId != null && invoiceId.isNotEmpty) {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Processing invoice...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
           
-          // Navigate to the buyer invoice detail screen
+          // Navigate to the buyer invoice detail screen with the non-nullable invoiceId
+          final String nonNullableInvoiceId = invoiceId; // Create a non-nullable copy
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => BuyerInvoiceDetailScreen(
-                invoiceId: invoiceId,
+                invoiceId: nonNullableInvoiceId,
               ),
             ),
           );

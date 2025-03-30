@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
@@ -279,12 +280,46 @@ class _SendCredexScreenState extends State<SendCredexScreen>
   Future<void> _scanQRCode() async {
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (context) => const ScanQRScreen(),
+        builder: (context) => const ScanQRScreen(showDebugOptions: false),
         fullscreenDialog: true,
       ),
     );
 
     if (result != null && mounted) {
+      // Check if the QR code is in the invoice URL format
+      if (result.startsWith('https://mycredex.app/getInvoice/') || 
+          result.startsWith('vimbisopay://invoice/')) {
+        // This is an invoice QR code, extract the invoice ID and navigate to the invoice detail screen
+        String invoiceId = "";
+        if (result.startsWith('https://mycredex.app/getInvoice/')) {
+          invoiceId = result.substring('https://mycredex.app/getInvoice/'.length);
+        } else if (result.startsWith('vimbisopay://invoice/')) {
+          invoiceId = result.substring('vimbisopay://invoice/'.length);
+        }
+        
+        if (invoiceId.isNotEmpty) {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Processing invoice...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Navigate to the buyer invoice detail screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BuyerInvoiceDetailScreen(
+                invoiceId: invoiceId,
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      
+      // Process recipient QR code (expected format: handle#accountId)
       final parts = result.split('#');
       if (parts.length == 2) {
         final handle =
@@ -294,6 +329,14 @@ class _SendCredexScreenState extends State<SendCredexScreen>
           _recipientAccountId = parts[1];
           _errorMessage = null;
         });
+      } else {
+        // Invalid QR code format
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid QR code format. Expected format: handle#accountId'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
       }
     }
   }

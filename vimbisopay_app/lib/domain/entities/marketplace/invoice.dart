@@ -45,6 +45,9 @@ class Invoice extends Entity {
 
   /// The URL to the QR code for this invoice.
   final String? invoiceQrLink;
+  
+  /// The ID of the account used for payment.
+  final String? paymentAccountId;
 
   /// Creates a new [Invoice] instance.
   Invoice({
@@ -61,6 +64,7 @@ class Invoice extends Entity {
     required this.updatedAt,
     this.paidAt,
     this.invoiceQrLink,
+    this.paymentAccountId,
   }) : super(id);
 
   /// Creates an [Invoice] from a JSON map.
@@ -84,6 +88,7 @@ class Invoice extends Entity {
       updatedAt: DateTime.parse(json['updated_at']),
       paidAt: json['paid_at'] != null ? DateTime.parse(json['paid_at']) : null,
       invoiceQrLink: json['invoice_qr_link'],
+      paymentAccountId: json['payment_account_id'],
     );
   }
 
@@ -103,6 +108,7 @@ class Invoice extends Entity {
       'updated_at': updatedAt.toIso8601String(),
       'paid_at': paidAt?.toIso8601String(),
       'invoice_qr_link': invoiceQrLink,
+      'payment_account_id': paymentAccountId,
     };
   }
 
@@ -141,6 +147,7 @@ class Invoice extends Entity {
     DateTime? updatedAt,
     DateTime? paidAt,
     String? invoiceQrLink,
+    String? paymentAccountId,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -156,6 +163,7 @@ class Invoice extends Entity {
       updatedAt: updatedAt ?? this.updatedAt,
       paidAt: paidAt ?? this.paidAt,
       invoiceQrLink: invoiceQrLink ?? this.invoiceQrLink,
+      paymentAccountId: paymentAccountId ?? this.paymentAccountId,
     );
   }
 
