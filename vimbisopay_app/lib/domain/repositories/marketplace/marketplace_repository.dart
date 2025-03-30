@@ -54,8 +54,15 @@ abstract class MarketplaceRepository {
 
   /// Searches for products by query.
   ///
+  /// If latitude and longitude are provided, the search will prioritize products
+  /// from nearby vendors.
+  ///
   /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> searchProducts(String query);
+  Future<Either<Failure, List<Product>>> searchProducts(
+    String query, {
+    double? latitude,
+    double? longitude,
+  });
 
   /// Creates an internal account for a product.
   ///

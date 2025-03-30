@@ -7,6 +7,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
@@ -28,6 +29,7 @@ class MarketplaceScreen extends StatefulWidget {
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final LocationService _locationService = ServiceLocator.locationService;
   bool _isLoading = true;
   bool _isInitializing = true; // Track initialization state
   String _errorMessage = '';
@@ -38,6 +40,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isCheckingVendorStatus = false;
   String? _memberId;
   String? _vendorId;
+  double? _latitude;
+  double? _longitude;
+  bool _isRequestingLocation = false;
 
   @override
   void initState() {
@@ -51,18 +56,128 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           _navigateToVendorProfile(replace: true);
         });
       } else {
-        // Otherwise load products for regular marketplace view
-        _loadProducts();
-        _checkFirstTimeVisit();
-        
-        // Only set _isInitializing to false if we're not navigating away
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-          });
-        }
+        // Otherwise request location permission and load products
+        _requestLocationPermission().then((_) {
+          _loadProducts();
+          _checkFirstTimeVisit();
+          
+          // Only set _isInitializing to false if we're not navigating away
+          if (mounted) {
+            setState(() {
+              _isInitializing = false;
+            });
+          }
+        });
       }
     });
+  }
+  
+  /// Requests location permission from the user.
+  ///
+  /// This method shows a dialog explaining why we need location permission
+  /// and then requests the permission if the user agrees.
+  Future<void> _requestLocationPermission() async {
+    if (_isRequestingLocation) return;
+    
+    setState(() {
+      _isRequestingLocation = true;
+    });
+    
+    try {
+      Logger.data('[MARKETPLACE] Checking if location services are enabled');
+      
+      // Check if location services are enabled
+      bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
+      if (!servicesEnabled) {
+        Logger.data('[MARKETPLACE] Location services are disabled');
+        setState(() {
+          _isRequestingLocation = false;
+        });
+        return;
+      }
+      
+      // Check if permission is already granted
+      bool hasPermission = await _locationService.checkLocationPermission();
+      if (hasPermission) {
+        Logger.data('[MARKETPLACE] Location permission already granted');
+        // Get current location
+        await _getCurrentLocation();
+        setState(() {
+          _isRequestingLocation = false;
+        });
+        return;
+      }
+      
+      // Show a dialog explaining why we need location permission
+      if (mounted) {
+        final shouldRequest = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Permission'),
+            content: const Text(
+              'To help you find nearby products and services, we need your location. '
+              'Would you like to grant location permission?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Not Now'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Grant Permission'),
+              ),
+            ],
+          ),
+        ) ?? false;
+        
+        if (!shouldRequest) {
+          Logger.data('[MARKETPLACE] User declined to request location permission');
+          setState(() {
+            _isRequestingLocation = false;
+          });
+          return;
+        }
+      }
+      
+      // Request permission
+      final permissionGranted = await _locationService.requestLocationPermission();
+      Logger.data('[MARKETPLACE] Location permission request result: $permissionGranted');
+      
+      if (permissionGranted) {
+        // Get current location
+        await _getCurrentLocation();
+      }
+    } catch (e) {
+      Logger.error('[MARKETPLACE] Error requesting location permission', e);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequestingLocation = false;
+        });
+      }
+    }
+  }
+  
+  /// Gets the current location if available.
+  Future<void> _getCurrentLocation() async {
+    try {
+      Logger.data('[MARKETPLACE] Getting current location');
+      
+      final position = await _locationService.getCurrentPosition();
+      if (position != null && mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+        });
+        Logger.data('[MARKETPLACE] Got location: (${position.latitude}, ${position.longitude})');
+      } else {
+        Logger.error('[MARKETPLACE] Failed to get location');
+      }
+    } catch (e) {
+      Logger.error('[MARKETPLACE] Error getting current location', e);
+    }
   }
   
   Future<void> _checkFirstTimeVisit() async {
@@ -276,9 +391,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     });
 
     try {
+      // If we have a selected category, use getProductsByCategory
+      // Otherwise use searchProducts with location data if available
       final result = _selectedCategory != null
           ? await _marketplaceRepository.getProductsByCategory(_selectedCategory!)
-          : await _marketplaceRepository.searchProducts('');
+          : await _marketplaceRepository.searchProducts(
+              '', // Empty query or "a" will be used as default in the repository
+              latitude: _latitude,
+              longitude: _longitude,
+            );
 
       result.fold(
         (failure) {

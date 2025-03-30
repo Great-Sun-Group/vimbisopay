@@ -3,6 +3,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/product.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class SearchResultsScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class SearchResultsScreen extends StatefulWidget {
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final LocationService _locationService = ServiceLocator.locationService;
   final TextEditingController _searchController = TextEditingController();
   
   bool _isLoading = true;
@@ -28,13 +30,44 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   List<Product> _products = [];
   List<String> _categories = [];
   String? _selectedCategory;
+  double? _latitude;
+  double? _longitude;
   
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.initialQuery ?? '';
     _selectedCategory = widget.initialCategory;
-    _loadProducts();
+    _getCurrentLocation().then((_) {
+      _loadProducts();
+    });
+  }
+  
+  /// Gets the current location if available.
+  Future<void> _getCurrentLocation() async {
+    try {
+      Logger.data('[SEARCH_RESULTS] Getting current location');
+      
+      // Check if permission is already granted
+      bool hasPermission = await _locationService.checkLocationPermission();
+      if (!hasPermission) {
+        Logger.data('[SEARCH_RESULTS] Location permission not granted');
+        return;
+      }
+      
+      final position = await _locationService.getCurrentPosition();
+      if (position != null && mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+        });
+        Logger.data('[SEARCH_RESULTS] Got location: (${position.latitude}, ${position.longitude})');
+      } else {
+        Logger.error('[SEARCH_RESULTS] Failed to get location');
+      }
+    } catch (e) {
+      Logger.error('[SEARCH_RESULTS] Error getting current location', e);
+    }
   }
   
   @override
@@ -50,9 +83,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     });
 
     try {
+      // If we have a selected category, use getProductsByCategory
+      // Otherwise use searchProducts with location data if available
       final result = _selectedCategory != null
           ? await _marketplaceRepository.getProductsByCategory(_selectedCategory!)
-          : await _marketplaceRepository.searchProducts(_searchController.text);
+          : await _marketplaceRepository.searchProducts(
+              _searchController.text,
+              latitude: _latitude,
+              longitude: _longitude,
+            );
 
       result.fold(
         (failure) {
@@ -77,7 +116,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         },
       );
     } catch (e) {
-      Logger.error('Error loading products', e);
+      Logger.error('[SEARCH_RESULTS] Error loading products', e);
       setState(() {
         _isLoading = false;
         _errorMessage = 'An unexpected error occurred';

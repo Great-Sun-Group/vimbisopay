@@ -611,16 +611,36 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }
 
   @override
-  Future<Either<Failure, List<Product>>> searchProducts(String query) async {
+  Future<Either<Failure, List<Product>>> searchProducts(
+    String query, {
+    double? latitude,
+    double? longitude,
+  }) async {
     final stopwatch = Stopwatch()..start();
     Logger.data('[MARKETPLACE] Starting searchProducts operation for query: $query');
+    if (latitude != null && longitude != null) {
+      Logger.data('[MARKETPLACE] Including location: ($latitude, $longitude)');
+    }
+    
+    // If query is empty and we have location, use "a" as default query
+    final effectiveQuery = query.isEmpty && (latitude != null || longitude != null) ? "a" : query;
     
     return _executeAuthenticatedRequest<List<Product>>(
       request: (token) async {
         // Prepare request data
-        final requestBody = jsonEncode({
-          'query': query,
-        });
+        final Map<String, dynamic> requestData = {
+          'query': effectiveQuery,
+        };
+        
+        // Add location if provided
+        if (latitude != null && longitude != null) {
+          requestData['location'] = {
+            'latitude': latitude,
+            'longitude': longitude,
+          };
+        }
+        
+        final requestBody = jsonEncode(requestData);
         
         // Call the API endpoint to search products
         Logger.data('[MARKETPLACE] Sending POST request to $_baseUrl/searchProducts');
