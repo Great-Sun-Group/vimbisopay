@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
@@ -16,6 +17,7 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
+import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 
 class SendCredexScreen extends StatefulWidget {
   static const String routeName = '/send-credex';
@@ -23,6 +25,8 @@ class SendCredexScreen extends StatefulWidget {
   final AccountRepository accountRepository;
   final HomeBloc homeBloc;
   final DatabaseHelper databaseHelper;
+  final String? recipientHandle;
+  final String? recipientAccountId;
 
   const SendCredexScreen({
     super.key,
@@ -30,6 +34,8 @@ class SendCredexScreen extends StatefulWidget {
     required this.accountRepository,
     required this.homeBloc,
     required this.databaseHelper,
+    this.recipientHandle,
+    this.recipientAccountId,
   });
 
   @override
@@ -141,6 +147,16 @@ class _SendCredexScreenState extends State<SendCredexScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
+    
+    // Check if recipient information is provided in the arguments
+    if (widget.recipientHandle != null && widget.recipientAccountId != null) {
+      // Pre-fill recipient field and set account ID
+      _recipientController.text = widget.recipientHandle!;
+      _recipientAccountId = widget.recipientAccountId;
+      
+      // Log that we're using pre-filled recipient info
+      Logger.data('[SEND_CREDEX] Using pre-filled recipient: @${widget.recipientHandle}');
+    }
   }
 
   void _setupAmountFocusListener() {

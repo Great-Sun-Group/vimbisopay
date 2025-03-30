@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/payment_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
 /// A screen that displays invoice details to a buyer.
 ///
@@ -35,18 +36,52 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadInvoiceData();
+    
+    // Use post-frame callback to show dialog after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInvoiceData();
+    });
   }
 
   Future<void> _loadInvoiceData() async {
+    // Set loading state
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+    
+    // Show loading dialog
+    Logger.data("DEBUG: Showing loading dialog for invoice ${widget.invoiceId}");
+    
+    // Use a separate method to show the dialog to avoid context issues
+    if (mounted) {
+      // Use a global key for the loading dialog
+      final GlobalKey<State> dialogKey = GlobalKey<State>();
+      
+      // Show the dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true, // Use root navigator to ensure dialog is on top
+        builder: (BuildContext dialogContext) => LoadingDialog(
+          key: dialogKey,
+          message: 'Fetching invoice details...',
+        ),
+      );
+      
+      // Ensure the dialog is visible before proceeding
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     try {
       // Load invoice data
       final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
+      
+      // Dismiss the loading dialog
+      Logger.data("DEBUG: Finished fetching invoice ${widget.invoiceId}, dismissing dialog");
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       
       invoiceResult.fold(
         (failure) {
@@ -83,6 +118,12 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
         },
       );
     } catch (e) {
+      // Dismiss the loading dialog in case of error
+      Logger.error("DEBUG: Error fetching invoice: $e, dismissing dialog");
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
       setState(() {
         _isLoading = false;
         _errorMessage = 'An unexpected error occurred: $e';
@@ -114,11 +155,11 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
       appBar: AppBar(
         title: const Text('Invoice Details'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? _buildErrorView()
-              : _buildInvoiceDetails(),
+      body: _errorMessage != null
+          ? _buildErrorView()
+          : _invoice != null 
+              ? _buildInvoiceDetails()
+              : const SizedBox.shrink(), // Empty widget when loading (dialog is shown instead)
       bottomNavigationBar: _invoice != null && _invoice!.status == InvoiceStatus.pending
           ? _buildBottomBar()
           : null,

@@ -427,6 +427,8 @@ class MyApp extends StatelessWidget {
                 accountRepository: args.accountRepository,
                 homeBloc: args.homeBloc,
                 databaseHelper: args.databaseHelper,
+                recipientHandle: args.recipientHandle,
+                recipientAccountId: args.recipientAccountId,
               ),
               settings: settings,
             );

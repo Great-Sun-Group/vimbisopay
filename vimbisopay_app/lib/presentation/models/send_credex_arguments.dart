@@ -8,11 +8,15 @@ class SendCredexArguments {
   final AccountRepository accountRepository;
   final HomeBloc homeBloc;
   final DatabaseHelper databaseHelper;
+  final String? recipientHandle;
+  final String? recipientAccountId;
 
   SendCredexArguments({
     required this.senderAccount,
     required this.accountRepository,
     required this.homeBloc,
     required this.databaseHelper,
+    this.recipientHandle,
+    this.recipientAccountId,
   });
 }
