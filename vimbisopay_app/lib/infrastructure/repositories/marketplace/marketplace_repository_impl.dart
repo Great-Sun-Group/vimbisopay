@@ -1897,4 +1897,54 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       },
     );
   }
+  
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getStorefront(String accountId) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data('[STOREFRONT] Starting getStorefront operation for account ID: $accountId');
+    
+    return _executeAuthenticatedRequest<Map<String, dynamic>>(
+      request: (token) async {
+        // Call the getStorefront API endpoint with authentication
+        final url = 'https://dev.mycredex.dev/getStorefront/$accountId';
+        Logger.data('[STOREFRONT] Sending GET request to $url');
+        
+        final response = await _loggedRequest(
+          () => _httpClient.get(
+            Uri.parse(url),
+            headers: _authHeaders(token),
+          ),
+          url,
+          'GET',
+          headers: _authHeaders(token),
+        );
+        
+        if (response.statusCode == 200) {
+          // Parse the response body
+          final responseData = jsonDecode(response.body);
+          Logger.data('[STOREFRONT] Response data received successfully');
+          
+          // Log the response message
+          if (responseData.containsKey('message')) {
+            Logger.data('[STOREFRONT] Response message: ${responseData['message']}');
+          }
+          
+          // Extract the data from the response
+          if (responseData.containsKey('data')) {
+            final data = responseData['data'] as Map<String, dynamic>;
+            
+            stopwatch.stop();
+            Logger.performance('[STOREFRONT] getStorefront completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(data);
+          } else {
+            Logger.error('[STOREFRONT] Response does not contain data field');
+            return Left(ServerFailure('Response does not contain data field'));
+          }
+        } else {
+          Logger.error('[STOREFRONT] Server error with status code ${response.statusCode}');
+          return Left(ServerFailure('Failed to get storefront: ${response.body}'));
+        }
+      },
+    );
+  }
 }

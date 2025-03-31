@@ -13,6 +13,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/invent
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/store_information_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
 
 /// Marketplace screen for the VimbisoPay app.
@@ -40,6 +41,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isCheckingVendorStatus = false;
   String? _memberId;
   String? _vendorId;
+  String? _personalAccountId;
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
@@ -243,6 +245,29 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
       
       _memberId = user.memberId;
+      
+      // Find the user's personal account ID
+      if (user.dashboard != null && user.dashboard!.accounts.isNotEmpty) {
+        // Try to find an account with accountType PERSONAL
+        for (final account in user.dashboard!.accounts) {
+          if (account.accountType == 'PERSONAL') {
+            _personalAccountId = account.accountID;
+            Logger.data('[MARKETPLACE] Found PERSONAL account: $_personalAccountId (${account.accountName})');
+            break;
+          }
+        }
+        
+        // If no account with accountType PERSONAL found, try to find by name
+        if (_personalAccountId == null) {
+          for (final account in user.dashboard!.accounts) {
+            if (account.accountName.toUpperCase().contains('PERSONAL')) {
+              _personalAccountId = account.accountID;
+              Logger.data('[MARKETPLACE] Found account with PERSONAL in name: $_personalAccountId (${account.accountName})');
+              break;
+            }
+          }
+        }
+      }
 
       if (_memberId != null) {
         // Check if user is a vendor
@@ -353,6 +378,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       );
     }
   }
+  
+  void _navigateToStoreInformation() {
+    if (_vendorId == null) return;
+    
+    // Use personal account ID if available, otherwise use vendor ID
+    final storeId = _personalAccountId ?? _vendorId!;
+    Logger.data('[MARKETPLACE] Navigating to store information with ID: $storeId');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StoreInformationScreen(
+          storeId: storeId,
+          isOwner: true,
+        ),
+      ),
+    );
+  }
 
   void _navigateToInventoryManagement() {
     if (_vendorId == null) return;
@@ -403,12 +446,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         (products) {
           // If user is a vendor in browse mode, filter out their own products
           List<Product> filteredProducts = products;
-          // TEMPORARILY COMMENTED OUT FOR TESTING
-          // if (_isVendor && _showBrowseMode && _vendorId != null) {
-          //   Logger.data('[MARKETPLACE] Filtering out vendor\'s own products. Vendor ID: $_vendorId');
-          //   filteredProducts = products.where((product) => product.vendorId != _vendorId).toList();
-          //   Logger.data('[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
-          // }
+          if (_isVendor && _showBrowseMode && _vendorId != null) {
+            Logger.data('[MARKETPLACE] Filtering out vendor\'s own products. Vendor ID: $_vendorId');
+            filteredProducts = products.where((product) => product.vendorId != _vendorId).toList();
+            Logger.data('[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
+          }
           
           // Extract unique categories
           final categories = filteredProducts
@@ -438,11 +480,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       '/search-results',
       arguments: {
         'category': category,
-        // TEMPORARILY COMMENTED OUT FOR TESTING
-        // 'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
-        // 'filterOwnProducts': _isVendor && _showBrowseMode,
-        'vendorId': null,
-        'filterOwnProducts': false,
+        'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
+        'filterOwnProducts': _isVendor && _showBrowseMode,
       },
     );
   }
@@ -453,11 +492,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       '/search-results',
       arguments: {
         'query': query,
-        // TEMPORARILY COMMENTED OUT FOR TESTING
-        // 'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
-        // 'filterOwnProducts': _isVendor && _showBrowseMode,
-        'vendorId': null,
-        'filterOwnProducts': false,
+        'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
+        'filterOwnProducts': _isVendor && _showBrowseMode,
       },
     );
   }
@@ -579,6 +615,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             onTap: () {
               Navigator.pop(context);
               _navigateToVendorProfile();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.store, color: AppColors.primary),
+            title: const Text('Store Information'),
+            onTap: () {
+              Navigator.pop(context);
+              _navigateToStoreInformation();
             },
           ),
         ],
@@ -897,6 +941,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _showBrowseMode 
+                    ? 'Browse and discover products from other vendors in the marketplace.'
+                    : 'Manage your store and view your own products.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 12),

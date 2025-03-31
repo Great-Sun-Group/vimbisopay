@@ -25,6 +25,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_s
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/utils/database_test.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -411,6 +412,13 @@ class MyApp extends StatelessWidget {
           if (settings.name == '/debug') {
             return MaterialPageRoute(
               builder: (context) => const DebugScreen(),
+              settings: settings,
+            );
+          }
+          
+          if (settings.name == '/database-test') {
+            return MaterialPageRoute(
+              builder: (context) => const DatabaseTestScreen(),
               settings: settings,
             );
           }

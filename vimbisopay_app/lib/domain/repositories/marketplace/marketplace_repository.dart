@@ -229,4 +229,9 @@ abstract class MarketplaceRepository {
     double? latitude,
     double? longitude,
   });
+  
+  /// Gets storefront information for a vendor using their personal account ID.
+  ///
+  /// Returns storefront data if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, Map<String, dynamic>>> getStorefront(String accountId);
 }

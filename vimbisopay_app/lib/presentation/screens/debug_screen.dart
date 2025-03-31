@@ -349,12 +349,33 @@ Received at: ${DateTime.now()}
               ),
             ),
             const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isLoading ? null : _forceRefresh,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Force Refresh Remote Config'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _isLoading ? null : _forceRefresh,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Force Refresh Remote Config'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/database-test');
+              },
+              icon: const Icon(Icons.storage),
+              label: const Text('Database Test'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.secondary,
                 foregroundColor: AppColors.textPrimary,
                 padding: const EdgeInsets.symmetric(
                   vertical: 16,

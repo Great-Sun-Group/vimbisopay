@@ -107,12 +107,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         (products) {
           // Filter out vendor's own products if needed
           List<Product> filteredProducts = products;
-          // TEMPORARILY COMMENTED OUT FOR TESTING
-          // if (widget.filterOwnProducts && widget.vendorId != null) {
-          //   Logger.data('[SEARCH_RESULTS] Filtering out vendor\'s own products. Vendor ID: ${widget.vendorId}');
-          //   filteredProducts = products.where((product) => product.vendorId != widget.vendorId).toList();
-          //   Logger.data('[SEARCH_RESULTS] Filtered ${products.length - filteredProducts.length} products');
-          // }
+          if (widget.filterOwnProducts && widget.vendorId != null) {
+            Logger.data('[SEARCH_RESULTS] Filtering out vendor\'s own products. Vendor ID: ${widget.vendorId}');
+            filteredProducts = products.where((product) => product.vendorId != widget.vendorId).toList();
+            Logger.data('[SEARCH_RESULTS] Filtered ${products.length - filteredProducts.length} products');
+          }
           
           // Extract unique categories
           final categories = filteredProducts

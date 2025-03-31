@@ -5,7 +5,25 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dash;
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+
+/// Class to represent cached store data
+class CachedStore {
+  final String storeId;
+  final Vendor vendor;
+  final List<Product> products;
+  final String? profileImageUrl;
+  final DateTime lastUpdated;
+  
+  CachedStore({
+    required this.storeId,
+    required this.vendor,
+    required this.products,
+    this.profileImageUrl,
+    required this.lastUpdated,
+  });
+}
 
 class DatabaseHelper {
   final _userController = StreamController<User?>.broadcast();
@@ -20,7 +38,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 19,
+      version: 20,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -35,6 +53,27 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 20) {
+      Logger.data('Starting database upgrade to version 20');
+      
+      // Create cached_stores table
+      try {
+        await db.execute('''
+          CREATE TABLE cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+        Logger.data('Created cached_stores table');
+      } catch (e) {
+        Logger.error('Failed to create cached_stores table', e);
+        // Don't throw here as the table might already exist
+      }
+    }
+    
     if (oldVersion < 19) {
       Logger.data('Starting database upgrade to version 19');
       
@@ -443,6 +482,17 @@ class DatabaseHelper {
         firstname TEXT NOT NULL,
         lastname TEXT NOT NULL,
         FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+      )
+    ''');
+    
+    // Add cached_stores table
+    await db.execute('''
+      CREATE TABLE cached_stores(
+        storeId TEXT PRIMARY KEY,
+        vendor TEXT NOT NULL,
+        products TEXT NOT NULL,
+        profileImageUrl TEXT,
+        lastUpdated INTEGER NOT NULL
       )
     ''');
   }
@@ -1133,5 +1183,167 @@ class DatabaseHelper {
   Future<void> clearLedgerEntries() async {
     final Database db = await database;
     await db.delete('ledger_entries');
+  }
+  
+  /// Caches store data in the database
+  Future<void> cacheStoreData({
+    required String storeId,
+    required Vendor vendor,
+    required List<Product> products,
+    String? profileImageUrl,
+  }) async {
+    try {
+      Logger.data('[DATABASE] Caching store data for store ID: $storeId');
+      Logger.data('[DATABASE] Vendor: ${vendor.businessName}, Products count: ${products.length}');
+      
+      final Database db = await database;
+      
+      // Verify that the cached_stores table exists
+      final tableCheck = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='cached_stores'");
+      if (tableCheck.isEmpty) {
+        Logger.error('[DATABASE] cached_stores table does not exist, creating it now');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+      }
+      
+      // Convert vendor and products to JSON strings
+      final vendorJson = jsonEncode(vendor.toJson());
+      final productsJson = jsonEncode(products.map((p) => p.toJson()).toList());
+      
+      Logger.data('[DATABASE] Vendor JSON size: ${vendorJson.length} characters');
+      Logger.data('[DATABASE] Products JSON size: ${productsJson.length} characters');
+      
+      // Prepare data for insertion
+      final data = {
+        'storeId': storeId,
+        'vendor': vendorJson,
+        'products': productsJson,
+        'profileImageUrl': profileImageUrl,
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      // Insert or replace the cached store data
+      final result = await db.insert(
+        'cached_stores',
+        data,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      Logger.data('[DATABASE] Store data cached successfully for store ID: $storeId, result: $result');
+      
+      // Verify the data was inserted by querying it back
+      final verifyData = await db.query(
+        'cached_stores',
+        where: 'storeId = ?',
+        whereArgs: [storeId],
+      );
+      
+      if (verifyData.isNotEmpty) {
+        Logger.data('[DATABASE] Verified data was inserted successfully');
+      } else {
+        Logger.error('[DATABASE] Data was not inserted successfully');
+      }
+    } catch (e, stackTrace) {
+      Logger.error('[DATABASE] Error caching store data', e);
+      Logger.error('[DATABASE] Stack trace: $stackTrace');
+      throw Exception('Failed to cache store data: $e');
+    }
+  }
+  
+  /// Retrieves cached store data from the database
+  Future<CachedStore?> getCachedStore(String storeId) async {
+    try {
+      Logger.data('[DATABASE] Getting cached store data for store ID: $storeId');
+      final Database db = await database;
+      
+      // Check if the cached_stores table exists
+      final tableCheck = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='cached_stores'");
+      if (tableCheck.isEmpty) {
+        Logger.error('[DATABASE] cached_stores table does not exist');
+        
+        // Create the table if it doesn't exist
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+        Logger.data('[DATABASE] Created cached_stores table');
+        return null;
+      }
+      
+      // Query the cached_stores table
+      final List<Map<String, dynamic>> results = await db.query(
+        'cached_stores',
+        where: 'storeId = ?',
+        whereArgs: [storeId],
+        limit: 1,
+      );
+      
+      if (results.isEmpty) {
+        Logger.data('[DATABASE] No cached store data found for store ID: $storeId');
+        
+        // Check if there are any records in the table
+        final countCheck = await db.rawQuery('SELECT COUNT(*) as count FROM cached_stores');
+        final count = Sqflite.firstIntValue(countCheck) ?? 0;
+        Logger.data('[DATABASE] Total records in cached_stores table: $count');
+        
+        return null;
+      }
+      
+      final data = results.first;
+      Logger.data('[DATABASE] Found cached store data with lastUpdated: ${DateTime.fromMillisecondsSinceEpoch(data['lastUpdated'] as int)}');
+      
+      try {
+        // Parse the vendor JSON
+        final vendorJson = jsonDecode(data['vendor'] as String);
+        final vendor = Vendor.fromJson(vendorJson);
+        
+        // Parse the products JSON
+        final productsJson = jsonDecode(data['products'] as String);
+        final products = (productsJson as List).map((p) => Product.fromJson(p)).toList();
+        
+        Logger.data('[DATABASE] Successfully parsed vendor and ${products.length} products from cached data');
+        
+        // Create and return the CachedStore object
+        return CachedStore(
+          storeId: storeId,
+          vendor: vendor,
+          products: products,
+          profileImageUrl: data['profileImageUrl'] as String?,
+          lastUpdated: DateTime.fromMillisecondsSinceEpoch(data['lastUpdated'] as int),
+        );
+      } catch (parseError) {
+        Logger.error('[DATABASE] Error parsing cached store data JSON', parseError);
+        
+        // Log the data that failed to parse
+        Logger.error('[DATABASE] Vendor JSON length: ${(data['vendor'] as String).length}');
+        Logger.error('[DATABASE] Products JSON length: ${(data['products'] as String).length}');
+        
+        // Delete the corrupted record
+        await db.delete(
+          'cached_stores',
+          where: 'storeId = ?',
+          whereArgs: [storeId],
+        );
+        Logger.data('[DATABASE] Deleted corrupted cached store data');
+        
+        return null;
+      }
+    } catch (e, stackTrace) {
+      Logger.error('[DATABASE] Error getting cached store data', e);
+      Logger.error('[DATABASE] Stack trace: $stackTrace');
+      return null;
+    }
   }
 }

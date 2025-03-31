@@ -9,169 +9,267 @@ import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repos
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
+import 'package:vimbisopay_app/infrastructure/utils/database_checker.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 
-/// Vendor Profile Screen for the VimbisoPay app.
+/// Store Information Screen for the VimbisoPay app.
 ///
-/// This screen displays a vendor's profile information, including business
+/// This screen displays a store's information, including business
 /// details, contact information, ratings, and products.
-class VendorProfileScreen extends StatefulWidget {
-  /// The ID of the vendor to display.
-  final String vendorId;
+class StoreInformationScreen extends StatefulWidget {
+  /// The ID of the store to display.
+  final String storeId;
 
-  /// Whether the current user is the owner of this vendor profile.
+  /// Whether the current user is the owner of this store.
   final bool isOwner;
   
   /// Whether to show a success message when the screen is loaded.
   final bool showSuccessMessage;
 
-  /// Creates a new [VendorProfileScreen] instance.
-  const VendorProfileScreen({
+  /// Creates a new [StoreInformationScreen] instance.
+  const StoreInformationScreen({
     super.key,
-    required this.vendorId,
+    required this.storeId,
     this.isOwner = false,
     this.showSuccessMessage = false,
   });
 
   @override
-  State<VendorProfileScreen> createState() => _VendorProfileScreenState();
+  State<StoreInformationScreen> createState() => _StoreInformationScreenState();
 }
 
-class _VendorProfileScreenState extends State<VendorProfileScreen> {
+class _StoreInformationScreenState extends State<StoreInformationScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
   final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
   final StoreStatusService _storeStatusService = ServiceLocator.storeStatusService;
+  
   bool _isLoading = true;
+  bool _isRefreshing = false;
   bool _isUpdatingStoreStatus = false;
   String _errorMessage = '';
+  
   Vendor? _vendor;
   List<Product> _products = [];
   User? _currentUser;
   String? _profileThumbnailUrl;
   bool _storeOpen = false;
+  String? _personalAccountId;
 
   @override
   void initState() {
     super.initState();
-    Logger.lifecycle('VendorProfileScreen initialized');
-    _loadVendorData();
+    Logger.lifecycle('StoreInformationScreen initialized');
     
-    // Proactively request location permission when the screen is initialized
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.isOwner) {
-        _storeStatusService.requestLocationPermission(context);
-      }
+    // Initially set loading to false until we determine if we need to show the loading indicator
+    setState(() {
+      _isLoading = false;
     });
     
-    // Show success message if needed
-    if (widget.showSuccessMessage) {
-      // Use post-frame callback to ensure the context is ready
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vendor profile created successfully'),
-              backgroundColor: AppColors.successGreen,
-            ),
-          );
-        }
-      });
-    }
+    // Check database status
+    DatabaseChecker.checkDatabaseStatus().then((_) {
+      Logger.data('[STORE_INFO] Database status check completed');
+    });
+    
+    // Load cached data first, then fetch fresh data
+    _loadCachedData().then((cachedDataFound) {
+      // Only show loading indicator if no cached data was found
+      if (!cachedDataFound && mounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+      
+      _loadFreshData();
+      
+      // Proactively request location permission when the screen is initialized
+      if (mounted && widget.isOwner) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _storeStatusService.requestLocationPermission(context);
+        });
+      }
+      
+      // Show success message if needed
+      if (widget.showSuccessMessage) {
+        // Use post-frame callback to ensure the context is ready
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Store information updated successfully'),
+                backgroundColor: AppColors.successGreen,
+              ),
+            );
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
-    Logger.lifecycle('VendorProfileScreen disposed');
+    Logger.lifecycle('StoreInformationScreen disposed');
     super.dispose();
   }
 
-  Future<void> _loadVendorData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
+  /// Loads cached store data from the database
+  /// Returns true if cached data was found, false otherwise
+  Future<bool> _loadCachedData() async {
     try {
+      Logger.data('[STORE_INFO] Loading cached store data');
+      
       // Load current user data
-      try {
-        _currentUser = await _databaseHelper.getUser();
-        if (_currentUser == null) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'User not found';
-          });
-          return;
-        }
-        
-        // Get store status from user
-        _storeOpen = _currentUser!.storeOpen;
-        Logger.data('[VENDOR_PROFILE] Store status: ${_storeOpen ? 'Open' : 'Closed'}');
-      } catch (e) {
-        Logger.error('[VENDOR_PROFILE] Error loading user data', e);
+      _currentUser = await _databaseHelper.getUser();
+      if (_currentUser == null) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load user data: $e';
+          _errorMessage = 'User not found';
         });
-        return;
+        return false;
       }
-
-      // Check if user is a vendor
-      if (!_currentUser!.activateMarket) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'User is not a vendor';
-        });
-        return;
-      }
-
+      
+      // Get store status from user
+      _storeOpen = _currentUser!.storeOpen;
+      Logger.data('[STORE_INFO] Store status from cache: ${_storeOpen ? 'Open' : 'Closed'}');
+      
       // Find the user's personal account ID
-      String? personalAccountId;
       if (_currentUser?.dashboard != null && _currentUser!.dashboard!.accounts.isNotEmpty) {
         // Try to find an account with accountType PERSONAL
         for (final account in _currentUser!.dashboard!.accounts) {
           if (account.accountType == 'PERSONAL') {
-            personalAccountId = account.accountID;
-            Logger.data('[VENDOR_PROFILE] Found PERSONAL account: $personalAccountId (${account.accountName})');
+            _personalAccountId = account.accountID;
+            Logger.data('[STORE_INFO] Found PERSONAL account: $_personalAccountId (${account.accountName})');
             break;
           }
         }
         
         // If no account with accountType PERSONAL found, try to find by name
-        if (personalAccountId == null) {
+        if (_personalAccountId == null) {
           for (final account in _currentUser!.dashboard!.accounts) {
             if (account.accountName.toUpperCase().contains('PERSONAL')) {
-              personalAccountId = account.accountID;
-              Logger.data('[VENDOR_PROFILE] Found account with PERSONAL in name: $personalAccountId (${account.accountName})');
+              _personalAccountId = account.accountID;
+              Logger.data('[STORE_INFO] Found account with PERSONAL in name: $_personalAccountId (${account.accountName})');
               break;
             }
           }
         }
       }
       
-      if (personalAccountId == null) {
+      // Load cached store data from database
+      // First try with personal account ID if available
+      CachedStore? cachedStore;
+      if (_personalAccountId != null) {
+        Logger.data('[STORE_INFO] Trying to get cached store data with personal account ID: $_personalAccountId');
+        cachedStore = await _databaseHelper.getCachedStore(_personalAccountId!);
+      }
+      
+      // If not found with personal account ID, try with widget.storeId
+      if (cachedStore == null) {
+        Logger.data('[STORE_INFO] No cached store data found with personal account ID, trying with widget.storeId: ${widget.storeId}');
+        cachedStore = await _databaseHelper.getCachedStore(widget.storeId);
+      }
+      
+      if (cachedStore != null) {
+        Logger.data('[STORE_INFO] Found cached store data with ID: ${cachedStore.storeId}');
+        
+        final vendor = cachedStore.vendor;
+        final products = cachedStore.products;
+        final profileImageUrl = cachedStore.profileImageUrl;
+        
         setState(() {
           _isLoading = false;
+          _vendor = vendor;
+          _products = products;
+          _profileThumbnailUrl = profileImageUrl;
+        });
+        return true;
+      } else {
+        Logger.data('[STORE_INFO] No cached store data found');
+        // Keep isLoading true to show loading indicator until fresh data is loaded
+        return false;
+      }
+    } catch (e) {
+      Logger.error('[STORE_INFO] Error loading cached data', e);
+      // Don't set error message here, as we'll try to load fresh data next
+      return false;
+    }
+  }
+
+  /// Loads fresh store data from the API
+  Future<void> _loadFreshData() async {
+    if (_isRefreshing) return;
+    
+    setState(() {
+      _isRefreshing = true;
+      if (_vendor == null) {
+        _isLoading = true; // Only show loading indicator if we don't have cached data
+      }
+    });
+
+    try {
+      Logger.data('[STORE_INFO] Starting to load fresh store data for store ID: ${widget.storeId}');
+      
+      // Check if user is a vendor
+      if (_currentUser == null || !_currentUser!.activateMarket) {
+        Logger.error('[STORE_INFO] User is not a vendor or user is null');
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+          _errorMessage = 'User is not a vendor';
+        });
+        return;
+      }
+
+      // Check if we have a personal account ID
+      if (_personalAccountId == null) {
+        Logger.error('[STORE_INFO] No personal account ID found for user: ${_currentUser!.memberId}');
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
           _errorMessage = 'No personal account found';
         });
         return;
       }
       
+      Logger.data('[STORE_INFO] Using personal account ID: $_personalAccountId to fetch storefront data');
+      
       // Use the getStorefront API to get vendor information
-      final storefrontResult = await _marketplaceRepository.getStorefront(personalAccountId);
+      final storefrontResult = await _marketplaceRepository.getStorefront(_personalAccountId!);
       
       return storefrontResult.fold(
         (failure) {
-          Logger.error('[VENDOR_PROFILE] Failed to get storefront: ${failure.message}');
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Failed to get storefront: ${failure.message}';
-          });
+          Logger.error('[STORE_INFO] Failed to get storefront: ${failure.message}');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isRefreshing = false;
+              // Only set error message if we don't have cached data
+              if (_vendor == null) {
+                _errorMessage = 'Failed to get storefront: ${failure.message}';
+              }
+            });
+          }
         },
-        (data) {
+        (data) async {
           try {
+            Logger.data('[STORE_INFO] Successfully received storefront data');
+            
+            // Log the structure of the data for debugging
+            Logger.data('[STORE_INFO] Data structure: ${_getDataStructure(data)}');
+            
+            // Validate the expected data structure
+            if (!data.containsKey('dashboard')) {
+              throw Exception('Missing dashboard key in response data');
+            }
+            if (!data['dashboard'].containsKey('store')) {
+              throw Exception('Missing store key in dashboard data');
+            }
+            if (!data['dashboard'].containsKey('vendor')) {
+              throw Exception('Missing vendor key in dashboard data');
+            }
+            
             // Extract store information
             final store = data['dashboard']['store'];
             final storeId = store['storeID'] as String?;
@@ -179,20 +277,30 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             final storeDescription = store['storeDescription'] as String?;
             final storeOpen = store['storeOpen'] as bool?;
             
+            Logger.data('[STORE_INFO] Extracted store info - ID: $storeId, Name: $storeName');
+            
             // Extract profile picture URLs
             Map<String, dynamic>? profilePictureUrls = store['profilePictureUrls'] as Map<String, dynamic>?;
             String? profileImageUrl;
             if (profilePictureUrls != null) {
+              Logger.data('[STORE_INFO] Found profile picture URLs: ${profilePictureUrls.keys.join(', ')}');
+              
               // Prefer pic600 if available, then pic200, then thumbnail, then original
               if (profilePictureUrls['pic600'] != null) {
                 profileImageUrl = profilePictureUrls['pic600'] as String?;
+                Logger.data('[STORE_INFO] Using pic600 as profile image URL');
               } else if (profilePictureUrls['pic200'] != null) {
                 profileImageUrl = profilePictureUrls['pic200'] as String?;
+                Logger.data('[STORE_INFO] Using pic200 as profile image URL');
               } else if (profilePictureUrls['thumbnail'] != null) {
                 profileImageUrl = profilePictureUrls['thumbnail'] as String?;
+                Logger.data('[STORE_INFO] Using thumbnail as profile image URL');
               } else if (profilePictureUrls['original'] != null) {
                 profileImageUrl = profilePictureUrls['original'] as String?;
+                Logger.data('[STORE_INFO] Using original as profile image URL');
               }
+            } else {
+              Logger.data('[STORE_INFO] No profile picture URLs found');
             }
             
             // Extract vendor information
@@ -203,12 +311,18 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             final memberHandle = vendor['memberHandle'] as String?;
             final vendorBio = vendor['vendorBio'] as String?;
             
+            Logger.data('[STORE_INFO] Extracted vendor info - Member ID: $memberId, Name: $firstname $lastname');
+            
             // Create a Vendor object
+            // Always use personal account ID as the store ID if available
+            final vendorStoreId = _personalAccountId ?? widget.storeId;
+            Logger.data('[STORE_INFO] Using store ID for vendor object: $vendorStoreId');
+            
             final vendorObj = Vendor(
-              id: storeId ?? widget.vendorId,
+              id: vendorStoreId,
               memberId: memberId ?? _currentUser!.memberId,
               businessName: storeName ?? (firstname != null && lastname != null ? '$firstname $lastname' : 'My Business'),
-              description: storeDescription ?? vendorBio ?? 'Vendor profile',
+              description: storeDescription ?? vendorBio ?? 'Store profile',
               email: '',
               phone: _currentUser!.phone,
               profileImageUrl: profileImageUrl,
@@ -223,12 +337,15 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             // Update store status
             if (storeOpen != null) {
               _storeOpen = storeOpen;
+              Logger.data('[STORE_INFO] Updated store status: ${_storeOpen ? 'Open' : 'Closed'}');
             }
             
             // Extract products
             List<Product> vendorProducts = [];
-            if (data['dashboard']['products'] is List) {
+            if (data['dashboard'].containsKey('products') && data['dashboard']['products'] is List) {
               final products = data['dashboard']['products'] as List;
+              Logger.data('[STORE_INFO] Found ${products.length} products in response');
+              
               vendorProducts = products.map((product) {
                 // Extract product details
                 final productId = product['productID'] as String?;
@@ -259,29 +376,101 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                   updatedAt: DateTime.now(),
                 );
               }).toList();
+              
+              Logger.data('[STORE_INFO] Created ${vendorProducts.length} Product objects');
+            } else {
+              Logger.data('[STORE_INFO] No products found in response or invalid format');
+            }
+            
+            // Cache the store data in the database
+            Logger.data('[STORE_INFO] Attempting to cache store data in database with ID: ${vendorObj.id}');
+            try {
+              await _databaseHelper.cacheStoreData(
+                storeId: vendorObj.id,
+                vendor: vendorObj,
+                products: vendorProducts,
+                profileImageUrl: profileImageUrl ?? "",
+              );
+              Logger.data('[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
+              
+              // Verify the data was cached by retrieving it
+              final cachedStore = await _databaseHelper.getCachedStore(vendorObj.id);
+              if (cachedStore != null) {
+                Logger.data('[STORE_INFO] Verified cached data can be retrieved with ID: ${cachedStore.storeId}');
+              } else {
+                Logger.error('[STORE_INFO] Failed to verify cached data - could not retrieve it');
+              }
+            } catch (cacheError) {
+              Logger.error('[STORE_INFO] Error caching store data', cacheError);
+              // Continue even if caching fails, as we still have the data in memory
             }
             
             // Update state
-            setState(() {
-              _isLoading = false;
-              _vendor = vendorObj;
-              _products = vendorProducts;
-              _profileThumbnailUrl = profileImageUrl;
-            });
-          } catch (e) {
-            Logger.error('[VENDOR_PROFILE] Error parsing storefront data', e);
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Error parsing storefront data: $e';
-            });
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _isRefreshing = false;
+                _vendor = vendorObj;
+                _products = vendorProducts;
+                _profileThumbnailUrl = profileImageUrl;
+              });
+            }
+            
+            Logger.data('[STORE_INFO] Successfully updated UI with fresh store data');
+          } catch (e, stackTrace) {
+            Logger.error('[STORE_INFO] Error parsing storefront data', e);
+            Logger.error('[STORE_INFO] Stack trace: $stackTrace');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _isRefreshing = false;
+                // Only set error message if we don't have cached data
+                if (_vendor == null) {
+                  _errorMessage = 'Error parsing storefront data: $e';
+                }
+              });
+            }
           }
         },
       );
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'An unexpected error occurred: $e';
-      });
+    } catch (e, stackTrace) {
+      Logger.error('[STORE_INFO] Unexpected error in _loadFreshData', e);
+      Logger.error('[STORE_INFO] Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+          // Only set error message if we don't have cached data
+          if (_vendor == null) {
+            _errorMessage = 'An unexpected error occurred: $e';
+          }
+        });
+      }
+    }
+  }
+  
+  /// Helper method to log the structure of a data object without exposing sensitive data
+  String _getDataStructure(dynamic data, {int level = 0}) {
+    if (data == null) {
+      return 'null';
+    }
+    
+    if (data is Map) {
+      final keys = data.keys.map((k) {
+        final value = data[k];
+        if (value is Map) {
+          return '$k: {${_getDataStructure(value, level: level + 1)}}';
+        } else if (value is List) {
+          return '$k: [${value.length} items]';
+        } else {
+          return '$k: ${value.runtimeType}';
+        }
+      }).join(', ');
+      return keys;
+    } else if (data is List) {
+      return '[${data.length} items]';
+    } else {
+      return data.runtimeType.toString();
     }
   }
 
@@ -290,9 +479,11 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
+          : _errorMessage.isNotEmpty && _vendor == null
               ? _buildErrorView()
-              : _buildVendorProfile(),
+              : _vendor != null
+                  ? _buildStoreProfile()
+                  : const Center(child: CircularProgressIndicator()), // Fallback if vendor is null
       // Add FloatingActionButton here, only visible if user is the owner AND products list is not empty
       floatingActionButton: (widget.isOwner && _products.isNotEmpty)
           ? FloatingActionButton.extended(
@@ -301,7 +492,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                   context,
                   '/vendor-sales-tab',
                   arguments: {
-                    'vendorId': widget.vendorId,
+                    'vendorId': widget.storeId,
                   },
                 );
               },
@@ -336,7 +527,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: _loadVendorData,
+              onPressed: _loadFreshData,
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),
@@ -351,26 +542,59 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  Widget _buildVendorProfile() {
+  Widget _buildStoreProfile() {
+    // Add null check to prevent exception
+    if (_vendor == null) {
+      Logger.error('[STORE_INFO] Attempted to build store profile with null vendor');
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading store information...'),
+          ],
+        ),
+      );
+    }
+    
     final vendor = _vendor!;
     
-    return CustomScrollView(
-      slivers: [
-        _buildAppBar(vendor),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildBusinessInfo(vendor),
-                const SizedBox(height: 24),
-                _buildAccountsSection(),
-              ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadFreshData();
+      },
+      child: CustomScrollView(
+        slivers: [
+          _buildAppBar(vendor),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isRefreshing)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  _buildBusinessInfo(vendor),
+                  const SizedBox(height: 24),
+                  _buildAccountsSection(),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -498,7 +722,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => InventoryManagementScreen(
-                        vendorId: widget.vendorId,
+                        vendorId: widget.storeId,
                       ),
                     ),
                   );
@@ -512,7 +736,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => EditVendorProfileScreen(
-                        vendorId: widget.vendorId,
+                        vendorId: widget.storeId,
                       ),
                     ),
                   ).then((result) {
@@ -522,16 +746,16 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'Vendor profile updated successfully'),
+                            content: Text(result['message'] ?? 'Store information updated successfully'),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
                     }
                     
-                    // Refresh the vendor data
+                    // Refresh the store data
                     if (mounted) {
-                      _loadVendorData();
+                      _loadFreshData();
                     }
                   });
                 },
@@ -550,7 +774,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     });
     
     try {
-      Logger.data('[VENDOR_PROFILE] Updating store status to: ${value ? 'Open' : 'Closed'}');
+      Logger.data('[STORE_INFO] Updating store status to: ${value ? 'Open' : 'Closed'}');
       
       // Get current location if opening the store
       double? latitude;
@@ -560,7 +784,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         // First check if location services are enabled
         final servicesEnabled = await _storeStatusService.checkLocationServicesEnabled(context);
         if (!servicesEnabled) {
-          Logger.error('[VENDOR_PROFILE] Location services are disabled');
+          Logger.error('[STORE_INFO] Location services are disabled');
           if (mounted) {
             // Ask if the user wants to continue without location
             final continueWithoutLocation = await showDialog<bool>(
@@ -586,7 +810,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             ) ?? false;
             
             if (!continueWithoutLocation) {
-              Logger.data('[VENDOR_PROFILE] User cancelled store status update due to disabled location services');
+              Logger.data('[STORE_INFO] User cancelled store status update due to disabled location services');
               setState(() {
                 _isUpdatingStoreStatus = false;
               });
@@ -594,7 +818,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             }
             
             // User chose to continue without location
-            Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+            Logger.data('[STORE_INFO] User chose to continue without location');
           } else {
             setState(() {
               _isUpdatingStoreStatus = false;
@@ -605,7 +829,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           // Location services are enabled, now check and request permission if needed
           final hasPermission = await _storeStatusService.requestLocationPermission(context);
           if (!hasPermission) {
-            Logger.error('[VENDOR_PROFILE] Location permission not granted');
+            Logger.error('[STORE_INFO] Location permission not granted');
             if (mounted) {
               // Ask if the user wants to continue without location
               final continueWithoutLocation = await showDialog<bool>(
@@ -631,7 +855,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               ) ?? false;
               
               if (!continueWithoutLocation) {
-                Logger.data('[VENDOR_PROFILE] User cancelled store status update due to denied location permission');
+                Logger.data('[STORE_INFO] User cancelled store status update due to denied location permission');
                 setState(() {
                   _isUpdatingStoreStatus = false;
                 });
@@ -639,7 +863,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               }
               
               // User chose to continue without location
-              Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+              Logger.data('[STORE_INFO] User chose to continue without location');
             } else {
               setState(() {
                 _isUpdatingStoreStatus = false;
@@ -651,9 +875,9 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             final location = await _storeStatusService.getCurrentLocation();
             if (location != null) {
               (latitude, longitude) = location;
-              Logger.data('[VENDOR_PROFILE] Got location: ($latitude, $longitude)');
+              Logger.data('[STORE_INFO] Got location: ($latitude, $longitude)');
             } else {
-              Logger.error('[VENDOR_PROFILE] Failed to get location');
+              Logger.error('[STORE_INFO] Failed to get location');
               // Ask if the user wants to continue without location
               if (mounted) {
                 final continueWithoutLocation = await showDialog<bool>(
@@ -680,7 +904,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                 ) ?? false;
                 
                 if (!continueWithoutLocation) {
-                  Logger.data('[VENDOR_PROFILE] User cancelled store status update due to location not available');
+                  Logger.data('[STORE_INFO] User cancelled store status update due to location not available');
                   setState(() {
                     _isUpdatingStoreStatus = false;
                   });
@@ -688,7 +912,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                 }
                 
                 // User chose to continue without location
-                Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+                Logger.data('[STORE_INFO] User chose to continue without location');
               } else {
                 setState(() {
                   _isUpdatingStoreStatus = false;
@@ -708,7 +932,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
       );
       
       if (success) {
-        Logger.data('[VENDOR_PROFILE] Store status updated successfully');
+        Logger.data('[STORE_INFO] Store status updated successfully');
         // Update local state
         if (mounted) {
           setState(() {
@@ -724,7 +948,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           );
         }
       } else {
-        Logger.error('[VENDOR_PROFILE] Failed to update store status: $errorMessage');
+        Logger.error('[STORE_INFO] Failed to update store status: $errorMessage');
         // Show error message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -739,7 +963,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         }
       }
     } catch (e) {
-      Logger.error('[VENDOR_PROFILE] Error updating store status', e);
+      Logger.error('[STORE_INFO] Error updating store status', e);
       // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -812,10 +1036,10 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       icon: const Icon(Icons.settings),
                       label: const Text('Settings'),
                       onPressed: () {
-                        // TODO: Navigate to vendor settings
+                        // TODO: Navigate to store settings
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Vendor settings coming soon'),
+                            content: Text('Store settings coming soon'),
                           ),
                         );
                       },
@@ -880,7 +1104,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Accounts',
+              'Products',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -889,13 +1113,13 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             if (widget.isOwner)
               TextButton.icon(
                 icon: const Icon(Icons.add),
-                label: const Text('Add Account'),
+                label: const Text('Add Product'),
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => AddEditSkuScreen(
-                        vendorId: widget.vendorId,
+                        vendorId: widget.storeId,
                       ),
                     ),
                   ).then((result) {
@@ -905,58 +1129,16 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'Account added successfully'),
+                            content: Text(result['message'] ?? 'Product added successfully'),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
                       
-                      // Check if the result contains a product
-                      if (result.containsKey('product') && result['product'] != null) {
-                        final productMap = result['product'] as Map<String, dynamic>;
-                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
-                        
-                        try {
-                          // Create a new Product object from the data
-                          final retrievedProduct = Product(
-                            id: productMap['id'],
-                            vendorId: productMap['vendorId'],
-                            name: productMap['name'],
-                            description: productMap['description'],
-                            price: productMap['price'],
-                            currency: productMap['currency'],
-                            imageUrls: List<String>.from(productMap['imageUrls']),
-                            category: productMap['category'],
-                            tags: List<String>.from(productMap['tags']),
-                            isAvailable: productMap['isAvailable'],
-                            accountId: productMap['accountId'],
-                            createdAt: DateTime.parse(productMap['createdAt']),
-                            updatedAt: DateTime.parse(productMap['updatedAt']),
-                          );
-                          
-                          // Check if the product has image URLs
-                          if (retrievedProduct.imageUrls.isNotEmpty) {
-                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
-                            
-                            // Update the state with the new product
-                            setState(() {
-                              // Add the new product to the list
-                              _products.add(retrievedProduct);
-                            });
-                            
-                            // No need to reload all vendor data
-                            return;
-                          }
-                        } catch (e) {
-                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
-                          // Continue to reload all vendor data
-                        }
+                      // Refresh the store data
+                      if (mounted) {
+                        _loadFreshData();
                       }
-                    }
-                    
-                    // If we didn't get a product or it didn't have image URLs, refresh all data
-                    if (mounted) {
-                      _loadVendorData();
                     }
                   });
                 },
@@ -965,13 +1147,13 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         ),
         const SizedBox(height: 16),
         _products.isEmpty
-            ? _buildEmptyAccountsView()
-            : _buildAccountsGrid(),
+            ? _buildEmptyProductsView()
+            : _buildProductsGrid(),
       ],
     );
   }
 
-  Widget _buildEmptyAccountsView() {
+  Widget _buildEmptyProductsView() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -986,8 +1168,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             const SizedBox(height: 16),
             Text(
               widget.isOwner
-                  ? 'You haven\'t added any accounts yet'
-                  : 'This vendor hasn\'t added any accounts yet',
+                  ? 'You haven\'t added any products yet'
+                  : 'This store hasn\'t added any products yet',
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -1002,73 +1184,17 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => AddEditSkuScreen(
-                        vendorId: widget.vendorId,
+                        vendorId: widget.storeId,
                       ),
                     ),
-                  ).then((result) {
-                    // Check if we got a success result
-                    if (result != null && result is Map && result['success'] == true) {
-                      // Show success message
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(result['message'] ?? 'Account added successfully'),
-                            backgroundColor: AppColors.successGreen,
-                          ),
-                        );
-                      }
-                      
-                      // Check if the result contains a product
-                      if (result.containsKey('product') && result['product'] != null) {
-                        final productMap = result['product'] as Map<String, dynamic>;
-                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
-                        
-                        try {
-                          // Create a new Product object from the data
-                          final retrievedProduct = Product(
-                            id: productMap['id'],
-                            vendorId: productMap['vendorId'],
-                            name: productMap['name'],
-                            description: productMap['description'],
-                            price: productMap['price'],
-                            currency: productMap['currency'],
-                            imageUrls: List<String>.from(productMap['imageUrls']),
-                            category: productMap['category'],
-                            tags: List<String>.from(productMap['tags']),
-                            isAvailable: productMap['isAvailable'],
-                            accountId: productMap['accountId'],
-                            createdAt: DateTime.parse(productMap['createdAt']),
-                            updatedAt: DateTime.parse(productMap['updatedAt']),
-                          );
-                          
-                          // Check if the product has image URLs
-                          if (retrievedProduct.imageUrls.isNotEmpty) {
-                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
-                            
-                            // Update the state with the new product
-                            setState(() {
-                              // Add the new product to the list
-                              _products.add(retrievedProduct);
-                            });
-                            
-                            // No need to reload all vendor data
-                            return;
-                          }
-                        } catch (e) {
-                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
-                          // Continue to reload all vendor data
-                        }
-                      }
-                    }
-                    
-                    // If we didn't get a product or it didn't have image URLs, refresh all data
+                  ).then((_) {
                     if (mounted) {
-                      _loadVendorData();
+                      _loadFreshData();
                     }
                   });
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('Add Your First Account'),
+                label: const Text('Add Your First Product'),
               ),
             ],
           ],
@@ -1077,7 +1203,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
     );
   }
 
-  Widget _buildAccountsGrid() {
+  Widget _buildProductsGrid() {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1097,7 +1223,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
 
   /// Builds the product image widget based on the image URL type.
   Widget _buildProductImage(Product product) {
-    if (product.imageUrls.isEmpty || product.imageUrls.first == 'https://example.com/product_placeholder.jpg') {
+    if (product.imageUrls.isEmpty) {
       // Show placeholder if no image
       return Container(
         color: AppColors.grey300,
@@ -1119,7 +1245,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         File(filePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          Logger.error('Error loading local image: $filePath', error);
+          Logger.error('[STORE_INFO] Error loading local image: $filePath', error);
           return Container(
             color: AppColors.grey300,
             child: const Center(
@@ -1159,7 +1285,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
   Widget _buildProfileImage(Vendor vendor) {
     // Use profile thumbnail URL if available
     if (_profileThumbnailUrl != null && _profileThumbnailUrl!.isNotEmpty) {
-      Logger.data('[VENDOR_PROFILE] Using profile thumbnail URL: $_profileThumbnailUrl');
+      Logger.data('[STORE_INFO] Using profile thumbnail URL: $_profileThumbnailUrl');
       return _buildImageFromUrl(
         _profileThumbnailUrl,
         placeholder: Container(
@@ -1205,25 +1331,25 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
   /// Builds an image widget from a URL, handling both local and remote URLs.
   Widget _buildImageFromUrl(String? imageUrl, {Widget? placeholder}) {
     if (imageUrl == null || imageUrl.isEmpty) {
-      Logger.data('[VENDOR_PROFILE] Image URL is null or empty, using placeholder');
+      Logger.data('[STORE_INFO] Image URL is null or empty, using placeholder');
       return placeholder ?? Container(color: AppColors.grey300);
     }
     
     if (imageUrl.startsWith('file://')) {
       // Show local file image
       final filePath = imageUrl.substring(7); // Remove 'file://' prefix
-      Logger.data('[VENDOR_PROFILE] Loading local image: $filePath');
+      Logger.data('[STORE_INFO] Loading local image: $filePath');
       return Image.file(
         File(filePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          Logger.error('[VENDOR_PROFILE] Error loading local image: $filePath', error);
+          Logger.error('[STORE_INFO] Error loading local image: $filePath', error);
           return placeholder ?? Container(color: AppColors.grey300);
         },
       );
     } else {
       // Show remote image
-      Logger.data('[VENDOR_PROFILE] Loading remote image: $imageUrl');
+      Logger.data('[STORE_INFO] Loading remote image: $imageUrl');
       return CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
@@ -1232,7 +1358,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           child: const Center(child: CircularProgressIndicator()),
         ),
         errorWidget: (context, url, error) {
-          Logger.error('[VENDOR_PROFILE] Error loading remote image: $url', error);
+          Logger.error('[STORE_INFO] Error loading remote image: $url', error);
           return placeholder ?? Container(color: AppColors.grey300);
         },
       );
