@@ -195,6 +195,9 @@ class AccountRepositoryImpl implements AccountRepository {
         
         final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         final user = User(
           memberId: memberId,
           phone: userPhone,
@@ -206,10 +209,19 @@ class AccountRepositoryImpl implements AccountRepository {
           passwordChanged: password != null ? DateTime.now() : null,
           dashboard: dashboardObj,
           activateMarket: isVendor, // Set activateMarket based on vendor status
+          // Preserve store status and location from existing user if available
+          storeOpen: existingUser?.storeOpen ?? false,
+          latitude: existingUser?.latitude,
+          longitude: existingUser?.longitude,
         );
 
         // Save user with password info to database
         await _databaseHelper.saveUser(user);
+        
+        Logger.data('[LOGIN_V2] Preserved store status: ${user.storeOpen}');
+        if (user.latitude != null && user.longitude != null) {
+          Logger.data('[LOGIN_V2] Preserved location: (${user.latitude}, ${user.longitude})');
+        }
 
         return Right(user);
       } else {
@@ -370,6 +382,9 @@ class AccountRepositoryImpl implements AccountRepository {
                   passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
                   activateMarket: activateMarket, // Set vendor status based on dashboard data
+                  storeOpen: user.storeOpen, // Preserve the original storeOpen status
+                  latitude: user.latitude, // Preserve the original latitude
+                  longitude: user.longitude, // Preserve the original longitude
                   version: newUser.version,
                   authMethod: newUser.authMethod,
                   otpVerified: newUser.otpVerified,
@@ -863,6 +878,9 @@ class AccountRepositoryImpl implements AccountRepository {
           return Right(user);
         }
 
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         // Otherwise return full user info
         final user = User(
           memberId: memberId,
@@ -874,7 +892,16 @@ class AccountRepositoryImpl implements AccountRepository {
           authMethod: authMethod,
           dashboard: dashboardObj,
           activateMarket: isVendor, // Set activateMarket based on vendor status
+          // Preserve store status and location from existing user if available
+          storeOpen: existingUser?.storeOpen ?? false,
+          latitude: existingUser?.latitude,
+          longitude: existingUser?.longitude,
         );
+        
+        Logger.data('[LOGIN] Preserved store status: ${user.storeOpen}');
+        if (user.latitude != null && user.longitude != null) {
+          Logger.data('[LOGIN] Preserved location: (${user.latitude}, ${user.longitude})');
+        }
 
         return Right(user);
       } else {
@@ -1336,12 +1363,40 @@ Response body: ${response.body}
 
         Logger.data('[SET_INITIAL_PASSWORD] Password set successfully, proceeding with v2 login');
         
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         // Immediately perform v2 login with the new password hash
         final loginResult = await loginV2(
           phone: formattedPhone,
           passwordHash: hashedPassword,
         );
-
+        
+        // If we have an existing user and the login was successful, ensure we preserve the store status and location
+        if (existingUser != null) {
+          return loginResult.fold(
+            (failure) => Left(failure),
+            (newUser) async {
+              // Create updated user with preserved store status and location
+              final updatedUser = newUser.copyWith(
+                storeOpen: existingUser.storeOpen,
+                latitude: existingUser.latitude,
+                longitude: existingUser.longitude,
+              );
+              
+              // Save the updated user
+              await _databaseHelper.saveUser(updatedUser);
+              
+              Logger.data('[SET_INITIAL_PASSWORD] Preserved store status: ${updatedUser.storeOpen}');
+              if (updatedUser.latitude != null && updatedUser.longitude != null) {
+                Logger.data('[SET_INITIAL_PASSWORD] Preserved location: (${updatedUser.latitude}, ${updatedUser.longitude})');
+              }
+              
+              return Right(updatedUser);
+            },
+          );
+        }
+        
         return loginResult;
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to set initial password';
@@ -1400,11 +1455,18 @@ Response body: ${response.body}
         );
 
         if (response.statusCode == 200) {
-          // Update stored password hash
+          // Update stored password hash while preserving store status and location
           final updatedUser = user.copyWith(
             passwordHash: newHash,
             passwordChanged: DateTime.now(),
+            // No need to explicitly set storeOpen, latitude, and longitude
+            // as copyWith will preserve them from the original user object
           );
+          
+          Logger.data('[UPDATE_PASSWORD] Preserved store status: ${updatedUser.storeOpen}');
+          if (updatedUser.latitude != null && updatedUser.longitude != null) {
+            Logger.data('[UPDATE_PASSWORD] Preserved location: (${updatedUser.latitude}, ${updatedUser.longitude})');
+          }
           await _databaseHelper.saveUser(updatedUser);
           
           return const Right(true);

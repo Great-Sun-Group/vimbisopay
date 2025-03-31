@@ -43,32 +43,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
+  bool _showBrowseMode = true; // Default to browse mode for vendors
 
   @override
   void initState() {
     super.initState();
     Logger.lifecycle('MarketplaceScreen initialized');
     _checkVendorStatus().then((_) {
-      // If user is a vendor, navigate to their vendor profile
-      if (_isVendor && _vendorId != null && mounted) {
-        Logger.data('[MARKETPLACE] User is a vendor, navigating to vendor profile');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _navigateToVendorProfile(replace: true);
-        });
-      } else {
-        // Otherwise request location permission and load products
-        _requestLocationPermission().then((_) {
-          _loadProducts();
-          _checkFirstTimeVisit();
-          
-          // Only set _isInitializing to false if we're not navigating away
-          if (mounted) {
-            setState(() {
-              _isInitializing = false;
-            });
-          }
-        });
-      }
+      // Request location permission and load products for all users (including vendors)
+      _requestLocationPermission().then((_) {
+        _loadProducts();
+        _checkFirstTimeVisit();
+        
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+          });
+        }
+      });
     });
   }
   
@@ -409,8 +401,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           });
         },
         (products) {
+          // If user is a vendor in browse mode, filter out their own products
+          List<Product> filteredProducts = products;
+          // TEMPORARILY COMMENTED OUT FOR TESTING
+          // if (_isVendor && _showBrowseMode && _vendorId != null) {
+          //   Logger.data('[MARKETPLACE] Filtering out vendor\'s own products. Vendor ID: $_vendorId');
+          //   filteredProducts = products.where((product) => product.vendorId != _vendorId).toList();
+          //   Logger.data('[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
+          // }
+          
           // Extract unique categories
-          final categories = products
+          final categories = filteredProducts
               .map((p) => p.category)
               .toSet()
               .toList()
@@ -418,7 +419,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
           setState(() {
             _isLoading = false;
-            _products = products;
+            _products = filteredProducts;
             _categories = categories;
           });
         },
@@ -437,6 +438,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       '/search-results',
       arguments: {
         'category': category,
+        // TEMPORARILY COMMENTED OUT FOR TESTING
+        // 'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
+        // 'filterOwnProducts': _isVendor && _showBrowseMode,
+        'vendorId': null,
+        'filterOwnProducts': false,
       },
     );
   }
@@ -447,6 +453,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       '/search-results',
       arguments: {
         'query': query,
+        // TEMPORARILY COMMENTED OUT FOR TESTING
+        // 'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
+        // 'filterOwnProducts': _isVendor && _showBrowseMode,
+        'vendorId': null,
+        'filterOwnProducts': false,
       },
     );
   }
@@ -527,6 +538,25 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Toggle between browse mode and vendor mode
+          SwitchListTile(
+            title: const Text('Browse Mode'),
+            subtitle: const Text('Discover products from other vendors'),
+            value: _showBrowseMode,
+            secondary: Icon(
+              _showBrowseMode ? Icons.search : Icons.storefront,
+              color: AppColors.primary,
+            ),
+            onChanged: (value) {
+              setState(() {
+                _showBrowseMode = value;
+              });
+              Navigator.pop(context);
+              // Reload products to apply filtering
+              _loadProducts();
+            },
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.point_of_sale, color: AppColors.primary),
             title: const Text('New Sale'),
@@ -854,7 +884,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Widget _buildVendorCTA() {
     if (_isVendor) {
-      // Show quick actions for vendors
+      // Show mode toggle for vendors with improved layout
       return Card(
         margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
         child: Padding(
@@ -863,37 +893,36 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Vendor Quick Actions',
+                'Marketplace Mode',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _navigateToInventoryManagement,
-                      icon: const Icon(Icons.inventory_2),
-                      label: const Text('Inventory'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+              Center(
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(
+                      value: true,
+                      label: Text('Browse'),
+                      icon: Icon(Icons.search),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _navigateToNewSale,
-                      icon: const Icon(Icons.point_of_sale),
-                      label: const Text('New Sale'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                    ButtonSegment<bool>(
+                      value: false,
+                      label: Text('My Store'),
+                      icon: Icon(Icons.storefront),
                     ),
-                  ),
-                ],
+                  ],
+                  selected: {_showBrowseMode},
+                  onSelectionChanged: (Set<bool> selection) {
+                    setState(() {
+                      _showBrowseMode = selection.first;
+                    });
+                    // Reload products to apply filtering
+                    _loadProducts();
+                  },
+                ),
               ),
             ],
           ),

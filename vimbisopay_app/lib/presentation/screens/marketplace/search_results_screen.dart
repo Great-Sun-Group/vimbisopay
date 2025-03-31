@@ -9,11 +9,15 @@ import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 class SearchResultsScreen extends StatefulWidget {
   final String? initialQuery;
   final String? initialCategory;
+  final String? vendorId;
+  final bool filterOwnProducts;
 
   const SearchResultsScreen({
     super.key,
     this.initialQuery,
     this.initialCategory,
+    this.vendorId,
+    this.filterOwnProducts = false,
   });
 
   @override
@@ -101,8 +105,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           });
         },
         (products) {
+          // Filter out vendor's own products if needed
+          List<Product> filteredProducts = products;
+          // TEMPORARILY COMMENTED OUT FOR TESTING
+          // if (widget.filterOwnProducts && widget.vendorId != null) {
+          //   Logger.data('[SEARCH_RESULTS] Filtering out vendor\'s own products. Vendor ID: ${widget.vendorId}');
+          //   filteredProducts = products.where((product) => product.vendorId != widget.vendorId).toList();
+          //   Logger.data('[SEARCH_RESULTS] Filtered ${products.length - filteredProducts.length} products');
+          // }
+          
           // Extract unique categories
-          final categories = products
+          final categories = filteredProducts
               .map((p) => p.category)
               .toSet()
               .toList()
@@ -110,7 +123,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
           setState(() {
             _isLoading = false;
-            _products = products;
+            _products = filteredProducts;
             _categories = categories;
           });
         },
