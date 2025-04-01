@@ -1,0 +1,10 @@
+⁠ curl --location 'https://dev.mycredex.dev/sellInMarket' 
+--header 'x-client-api-key: gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb' 
+--header 'Content-Type: application/json' 
+--header 'Authorization: ••••••' 
+--data '{
+  "vendor": true,
+  "storeAccountName": "test store 2",
+  "storeAccountHandle": "MyStore2"
+
+}

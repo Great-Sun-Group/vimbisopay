@@ -72,6 +72,7 @@ abstract class MarketplaceRepository {
     required String defaultDenom,
     required String accountType,
     String? storeAccountID,
+    String? accountDescription,
   });
 
   /// Creates a new product.
