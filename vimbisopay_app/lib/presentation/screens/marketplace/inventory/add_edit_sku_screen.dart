@@ -440,10 +440,25 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
         );
       } else {
         // For new products, create an internal account first
+        // Get the user to find the OPERATION account
+        final user = await ServiceLocator.databaseHelper.getUser();
+        String? storeAccountID;
+
+        // Find the OPERATION account from the user's accounts
+        if (user?.dashboard != null) {
+          for (final account in user!.dashboard!.accounts) {
+            if (account.accountType == 'OPERATION') {
+              storeAccountID = account.accountID;
+              break;
+            }
+          }
+        }
+
         final accountResult = await _marketplaceRepository.createInternalAccount(
           accountName: name,
           defaultDenom: _currency,
           accountType: 'PHYSICAL_ASSET',
+          storeAccountID: storeAccountID,
         );
 
         await accountResult.fold(

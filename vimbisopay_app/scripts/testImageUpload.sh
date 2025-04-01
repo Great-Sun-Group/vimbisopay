@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Configuration
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZW1iZXJJRCI6ImMwYTQwMGNlLTlkNmQtNGM0OS1hZThmLTE2YzAyYTYzY2E5MyIsImlhdCI6MTc0MzA0MTkzMiwibGFzdEFjdGl2aXR5IjoxNzQzMDQxOTMyLCJhYnNvbHV0ZUV4cGlyeSI6MTc0MzA0NTUzMiwidmVyc2lvbiI6InYxIiwiYXV0aE1ldGhvZCI6InBob25lX29ubHkifQ.gl7wiCNpXg0qD3LU8yGQlW3R4valPUsQwuqlO59Vq68"
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZW1iZXJJRCI6IjFlM2QzMGMzLWQ0NDQtNDA0Ny05MTkxLTA4MmNlNTdhYTg2ZCIsImlhdCI6MTc0MzQyMDk5NiwibGFzdEFjdGl2aXR5IjoxNzQzNDIwOTk2LCJhYnNvbHV0ZUV4cGlyeSI6MTc0MzQyNDU5NiwidmVyc2lvbiI6InYxIiwiYXV0aE1ldGhvZCI6InBob25lX29ubHkifQ.OJf9x7XMAAF2-jkE8rGPB_CfVVV-zZ4MORhoFn8QlcE"
 IMAGE_PATH="avatar_1.jpeg"
 NAME="profile_pic"
-DR_ACCOUNT_ID="96be06c3-f843-411a-ac06-f43c51c75d25"  # The debit account ID
+DR_ACCOUNT_ID="2781cc65-55fd-4403-966e-cc7d6426f7f9"  # The debit account ID
 CR_ACCOUNT_ID=""  # The credit account ID (optional)
 CLIENT_API_KEY="gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb"
 BASE_URL="https://dev.mycredex.dev"  # Fixed: removed endpoint from base URL

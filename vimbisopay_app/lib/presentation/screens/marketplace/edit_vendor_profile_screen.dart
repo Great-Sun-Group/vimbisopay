@@ -80,12 +80,42 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
         _profileImageUrl = currentUser.dashboard!.member.profilePictureThumbnail;
         Logger.data('[EDIT_VENDOR] Found profile image URL: $_profileImageUrl');
       }
+      
+      // Find the user's personal account ID and name
+      String businessName = 'My Business';
+      if (currentUser.dashboard != null && currentUser.dashboard!.accounts.isNotEmpty) {
+        // Try to find an account with accountType PERSONAL
+        for (final account in currentUser.dashboard!.accounts) {
+          if (account.accountType == 'PERSONAL') {
+            businessName = account.accountName;
+            Logger.data('[EDIT_VENDOR] Found PERSONAL account: ${account.accountID} (${account.accountName})');
+            break;
+          }
+        }
+        
+        // If no account with accountType PERSONAL found, try to find by name
+        if (businessName == 'My Business') {
+          for (final account in currentUser.dashboard!.accounts) {
+            if (account.accountName.toUpperCase().contains('PERSONAL')) {
+              businessName = account.accountName;
+              Logger.data('[EDIT_VENDOR] Found account with PERSONAL in name: ${account.accountID} (${account.accountName})');
+              break;
+            }
+          }
+        }
+      }
+      
+      // If still not found, use the user's first name as fallback
+      if (businessName == 'My Business' && currentUser.dashboard?.member.firstname != null) {
+        businessName = currentUser.dashboard!.member.firstname;
+        Logger.data('[EDIT_VENDOR] Using first name as business name: $businessName');
+      }
 
       // Create a vendor object from the current user
       final vendor = Vendor(
         id: widget.vendorId,
         memberId: currentUser.memberId,
-        businessName: currentUser.dashboard?.member.firstname ?? 'My Business',
+        businessName: businessName,
         description: '', // Will be populated from form or previous data
         email: '', // Will be populated from form or previous data
         phone: currentUser.phone,

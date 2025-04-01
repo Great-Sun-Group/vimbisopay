@@ -712,6 +712,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String accountName,
     required String defaultDenom,
     required String accountType,
+    String? storeAccountID,
   }) async {
     final stopwatch = Stopwatch()..start();
     Logger.data('[MARKETPLACE] Starting createInternalAccount operation');
@@ -719,11 +720,18 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     return _executeAuthenticatedRequest<String>(
       request: (token) async {
         // Prepare request data
-        final requestBody = jsonEncode({
+        final Map<String, dynamic> requestData = {
           'accountName': accountName,
           'defaultDenom': defaultDenom,
           'accountType': accountType,
-        });
+        };
+        
+        // Add storeAccountID if provided
+        if (storeAccountID != null) {
+          requestData['storeAccountID'] = storeAccountID;
+        }
+        
+        final requestBody = jsonEncode(requestData);
         Logger.data('[MARKETPLACE] Request body: $requestBody');
         
         // Call the /createAccountInternal API endpoint with authentication
@@ -1628,9 +1636,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     Logger.data('[PROFILE_IMAGE] Image file size: ${fileSizeKB.toStringAsFixed(2)} KB (${fileSizeMB.toStringAsFixed(2)} MB)');
     
     // Check if file is too large before even trying to encode it
-    if (fileSizeKB > 160) { // Reduced from 5MB to 80KB based on server limits
+    if (fileSizeKB > 10240) { // Changed from 160KB to 10MB (10240KB)
       Logger.error('[PROFILE_IMAGE] Image file is too large: ${fileSizeKB.toStringAsFixed(2)} KB');
-      return Left(ServerFailure('Image file is too large. Please use an image smaller than 80KB.'));
+      return Left(ServerFailure('Image file is too large. Please use an image smaller than 10MB.'));
     }
     
     final bytes = await file.readAsBytes();
@@ -1640,9 +1648,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     Logger.data('[PROFILE_IMAGE] Image converted to base64: ${base64SizeKB.toStringAsFixed(2)} KB (${base64SizeMB.toStringAsFixed(2)} MB)');
     
     // Check if base64 encoded data is too large
-    if (base64SizeKB > 100) { // Reduced from 6MB to 100KB (allowing for ~25% increase from base64 encoding)
+    if (base64SizeKB > 13653) { // Changed from 100KB to ~13.3MB (allowing for ~33% increase from base64 encoding)
       Logger.error('[PROFILE_IMAGE] Base64 encoded image is too large: ${base64SizeKB.toStringAsFixed(2)} KB');
-      return Left(ServerFailure('Encoded image is too large. Please use a smaller image (under 80KB).'));
+      return Left(ServerFailure('Encoded image is too large. Please use a smaller image (under 10MB).'));
     }
     
     // Prepare request data

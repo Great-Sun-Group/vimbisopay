@@ -56,7 +56,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   User? _currentUser;
   String? _profileThumbnailUrl;
   bool _storeOpen = false;
-  String? _personalAccountId;
+  String? _operationsAccountId;
 
   @override
   void initState() {
@@ -136,21 +136,21 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       
       // Find the user's personal account ID
       if (_currentUser?.dashboard != null && _currentUser!.dashboard!.accounts.isNotEmpty) {
-        // Try to find an account with accountType PERSONAL
+        // Try to find an account with accountType OPERATIONS
         for (final account in _currentUser!.dashboard!.accounts) {
-          if (account.accountType == 'PERSONAL') {
-            _personalAccountId = account.accountID;
-            Logger.data('[STORE_INFO] Found PERSONAL account: $_personalAccountId (${account.accountName})');
+          if (account.accountType == 'OPERATIONS') {
+            _operationsAccountId = account.accountID;
+            Logger.data('[STORE_INFO] Found OPERATIONS account: $_operationsAccountId (${account.accountName})');
             break;
           }
         }
         
-        // If no account with accountType PERSONAL found, try to find by name
-        if (_personalAccountId == null) {
+        // If no account with accountType OPERATIONS found, try to find by name
+        if (_operationsAccountId == null) {
           for (final account in _currentUser!.dashboard!.accounts) {
-            if (account.accountName.toUpperCase().contains('PERSONAL')) {
-              _personalAccountId = account.accountID;
-              Logger.data('[STORE_INFO] Found account with PERSONAL in name: $_personalAccountId (${account.accountName})');
+            if (account.accountName.toUpperCase().contains('OPERATIONS')) {
+              _operationsAccountId = account.accountID;
+              Logger.data('[STORE_INFO] Found account with OPERATIONS in name: $_operationsAccountId (${account.accountName})');
               break;
             }
           }
@@ -160,9 +160,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       // Load cached store data from database
       // First try with personal account ID if available
       CachedStore? cachedStore;
-      if (_personalAccountId != null) {
-        Logger.data('[STORE_INFO] Trying to get cached store data with personal account ID: $_personalAccountId');
-        cachedStore = await _databaseHelper.getCachedStore(_personalAccountId!);
+      if (_operationsAccountId != null) {
+        Logger.data('[STORE_INFO] Trying to get cached store data with personal account ID: $_operationsAccountId');
+        cachedStore = await _databaseHelper.getCachedStore(_operationsAccountId!);
       }
       
       // If not found with personal account ID, try with widget.storeId
@@ -223,7 +223,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       }
 
       // Check if we have a personal account ID
-      if (_personalAccountId == null) {
+      if (_operationsAccountId == null) {
         Logger.error('[STORE_INFO] No personal account ID found for user: ${_currentUser!.memberId}');
         setState(() {
           _isLoading = false;
@@ -233,10 +233,10 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         return;
       }
       
-      Logger.data('[STORE_INFO] Using personal account ID: $_personalAccountId to fetch storefront data');
+      Logger.data('[STORE_INFO] Using personal account ID: $_operationsAccountId to fetch storefront data');
       
       // Use the getStorefront API to get vendor information
-      final storefrontResult = await _marketplaceRepository.getStorefront(_personalAccountId!);
+      final storefrontResult = await _marketplaceRepository.getStorefront(_operationsAccountId!);
       
       return storefrontResult.fold(
         (failure) {
@@ -315,7 +315,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
             
             // Create a Vendor object
             // Always use personal account ID as the store ID if available
-            final vendorStoreId = _personalAccountId ?? widget.storeId;
+            final vendorStoreId = _operationsAccountId ?? widget.storeId;
             Logger.data('[STORE_INFO] Using store ID for vendor object: $vendorStoreId');
             
             final vendorObj = Vendor(

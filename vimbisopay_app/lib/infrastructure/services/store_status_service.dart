@@ -184,15 +184,15 @@ class StoreStatusService {
       return null;
     }
     
-    // Try to find an account with accountType PERSONAL
+    // Try to find an account with accountType OPERATIONS
     for (final account in user.dashboard!.accounts) {
-      if (account.accountType == 'PERSONAL') {
-        Logger.data('[STORE_STATUS] Found PERSONAL account: ${account.accountID} (${account.accountName})');
+      if (account.accountType == 'OPERATIONS') {
+        Logger.data('[STORE_STATUS] Found OPERATIONS account: ${account.accountID} (${account.accountName})');
         return account.accountID;
       }
     }
     
-    Logger.error('[STORE_STATUS] No PERSONAL account found');
+    Logger.error('[STORE_STATUS] No OPERATIONS account found');
     return null;
   }
 

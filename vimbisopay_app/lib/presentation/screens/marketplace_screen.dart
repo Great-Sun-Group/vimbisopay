@@ -609,14 +609,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               _navigateToInventoryManagement();
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.storefront, color: AppColors.primary),
-            title: const Text('Vendor Profile'),
-            onTap: () {
-              Navigator.pop(context);
-              _navigateToVendorProfile();
-            },
-          ),
+          // ListTile(
+          //   leading: const Icon(Icons.storefront, color: AppColors.primary),
+          //   title: const Text('Vendor Profile'),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     _navigateToVendorProfile();
+          //   },
+          // ),
           ListTile(
             leading: const Icon(Icons.store, color: AppColors.primary),
             title: const Text('Store Information'),
