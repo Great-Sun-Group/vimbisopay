@@ -145,3 +145,6 @@ Example entry format:
 -e 
 ## [1.0.0+46] - 2025-03-30
 - minor fix  .. preserving store open close state
+-e 
+## [1.0.0+47] - 2025-04-01
+- Seeking alignment
