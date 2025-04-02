@@ -7,6 +7,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:vimbisopay_app/core/config/feature_flags.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/main.dart';
+import 'package:vimbisopay_app/presentation/helpers/marketplace_debug_helper.dart';
 
 /// Debug screen for the VimbisoPay app.
 ///
@@ -376,6 +377,21 @@ Received at: ${DateTime.now()}
               label: const Text('Database Test'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.secondary,
+                foregroundColor: AppColors.textPrimary,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () {
+                MarketplaceDebugHelper.showAccountInfo(context);
+              },
+              icon: const Icon(Icons.account_circle),
+              label: const Text('Show Account Information'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.textPrimary,
                 padding: const EdgeInsets.symmetric(
                   vertical: 16,

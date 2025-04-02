@@ -116,7 +116,7 @@ class _BasketItemCardState extends State<BasketItemCard> {
                 
                 // Amount field - fixed width
                 SizedBox(
-                  width: 120, // Fixed comfortable width
+                  width: 132, // Fixed comfortable width (increased by 10%)
                   child: TextField(
                     controller: _amountController,
                     focusNode: _amountFocusNode,

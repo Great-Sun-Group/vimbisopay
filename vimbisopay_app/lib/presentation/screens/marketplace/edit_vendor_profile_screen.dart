@@ -224,40 +224,52 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       }
       
       // Log available account types for debugging
-      final accountTypes = user.dashboard!.accountsInternal.map((a) => '${a.accountName}: ${a.accountType}').join(', ');
+      final accountTypes = user.dashboard!.accountsInternal.map((a) => '${a.accountName}: ${a.accountType} (${a.accountID})').join(', ');
       Logger.data('[EDIT_VENDOR] Available internal accounts: $accountTypes');
       
-      // Try to find digital asset account in the internal accounts list
+      // Try to find OPERATIONS account in the internal accounts list
       String? digitalAssetAccountId;
       
       try {
-        // First try to find by type
-        final digitalAssetAccount = user.dashboard!.accountsInternal.firstWhere(
-          (account) => account.accountType == 'DIGITAL_ASSET',
-          orElse: () => throw Exception('No account with type DIGITAL_ASSET'),
+        // First try to find by type OPERATIONS
+        final operationsAccount = user.dashboard!.accountsInternal.firstWhere(
+          (account) => account.accountType == 'OPERATIONS',
+          orElse: () => throw Exception('No account with type OPERATIONS'),
         );
-        digitalAssetAccountId = digitalAssetAccount.accountID;
-        Logger.data('[EDIT_VENDOR] Found account by type: ${digitalAssetAccount.accountName}');
+        digitalAssetAccountId = operationsAccount.accountID;
+        Logger.data('[EDIT_VENDOR] Found OPERATIONS account: ${operationsAccount.accountName} (${operationsAccount.accountID})');
       } catch (e) {
-        Logger.error('[EDIT_VENDOR] Error finding account by type', e);
+        Logger.error('[EDIT_VENDOR] Error finding OPERATIONS account', e);
         
-        // Fallback: try to find by name
+        // Fallback to original behavior: try to find DIGITAL_ASSET account
         try {
-          final profilePicturesAccount = user.dashboard!.accountsInternal.firstWhere(
-            (account) => account.accountName == 'Profile Pictures',
-            orElse: () => throw Exception('No account named Profile Pictures'),
+          final digitalAssetAccount = user.dashboard!.accountsInternal.firstWhere(
+            (account) => account.accountType == 'DIGITAL_ASSET',
+            orElse: () => throw Exception('No account with type DIGITAL_ASSET'),
           );
-          digitalAssetAccountId = profilePicturesAccount.accountID;
-          Logger.data('[EDIT_VENDOR] Found account by name: ${profilePicturesAccount.accountName}');
+          digitalAssetAccountId = digitalAssetAccount.accountID;
+          Logger.data('[EDIT_VENDOR] Found DIGITAL_ASSET account: ${digitalAssetAccount.accountName} (${digitalAssetAccount.accountID})');
         } catch (e) {
-          Logger.error('[EDIT_VENDOR] Error finding account by name', e);
+          Logger.error('[EDIT_VENDOR] Error finding DIGITAL_ASSET account', e);
           
-          // Last resort: use the first account in the list
-          if (user.dashboard!.accountsInternal.isNotEmpty) {
-            digitalAssetAccountId = user.dashboard!.accountsInternal.first.accountID;
-            Logger.data('[EDIT_VENDOR] Using first available account: ${user.dashboard!.accountsInternal.first.accountName}');
-          } else {
-            throw Exception('No internal accounts available');
+          // Fallback: try to find by name
+          try {
+            final profilePicturesAccount = user.dashboard!.accountsInternal.firstWhere(
+              (account) => account.accountName == 'Profile Pictures',
+              orElse: () => throw Exception('No account named Profile Pictures'),
+            );
+            digitalAssetAccountId = profilePicturesAccount.accountID;
+            Logger.data('[EDIT_VENDOR] Found account by name: ${profilePicturesAccount.accountName} (${profilePicturesAccount.accountID})');
+          } catch (e) {
+            Logger.error('[EDIT_VENDOR] Error finding account by name', e);
+            
+            // Last resort: use the first account in the list
+            if (user.dashboard!.accountsInternal.isNotEmpty) {
+              digitalAssetAccountId = user.dashboard!.accountsInternal.first.accountID;
+              Logger.data('[EDIT_VENDOR] Using first available account: ${user.dashboard!.accountsInternal.first.accountName} (${user.dashboard!.accountsInternal.first.accountID})');
+            } else {
+              throw Exception('No internal accounts available');
+            }
           }
         }
       }
@@ -267,7 +279,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       }
       
       // Upload image
-      Logger.data('[EDIT_VENDOR] Uploading image to account: $digitalAssetAccountId');
+      Logger.data('[EDIT_VENDOR] Uploading image to account: $digitalAssetAccountId (Account Type: ${_getAccountTypeById(user, digitalAssetAccountId)})');
       final uploadResult = await _marketplaceRepository.uploadProfileImage(
         imagePath: _selectedImageFile!.path,
         drAccountId: digitalAssetAccountId,
@@ -313,6 +325,32 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
         _isUploadingImage = false;
       });
     }
+  }
+
+  /// Helper method to get account type by ID
+  String _getAccountTypeById(dynamic user, String accountId) {
+    try {
+      if (user?.dashboard?.accountsInternal != null) {
+        for (final account in user.dashboard!.accountsInternal) {
+          if (account.accountID == accountId) {
+            return account.accountType;
+          }
+        }
+      }
+      
+      // If not found in internal accounts, check regular accounts
+      if (user?.dashboard?.accounts != null) {
+        for (final account in user.dashboard!.accounts) {
+          if (account.accountID == accountId) {
+            return account.accountType;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.error('[EDIT_VENDOR] Error getting account type', e);
+    }
+    
+    return 'Unknown';
   }
 
   Future<void> _submitForm() async {

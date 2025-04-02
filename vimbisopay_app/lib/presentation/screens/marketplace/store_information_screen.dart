@@ -756,20 +756,20 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       ),
       actions: [
         if (widget.isOwner) ...[
-          IconButton(
-            icon: const Icon(Icons.inventory_2),
-            tooltip: 'Manage Inventory',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => InventoryManagementScreen(
-                    vendorId: widget.storeId,
-                  ),
-                ),
-              );
-            },
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.inventory_2),
+          //   tooltip: 'Manage Inventory',
+          //   onPressed: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => InventoryManagementScreen(
+          //           vendorId: widget.storeId,
+          //         ),
+          //       ),
+          //     );
+          //   },
+          // ),
           IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'Edit Profile',
