@@ -307,6 +307,14 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   }
   
   Widget _buildFloatingActionButton() {
+    // Check if keyboard is visible
+    final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    
+    // If keyboard is visible, return an empty container (hide the FAB)
+    if (isKeyboardVisible) {
+      return Container();
+    }
+    
     // Early return if basket is null or empty
     if (_basket == null || _basket!.isEmpty) {
       return FloatingActionButton.extended(

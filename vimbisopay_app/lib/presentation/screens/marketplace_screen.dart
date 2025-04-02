@@ -35,8 +35,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isInitializing = true; // Track initialization state
   String _errorMessage = '';
   List<Product> _products = [];
-  List<String> _categories = [];
-  String? _selectedCategory;
   bool _isVendor = false;
   bool _isCheckingVendorStatus = false;
   String? _memberId;
@@ -45,7 +43,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
-  bool _showBrowseMode = true; // Default to browse mode for vendors
+  bool _showBrowseMode = false; // Always default to store mode for vendors
 
   @override
   void initState() {
@@ -426,9 +424,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     });
 
     try {
-      // Use searchProducts with either the category or an empty string
+      // Always use "a" as the default search query to ensure products are loaded
       final result = await _marketplaceRepository.searchProducts(
-        _selectedCategory ?? '', // Use category as search query if selected, otherwise empty string
+        'a', // Default search with "a" to get products
         latitude: _latitude,
         longitude: _longitude,
       );
@@ -452,7 +450,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           setState(() {
             _isLoading = false;
             _products = filteredProducts;
-            _categories = []; // Empty categories list since category field is removed
           });
         },
       );
@@ -462,18 +459,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _errorMessage = 'An unexpected error occurred: $e';
       });
     }
-  }
-
-  void _selectCategory(String? category) {
-    Navigator.pushNamed(
-      context,
-      '/search-results',
-      arguments: {
-        'category': category,
-        'vendorId': _isVendor && _showBrowseMode ? _vendorId : null,
-        'filterOwnProducts': _isVendor && _showBrowseMode,
-      },
-    );
   }
 
   void _searchProducts(String query) {
@@ -564,25 +549,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Toggle between browse mode and vendor mode
-          SwitchListTile(
-            title: const Text('Browse Mode'),
-            subtitle: const Text('Discover products from other vendors'),
-            value: _showBrowseMode,
-            secondary: Icon(
-              _showBrowseMode ? Icons.search : Icons.storefront,
-              color: AppColors.primary,
-            ),
-            onChanged: (value) {
-              setState(() {
-                _showBrowseMode = value;
-              });
-              Navigator.pop(context);
-              // Reload products to apply filtering
-              _loadProducts();
-            },
-          ),
-          const Divider(),
           ListTile(
             leading: const Icon(Icons.point_of_sale, color: AppColors.primary),
             title: const Text('New Sale'),
@@ -784,44 +750,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ),
             ),
             
-            // Category filter
-            if (_categories.isNotEmpty)
-              SizedBox(
-                height: 50,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: const Text('All'),
-                        selected: _selectedCategory == null,
-                        onSelected: (selected) {
-                          if (selected) {
-                            _selectCategory(null);
-                          }
-                        },
-                      ),
-                    ),
-                    ..._categories.map((category) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text(category),
-                          selected: _selectedCategory == category,
-                          onSelected: (selected) {
-                            if (selected) {
-                              _selectCategory(category);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ],
-                ),
-              ),
-            
             // Loading indicator or error message
             if (_isLoading)
               const Expanded(
@@ -900,7 +828,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Try a different search or category',
+                        'Try a different search term',
                         style: TextStyle(
                           fontSize: 16,
                           color: AppColors.textSecondary,

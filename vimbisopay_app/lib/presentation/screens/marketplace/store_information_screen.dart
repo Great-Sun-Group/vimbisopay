@@ -320,16 +320,26 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 final productName = product['accountName'] as String?;
                 final productType = product['accountType'] as String?;
                 final productBalance = product['accountBalanceUSD'] as num?;
+                final profilePictureThumbnail = product['profilePictureThumbnail'] as String?;
+                
+                // Create image URLs list with profile picture thumbnail if available
+                List<String> imageUrls = [];
+                if (profilePictureThumbnail != null && profilePictureThumbnail.isNotEmpty) {
+                  Logger.data('[STORE_INFO] Adding profile picture thumbnail to product: $profilePictureThumbnail');
+                  imageUrls.add(profilePictureThumbnail);
+                } else {
+                  Logger.data('[STORE_INFO] No profile picture thumbnail available for product: $productId');
+                }
                 
                 // Create a Product object
                 return Product(
                   id: productId ?? '',
                   vendorId: vendorObj.id,
                   name: productName ?? 'Unknown Product',
-                  description: 'Product type: $productType',
+                  description: '',
                   price: productBalance != null ? (productBalance * 100).toInt() : 0, // Convert from dollars to cents
                   currency: 'USD', // Default currency
-                  imageUrls: [], // No image URLs in the new API response
+                  imageUrls: imageUrls, // Use the profile picture thumbnail as the product image
                   isAvailable: true,
                   accountId: productId,
                   createdAt: DateTime.now(),
@@ -1164,19 +1174,14 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   }
 
   Widget _buildProductsGrid() {
-    return GridView.builder(
+    return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
       itemCount: _products.length,
+      separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final product = _products[index];
-        return _buildProductCard(product);
+        return _buildProductListItem(product);
       },
     );
   }
@@ -1325,78 +1330,73 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
     }
   }
 
-  Widget _buildProductCard(Product product) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: InkWell(
-        onTap: () {
-          // TODO: Navigate to product detail screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Selected: ${product.name}'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product image
-            AspectRatio(
-              aspectRatio: 1.0,
-              child: _buildProductImage(product),
-            ),
-            // Product info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Flexible(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.store,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              product.storeName ?? 'Unknown Store',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+  /// Formats a price with currency symbol and two decimal places.
+  String _formatAccountBalance(double balance) {
+    return '\$${balance.toStringAsFixed(2)}';
+  }
+
+  Widget _buildProductListItem(Product product) {
+    // Extract account balance from product price (which is stored in cents)
+    final accountBalance = product.price / 100;
+    
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      leading: SizedBox(
+        width: 48,
+        height: 48,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4.0),
+          child: _buildProductImage(product),
         ),
       ),
+      title: Text(
+        product.name,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        product.description,
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            _formatAccountBalance(accountBalance),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.primary,
+            ),
+          ),
+          Text(
+            'Balance',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+      onTap: () {
+        // TODO: Navigate to product detail screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selected: ${product.name}'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      },
     );
   }
 }
