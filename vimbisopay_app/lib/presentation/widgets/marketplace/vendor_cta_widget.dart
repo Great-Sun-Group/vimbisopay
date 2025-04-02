@@ -9,9 +9,9 @@ class VendorCTAWidget extends StatelessWidget {
   final bool showBrowseMode;
   final Function(Set<bool>) onModeChanged;
   final VoidCallback onBecomeVendor;
-  final Future<User?> Function() getUserFunction;
-  final bool Function(User?) canBecomeVendorFunction;
   final bool isCheckingVendorStatus;
+  final User? user;
+  final bool canBecomeVendor;
 
   const VendorCTAWidget({
     super.key,
@@ -19,9 +19,9 @@ class VendorCTAWidget extends StatelessWidget {
     required this.showBrowseMode,
     required this.onModeChanged,
     required this.onBecomeVendor,
-    required this.getUserFunction,
-    required this.canBecomeVendorFunction,
     this.isCheckingVendorStatus = false,
+    required this.user,
+    required this.canBecomeVendor,
   });
 
   @override
@@ -90,25 +90,11 @@ class VendorCTAWidget extends StatelessWidget {
 
   /// Builds the CTA UI for non-vendors.
   Widget _buildNonVendorCTA(BuildContext context) {
-    // Always get the latest user data from the database
-    // This ensures we have the most up-to-date activateMarket status
-    Logger.data('[MARKETPLACE] Getting latest user data from database for vendor CTA');
-    return FutureBuilder<User?>(
-      future: getUserFunction(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        final user = snapshot.data;
-        final canBecomeVendor = canBecomeVendorFunction(user);
-        
-        Logger.data('[MARKETPLACE] User activateMarket status: ${user?.activateMarket}');
-        Logger.data('[MARKETPLACE] Can become vendor: $canBecomeVendor');
-        
-        return _buildVendorCTAContent(context, canBecomeVendor);
-      },
-    );
+    // Log the user status for debugging
+    Logger.data('[MARKETPLACE] User activateMarket status: ${user?.activateMarket}');
+    Logger.data('[MARKETPLACE] Can become vendor: $canBecomeVendor');
+    
+    return _buildVendorCTAContent(context, canBecomeVendor);
   }
   
   /// Builds the appropriate CTA content based on whether the user can become a vendor.

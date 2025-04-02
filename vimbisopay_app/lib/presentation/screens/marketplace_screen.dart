@@ -47,6 +47,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isRequestingLocation = false;
   bool _showBrowseMode = false; // Default to My Store mode for vendors
   bool _isFabVisible = true; // Track FAB visibility
+  User? _user; // Store user data
+  bool _canBecomeVendor = false; // Store canBecomeVendor result
 
   @override
   void initState() {
@@ -57,19 +59,39 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
     
-    _checkVendorStatus().then((_) {
-      // Request location permission and load products for all users (including vendors)
-      _requestLocationPermission().then((_) {
-        _loadProducts();
-        _checkFirstTimeVisit();
-        
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-          });
-        }
+    // First get the user data
+    _getUserData().then((_) {
+      // Then check vendor status
+      _checkVendorStatus().then((_) {
+        // Request location permission and load products for all users (including vendors)
+        _requestLocationPermission().then((_) {
+          _loadProducts();
+          _checkFirstTimeVisit();
+          
+          if (mounted) {
+            setState(() {
+              _isInitializing = false;
+            });
+          }
+        });
       });
     });
+  }
+  
+  /// Gets the user data from the database.
+  Future<void> _getUserData() async {
+    try {
+      final user = await ServiceLocator.databaseHelper.getUser();
+      
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _canBecomeVendor = _canBecomeVendor_internal(user);
+        });
+      }
+    } catch (e) {
+      Logger.error('Error getting user data', e);
+    }
   }
   
   void _scrollListener() {
@@ -366,7 +388,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // Check if the user is allowed to become a vendor
-  bool _canBecomeVendor(User? user) {
+  bool _canBecomeVendor_internal(User? user) {
     // If there's no user, don't allow becoming a vendor as guest
     if (user == null) return false;
     
@@ -773,9 +795,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   _loadProducts();
                 },
                 onBecomeVendor: _navigateToVendorRegistration,
-                getUserFunction: () => ServiceLocator.databaseHelper.getUser(),
-                canBecomeVendorFunction: _canBecomeVendor,
                 isCheckingVendorStatus: _isCheckingVendorStatus,
+                user: _user,
+                canBecomeVendor: _canBecomeVendor,
               ),
             
             // Search bar
