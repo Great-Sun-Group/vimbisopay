@@ -490,36 +490,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 color: AppColors.textSecondary,
                               ),
                             ),
-                            if (_storeOpen) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.circle,
-                                      size: 8,
-                                      color: AppColors.success,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Open',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _storeOpen 
+                                    ? AppColors.success.withOpacity(0.1)
+                                    : AppColors.error.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.circle,
+                                    size: 8,
+                                    color: _storeOpen 
+                                        ? AppColors.success
+                                        : AppColors.error,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _storeOpen ? 'Open' : 'Closed',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: _storeOpen 
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
