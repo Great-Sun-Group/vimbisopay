@@ -1,18 +1,19 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/rendering.dart'; // For ScrollDirection
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
+import 'package:vimbisopay_app/domain/entities/marketplace/product.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/presentation/widgets/marketplace/product_card.dart';
+import 'package:vimbisopay_app/presentation/widgets/marketplace/marketplace_states.dart';
+import 'package:vimbisopay_app/presentation/widgets/marketplace/vendor_cta_widget.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
-import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/store_information_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
 
@@ -31,6 +32,7 @@ class MarketplaceScreen extends StatefulWidget {
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
   final LocationService _locationService = ServiceLocator.locationService;
+  late ScrollController _scrollController;
   bool _isLoading = true;
   bool _isInitializing = true; // Track initialization state
   String _errorMessage = '';
@@ -43,12 +45,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
-  bool _showBrowseMode = true; // Always default to browse mode for vendors
+  bool _showBrowseMode = true; // Default to browse mode for vendors
+  bool _isFabVisible = true; // Track FAB visibility
 
   @override
   void initState() {
     super.initState();
     Logger.lifecycle('MarketplaceScreen initialized');
+    
+    // Initialize scroll controller
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
+    
     _checkVendorStatus().then((_) {
       // Request location permission and load products for all users (including vendors)
       _requestLocationPermission().then((_) {
@@ -62,6 +70,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         }
       });
     });
+  }
+  
+  void _scrollListener() {
+    // Show/hide FAB based on scroll direction
+    if (_scrollController.hasClients) {
+      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_scrollController.hasClients && _scrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
   }
   
   /// Requests location permission from the user.
@@ -220,6 +246,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     Logger.lifecycle('MarketplaceScreen disposed');
     super.dispose();
   }
@@ -565,14 +593,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               _navigateToInventoryManagement();
             },
           ),
-          // ListTile(
-          //   leading: const Icon(Icons.storefront, color: AppColors.primary),
-          //   title: const Text('Vendor Profile'),
-          //   onTap: () {
-          //     Navigator.pop(context);
-          //     _navigateToVendorProfile();
-          //   },
-          // ),
           ListTile(
             leading: const Icon(Icons.store, color: AppColors.primary),
             title: const Text('Store Information'),
@@ -584,6 +604,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         ],
       ),
     );
+  }
+  
+  // Helper method to check if extra padding is needed for FAB
+  double _getBottomPadding() {
+    return _isVendor && _isFabVisible ? 80.0 : 16.0;
   }
   
   void _showDebugInfo() {
@@ -679,18 +704,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Widget build(BuildContext context) {
     // Show a loading indicator during initialization
     if (_isInitializing) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Marketplace'),
-          backgroundColor: AppColors.surface,
-          foregroundColor: AppColors.textPrimary,
-        ),
-        body: const SafeArea(
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
+      return MarketplaceStates.buildInitializingState();
     }
     
     // Only build the full UI once initialization is complete
@@ -721,17 +735,48 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             ),
         ],
       ),
-      floatingActionButton: _isVendor ? FloatingActionButton.extended(
-        onPressed: _showVendorActionSheet,
-        icon: const Icon(Icons.storefront),
-        label: const Text('Vendor Actions'),
-        backgroundColor: AppColors.primary,
-      ) : null,
+      // Extremely simple FAB implementation
+      floatingActionButton: _isVendor && _isFabVisible ? 
+        GestureDetector(
+          onTap: _showVendorActionSheet,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '+',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+          ),
+        ) : null,
       body: SafeArea(
         child: Column(
           children: [
             // Vendor CTA Banner
-            if (!_isCheckingVendorStatus) _buildVendorCTA(),
+            if (!_isCheckingVendorStatus)
+              VendorCTAWidget(
+                isVendor: _isVendor,
+                showBrowseMode: _showBrowseMode,
+                onModeChanged: (selection) {
+                  setState(() {
+                    _showBrowseMode = selection.first;
+                  });
+                  // Reload products to apply filtering
+                  _loadProducts();
+                },
+                onBecomeVendor: _navigateToVendorRegistration,
+                getUserFunction: () => ServiceLocator.databaseHelper.getUser(),
+                canBecomeVendorFunction: _canBecomeVendor,
+                isCheckingVendorStatus: _isCheckingVendorStatus,
+              ),
             
             // Search bar
             Padding(
@@ -752,46 +797,22 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             
             // Loading indicator or error message
             if (_isLoading)
-              const Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
+              Expanded(
+                child: MarketplaceStates.buildLoadingState(),
               )
             else if (_errorMessage.isNotEmpty)
               Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.error,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: _loadProducts,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
+                child: MarketplaceStates.buildErrorState(
+                  errorMessage: _errorMessage,
+                  onRetry: _loadProducts,
                 ),
               )
             // Product grid
             else if (_products.isNotEmpty)
               Expanded(
                 child: GridView.builder(
-                  padding: const EdgeInsets.all(16.0),
+                  controller: _scrollController,
+                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, _getBottomPadding()), // Add bottom padding when FAB is present
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 0.65,
@@ -800,334 +821,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   ),
                   itemCount: _products.length,
                   itemBuilder: (context, index) {
-                    final product = _products[index];
-                    return _buildProductCard(product);
+                    return ProductCard(product: _products[index]);
                   },
                 ),
               )
             // Empty state
             else
               Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.search_off,
-                        size: 64,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No products found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Try a different search term',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                child: MarketplaceStates.buildEmptyState(),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVendorCTA() {
-    if (_isVendor) {
-      // Show mode toggle for vendors with improved layout
-      return Card(
-        margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Marketplace Mode',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _showBrowseMode 
-                    ? 'Browse and discover products from other vendors in the marketplace.'
-                    : 'Manage your store and view your own products.',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment<bool>(
-                      value: true,
-                      label: Text('Browse'),
-                      icon: Icon(Icons.search),
-                    ),
-                    ButtonSegment<bool>(
-                      value: false,
-                      label: Text('My Store'),
-                      icon: Icon(Icons.storefront),
-                    ),
-                  ],
-                  selected: {_showBrowseMode},
-                  onSelectionChanged: (Set<bool> selection) {
-                    setState(() {
-                      _showBrowseMode = selection.first;
-                    });
-                    // Reload products to apply filtering
-                    _loadProducts();
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      // Always get the latest user data from the database
-      // This ensures we have the most up-to-date activateMarket status
-      Logger.data('[MARKETPLACE] Getting latest user data from database for vendor CTA');
-      return FutureBuilder<User?>(
-        future: ServiceLocator.databaseHelper.getUser(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          
-          final user = snapshot.data;
-          final canBecomeVendor = _canBecomeVendor(user);
-          
-          Logger.data('[MARKETPLACE] User activateMarket status: ${user?.activateMarket}');
-          Logger.data('[MARKETPLACE] Can become vendor: $canBecomeVendor');
-          
-          return _buildVendorCTAContent(canBecomeVendor);
-        },
-      );
-    }
-  }
-  
-  Widget _buildVendorCTAContent(bool canBecomeVendor) {
-    if (!canBecomeVendor) {
-      // If the user can't become a vendor, show a message
-      return Card(
-        margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Marketplace',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Browse products and services from vendors in the marketplace.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    // Show CTA for non-vendors who can become vendors
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Sell in the Marketplace',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Create a vendor profile to sell your products and services.',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () {
-                  Logger.data('Become a Vendor button tapped');
-                  _navigateToVendorRegistration();
-                },
-                icon: const Icon(Icons.storefront),
-                label: const Text('Become a Vendor'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds the product image widget based on the image URL type.
-  Widget _buildProductImage(Product product) {
-    if (product.imageUrls.isEmpty || product.imageUrls.first == 'https://example.com/product_placeholder.jpg') {
-      // Show placeholder if no image
-      return Container(
-        color: AppColors.textGray.withOpacity(0.3),
-        child: Center(
-          child: Icon(
-            Icons.image,
-            color: AppColors.textGray,
-          ),
-        ),
-      );
-    }
-    
-    final imageUrl = product.imageUrls.first;
-    
-    if (imageUrl.startsWith('file://')) {
-      // Show local file image
-      final filePath = imageUrl.substring(7); // Remove 'file://' prefix
-      return Image.file(
-        File(filePath),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          Logger.error('Error loading local image: $filePath', error);
-          return Container(
-            color: AppColors.textGray.withOpacity(0.3),
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported,
-                color: AppColors.textGray,
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // Show remote image
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: AppColors.textGray.withOpacity(0.2),
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: AppColors.textGray.withOpacity(0.3),
-          child: Center(
-            child: Icon(
-              Icons.image_not_supported,
-              color: AppColors.textGray,
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildProductCard(Product product) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(
-                productId: product.id,
-              ),
-            ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product image
-            AspectRatio(
-              aspectRatio: 1.0,
-              child: _buildProductImage(product),
-            ),
-            // Product info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Flexible(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.store,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              product.storeName ?? 'Unknown Store',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
