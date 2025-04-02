@@ -132,7 +132,12 @@ class AccountRepositoryImpl implements AccountRepository {
         }
 
         // Otherwise process as normal login with dashboard
-        final dashboardObj = dashboard.Dashboard.fromMap({
+        // Extract vendor status from dashboard data
+        final bool isVendor = dashboardData['member']['activateMarket'] as bool? ?? false;
+        Logger.data('[LOGIN_V2] Vendor status from API: $isVendor');
+        
+        // Parse dashboard data including accountsInternal
+        final Map<String, dynamic> dashboardMap = {
           'member': {
             'memberID': actionDetails['memberID'],
             'memberTier': dashboardData['member']['memberTier'],
@@ -140,6 +145,7 @@ class AccountRepositoryImpl implements AccountRepository {
             'lastname': dashboardData['member']['lastname'],
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
+            'profilePictureThumbnail': dashboardData['member']['profilePictureThumbnail'] as String?,
           },
           'accounts': dashboardData['accounts']
               .map((accountData) => {
@@ -148,6 +154,7 @@ class AccountRepositoryImpl implements AccountRepository {
                     'accountHandle': accountData['accountHandle'],
                     'defaultDenom': accountData['defaultDenom'],
                     'isOwnedAccount': accountData['isOwnedAccount'],
+                    'accountType': accountData['accountType'], // Include accountType field
                     'balanceData': {
                       'securedNetBalancesByDenom': accountData['balanceData']
                           ['securedNetBalancesByDenom'],
@@ -176,8 +183,21 @@ class AccountRepositoryImpl implements AccountRepository {
                     'sendOffersTo': accountData['sendOffersTo'],
                   })
               .toList(),
-        });
+        };
+        
+        // Add accountsInternal if present in the response
+        if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+          Logger.data('[LOGIN_V2] Found accountsInternal in dashboard data');
+          dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+        } else {
+          Logger.data('[LOGIN_V2] No accountsInternal found in dashboard data');
+        }
+        
+        final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         final user = User(
           memberId: memberId,
           phone: userPhone,
@@ -188,10 +208,20 @@ class AccountRepositoryImpl implements AccountRepository {
           passwordHash: passwordHash,
           passwordChanged: password != null ? DateTime.now() : null,
           dashboard: dashboardObj,
+          activateMarket: isVendor, // Set activateMarket based on vendor status
+          // Preserve store status and location from existing user if available
+          storeOpen: existingUser?.storeOpen ?? false,
+          latitude: existingUser?.latitude,
+          longitude: existingUser?.longitude,
         );
 
         // Save user with password info to database
         await _databaseHelper.saveUser(user);
+        
+        Logger.data('[LOGIN_V2] Preserved store status: ${user.storeOpen}');
+        if (user.latitude != null && user.longitude != null) {
+          Logger.data('[LOGIN_V2] Preserved location: (${user.latitude}, ${user.longitude})');
+        }
 
         return Right(user);
       } else {
@@ -310,6 +340,40 @@ class AccountRepositoryImpl implements AccountRepository {
             return loginResult.fold(
               (loginFailure) => Left(loginFailure),
               (newUser) async {
+                Logger.data('[TOKEN_REFRESH] Creating updated user with refreshed token');
+                Logger.data('[TOKEN_REFRESH] Original user activateMarket: ${user.activateMarket}');
+                Logger.data('[TOKEN_REFRESH] New user activateMarket: ${newUser.activateMarket}');
+                
+                // Extract vendor status directly from the login response
+                bool isVendor = false;
+                
+                // Get the raw login response to extract vendor status
+                try {
+                  // We need to access the raw login response to get the vendor status
+                  // This is similar to how it's done in the loginV2 method
+                  final loginResponse = await loginV2(
+                    phone: user.phone,
+                    passwordHash: user.passwordHash,
+                  );
+                  
+                  // Extract vendor status from the login response
+                  loginResponse.fold(
+                    (failure) {
+                      Logger.error('[TOKEN_REFRESH] Failed to get vendor status from login response', failure);
+                    },
+                    (refreshedUser) {
+                      isVendor = refreshedUser.activateMarket;
+                      Logger.data('[TOKEN_REFRESH] Extracted vendor status from login response: $isVendor');
+                    }
+                  );
+                } catch (e) {
+                  Logger.error('[TOKEN_REFRESH] Error extracting vendor status from login response', e);
+                }
+                
+                // Use the extracted vendor status or fall back to previous values
+                final activateMarket = isVendor || newUser.activateMarket || user.activateMarket;
+                Logger.data('[TOKEN_REFRESH] Final activateMarket value: $activateMarket');
+                
                 final userWithPasswordHash = User(
                   memberId: newUser.memberId,
                   phone: newUser.phone,
@@ -317,8 +381,16 @@ class AccountRepositoryImpl implements AccountRepository {
                   passwordHash: user.passwordHash,
                   passwordChanged: user.passwordChanged,
                   dashboard: newUser.dashboard,
+                  activateMarket: activateMarket, // Set vendor status based on dashboard data
+                  storeOpen: user.storeOpen, // Preserve the original storeOpen status
+                  latitude: user.latitude, // Preserve the original latitude
+                  longitude: user.longitude, // Preserve the original longitude
+                  version: newUser.version,
+                  authMethod: newUser.authMethod,
+                  otpVerified: newUser.otpVerified,
                 );
 
+                Logger.data('[TOKEN_REFRESH] Updated user activateMarket: ${userWithPasswordHash.activateMarket}');
                 final saveResult = await saveUser(userWithPasswordHash);
 
                 return saveResult.fold(
@@ -722,7 +794,16 @@ class AccountRepositoryImpl implements AccountRepository {
 
         final dashboardData = jsonResponse['data']['dashboard'];
 
-        final dashboardObj = dashboard.Dashboard.fromMap({
+        // Extract vendor status from dashboard data
+        final bool isVendor = dashboardData['member']['activateMarket'] as bool? ?? false;
+        Logger.data('[LOGIN] Vendor status from API: $isVendor');
+        
+        // Extract profile thumbnail URL from dashboard data
+        final String? profileThumbnailUrl = dashboardData['member']['profilePictureThumbnail'] as String?;
+        Logger.data('[LOGIN] Profile thumbnail URL: $profileThumbnailUrl');
+        
+        // Parse dashboard data including accountsInternal
+        final Map<String, dynamic> dashboardMap = {
           'member': {
             'memberID': actionDetails['memberID'],
             'memberTier': dashboardData['member']['memberTier'],
@@ -730,6 +811,7 @@ class AccountRepositoryImpl implements AccountRepository {
             'lastname': dashboardData['member']['lastname'],
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
+            'profilePictureThumbnail': profileThumbnailUrl,
           },
           'accounts': dashboardData['accounts']
               .map((accountData) => {
@@ -766,7 +848,17 @@ class AccountRepositoryImpl implements AccountRepository {
                     'sendOffersTo': accountData['sendOffersTo'],
                   })
               .toList(),
-        });
+        };
+        
+        // Add accountsInternal if present in the response
+        if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+          Logger.data('[LOGIN] Found accountsInternal in dashboard data');
+          dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+        } else {
+          Logger.data('[LOGIN] No accountsInternal found in dashboard data');
+        }
+        
+        final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
         // Extract version and authMethod from token
         final tokenInfo = _extractTokenInfo(token);
@@ -786,6 +878,9 @@ class AccountRepositoryImpl implements AccountRepository {
           return Right(user);
         }
 
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         // Otherwise return full user info
         final user = User(
           memberId: memberId,
@@ -796,7 +891,17 @@ class AccountRepositoryImpl implements AccountRepository {
           version: version,
           authMethod: authMethod,
           dashboard: dashboardObj,
+          activateMarket: isVendor, // Set activateMarket based on vendor status
+          // Preserve store status and location from existing user if available
+          storeOpen: existingUser?.storeOpen ?? false,
+          latitude: existingUser?.latitude,
+          longitude: existingUser?.longitude,
         );
+        
+        Logger.data('[LOGIN] Preserved store status: ${user.storeOpen}');
+        if (user.latitude != null && user.longitude != null) {
+          Logger.data('[LOGIN] Preserved location: (${user.latitude}, ${user.longitude})');
+        }
 
         return Right(user);
       } else {
@@ -1258,12 +1363,40 @@ Response body: ${response.body}
 
         Logger.data('[SET_INITIAL_PASSWORD] Password set successfully, proceeding with v2 login');
         
+        // Get existing user to preserve store status and location
+        final existingUser = await _databaseHelper.getUser();
+        
         // Immediately perform v2 login with the new password hash
         final loginResult = await loginV2(
           phone: formattedPhone,
           passwordHash: hashedPassword,
         );
-
+        
+        // If we have an existing user and the login was successful, ensure we preserve the store status and location
+        if (existingUser != null) {
+          return loginResult.fold(
+            (failure) => Left(failure),
+            (newUser) async {
+              // Create updated user with preserved store status and location
+              final updatedUser = newUser.copyWith(
+                storeOpen: existingUser.storeOpen,
+                latitude: existingUser.latitude,
+                longitude: existingUser.longitude,
+              );
+              
+              // Save the updated user
+              await _databaseHelper.saveUser(updatedUser);
+              
+              Logger.data('[SET_INITIAL_PASSWORD] Preserved store status: ${updatedUser.storeOpen}');
+              if (updatedUser.latitude != null && updatedUser.longitude != null) {
+                Logger.data('[SET_INITIAL_PASSWORD] Preserved location: (${updatedUser.latitude}, ${updatedUser.longitude})');
+              }
+              
+              return Right(updatedUser);
+            },
+          );
+        }
+        
         return loginResult;
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to set initial password';
@@ -1322,11 +1455,18 @@ Response body: ${response.body}
         );
 
         if (response.statusCode == 200) {
-          // Update stored password hash
+          // Update stored password hash while preserving store status and location
           final updatedUser = user.copyWith(
             passwordHash: newHash,
             passwordChanged: DateTime.now(),
+            // No need to explicitly set storeOpen, latitude, and longitude
+            // as copyWith will preserve them from the original user object
           );
+          
+          Logger.data('[UPDATE_PASSWORD] Preserved store status: ${updatedUser.storeOpen}');
+          if (updatedUser.latitude != null && updatedUser.longitude != null) {
+            Logger.data('[UPDATE_PASSWORD] Preserved location: (${updatedUser.latitude}, ${updatedUser.longitude})');
+          }
           await _databaseHelper.saveUser(updatedUser);
           
           return const Right(true);
@@ -1486,7 +1626,12 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
             }
 
             Logger.data('Creating Dashboard from response data');
-            final dashboardObj = dashboard.Dashboard.fromMap({
+            // Parse dashboard data including accountsInternal
+            // Extract profile thumbnail URL from dashboard data
+            final String? profileThumbnailUrl = dashboardData['member']['profilePictureThumbnail'] as String?;
+            Logger.data('[RECURRING] Profile thumbnail URL: $profileThumbnailUrl');
+            
+            final Map<String, dynamic> dashboardMap = {
               'member': {
                 'memberID': dashboardData['member']['memberID'],
                 'memberTier': dashboardData['member']['memberTier'],
@@ -1494,6 +1639,7 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                 'lastname': dashboardData['member']['lastname'],
                 'memberHandle': dashboardData['member']['memberHandle'] as String? ?? '',
                 'defaultDenom': dashboardData['member']['defaultDenom'],
+                'profilePictureThumbnail': profileThumbnailUrl,
               },
               'accounts': dashboardData['accounts']
                   .map((accountData) => {
@@ -1502,6 +1648,7 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                         'accountHandle': accountData['accountHandle'],
                         'defaultDenom': accountData['defaultDenom'],
                         'isOwnedAccount': accountData['isOwnedAccount'],
+                        'accountType': accountData['accountType'], // Include accountType field
                         'balanceData': {
                           'securedNetBalancesByDenom': accountData['balanceData']
                               ['securedNetBalancesByDenom'],
@@ -1530,7 +1677,17 @@ Future<Either<Failure, bool>> upgradeToHustler10k(String accountId) async {
                         'sendOffersTo': accountData['sendOffersTo'],
                       })
                   .toList(),
-            });
+            };
+            
+            // Add accountsInternal if present in the response
+            if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+              Logger.data('[RECURRING] Found accountsInternal in dashboard data');
+              dashboardMap['accountsInternal'] = dashboardData['accountsInternal'];
+            } else {
+              Logger.data('[RECURRING] No accountsInternal found in dashboard data');
+            }
+            
+            final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
 
             Logger.data('Creating RecurringResponse with parsed dashboard');
             return Right(RecurringResponse(

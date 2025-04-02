@@ -10,7 +10,7 @@ class ScanQRScreen extends StatefulWidget {
 
   const ScanQRScreen({
     super.key,
-    this.showDebugOptions = true, // Enable by default for development
+    this.showDebugOptions = false, // Disabled by default for production
   });
 
   @override
@@ -94,103 +94,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
               },
             ),
           ),
-          
-          // Debug options for simulating QR code scans
-          if (widget.showDebugOptions) ...[
-            const Divider(height: 1),
-            Container(
-              color: AppColors.surface,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Debug: Simulate QR Code Scan',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'For testing without an actual QR code:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.receipt),
-                          label: const Text('Invoice 1'),
-                          onPressed: () {
-                            _hasScanned = true;
-                            Navigator.of(context).pop('vimbisopay://invoice/face-to-face-1');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.receipt),
-                          label: const Text('Invoice 2'),
-                          onPressed: () {
-                            _hasScanned = true;
-                            Navigator.of(context).pop('vimbisopay://invoice/face-to-face-2');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.receipt),
-                          label: const Text('Invoice 3'),
-                          onPressed: () {
-                            _hasScanned = true;
-                            Navigator.of(context).pop('vimbisopay://invoice/face-to-face-3');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.error_outline),
-                          label: const Text('Invalid'),
-                          onPressed: () {
-                            _hasScanned = true;
-                            Navigator.of(context).pop('invalid-qr-code');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.errorRed,
-                            foregroundColor: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+          // Debug options removed for production
         ],
       ),
     );

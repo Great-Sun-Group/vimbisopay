@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
@@ -13,11 +14,15 @@ import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 class VendorRegistrationScreen extends StatefulWidget {
   /// The ID of the member creating a vendor profile.
   final String memberId;
+  
+  /// The user data for pre-populating fields (optional)
+  final User? user;
 
   /// Creates a new [VendorRegistrationScreen] instance.
   const VendorRegistrationScreen({
     super.key,
     required this.memberId,
+    this.user,
   });
 
   @override
@@ -28,8 +33,6 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _businessNameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   
   bool _isLoading = false;
   String? _errorMessage;
@@ -37,11 +40,26 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
   final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
 
   @override
+  void initState() {
+    super.initState();
+    _prepopulateFieldsFromUser();
+  }
+
+  void _prepopulateFieldsFromUser() {
+    if (widget.user?.dashboard != null) {
+      final dashboard = widget.user!.dashboard!;
+      
+      // Pre-populate business name with user's name if available
+      if (dashboard.member.firstname.isNotEmpty && dashboard.member.lastname.isNotEmpty) {
+        _businessNameController.text = '${dashboard.member.firstname} ${dashboard.member.lastname}';
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _businessNameController.dispose();
     _descriptionController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -56,12 +74,52 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
     });
 
     try {
+      // Step 1: Enable vendor functionality
+      final enableResult = await _marketplaceRepository.enableVendorFunctionality();
+      
+      final enableSuccess = await enableResult.fold(
+        (failure) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = failure.message ?? 'Failed to enable vendor functionality';
+          });
+          return false;
+        },
+        (success) => true,
+      );
+      
+      if (!enableSuccess) {
+        return;
+      }
+      
+      // Step 2: Update member profile with vendor details
+      // Use the business name as the vendorBio since that's what we have
+      final updateResult = await _marketplaceRepository.updateMemberWithVendorDetails(
+        vendorBio: _businessNameController.text,
+      );
+      
+      final updateSuccess = await updateResult.fold(
+        (failure) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = failure.message ?? 'Failed to update member profile';
+          });
+          return false;
+        },
+        (success) => true,
+      );
+      
+      if (!updateSuccess) {
+        return;
+      }
+      
+      // Step 3: Create the vendor profile in the local repository
       final result = await _marketplaceRepository.createVendor(
         memberId: widget.memberId,
         businessName: _businessNameController.text,
         description: _descriptionController.text,
-        email: _emailController.text,
-        phone: _phoneController.text,
+        email: "", // Empty string since Contact Information section is removed
+        phone: "", // Empty string since Contact Information section is removed
       );
 
       result.fold(
@@ -76,30 +134,18 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
           
           if (!mounted) return;
           
-          // First show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vendor profile created successfully'),
-              backgroundColor: AppColors.success,
-              duration: Duration(seconds: 2),
+          // Navigate directly to vendor profile screen without delay
+          // This avoids the widget lifecycle issue
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VendorProfileScreen(
+                vendorId: vendor.id,
+                isOwner: true,
+                showSuccessMessage: true, // Show success message on the next screen
+              ),
             ),
           );
-          
-          // Wait for the snackbar to be visible before navigating
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              // Navigate to vendor profile screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => VendorProfileScreen(
-                    vendorId: vendor.id,
-                    isOwner: true,
-                  ),
-                ),
-              );
-            }
-          });
         },
       );
     } catch (e) {
@@ -218,59 +264,6 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'Please enter a description';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Contact Information
-                      SettingsContainer(
-                        title: 'Contact Information',
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Email
-                                TextFormField(
-                                  controller: _emailController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Business Email',
-                                    hintText: 'Enter your business email',
-                                    prefixIcon: Icon(Icons.email),
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your business email';
-                                    }
-                                    if (!value.contains('@')) {
-                                      return 'Please enter a valid email';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                // Phone
-                                TextFormField(
-                                  controller: _phoneController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Business Phone',
-                                    hintText: 'Enter your business phone',
-                                    prefixIcon: Icon(Icons.phone),
-                                  ),
-                                  keyboardType: TextInputType.phone,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your business phone';
                                     }
                                     return null;
                                   },

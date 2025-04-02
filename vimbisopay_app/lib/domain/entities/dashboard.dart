@@ -59,14 +59,114 @@ class MemberTier {
   bool get canRequestRecurringPayments => type.canRequestRecurringPayments;
 }
 
+class DashboardInternalAccount {
+  final String accountID;
+  final String accountName;
+  final String accountType;
+  final String? profilePictureThumbnail;
+  final SendOffersTo? sendOffersTo;
+  final BalanceData? balanceData;
+  final PendingData? pendingInData;
+  final PendingData? pendingOutData;
+
+  const DashboardInternalAccount({
+    required this.accountID,
+    required this.accountName,
+    required this.accountType,
+    this.profilePictureThumbnail,
+    this.sendOffersTo,
+    this.balanceData,
+    this.pendingInData,
+    this.pendingOutData,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'accountID': accountID,
+    'accountName': accountName,
+    'accountType': accountType,
+    'profilePictureThumbnail': profilePictureThumbnail,
+    'sendOffersTo': sendOffersTo?.toMap(),
+    'balanceData': balanceData?.toMap(),
+    'pendingInData': pendingInData?.toMap(),
+    'pendingOutData': pendingOutData?.toMap(),
+  };
+
+  factory DashboardInternalAccount.fromMap(Map<String, dynamic> map) {
+    // Handle balance data
+    BalanceData? balanceData;
+    if (map.containsKey('balanceData') && map['balanceData'] != null) {
+      balanceData = BalanceData.fromMap(map['balanceData']);
+    }
+    
+    // Handle send offers to
+    SendOffersTo? sendOffersTo;
+    if (map.containsKey('sendOffersTo') && map['sendOffersTo'] != null) {
+      sendOffersTo = SendOffersTo.fromMap(map['sendOffersTo']);
+    }
+    
+    // Handle pending in data
+    PendingData? pendingInData;
+    if (map.containsKey('pendingInData') && map['pendingInData'] != null) {
+      pendingInData = PendingData.fromMap(map['pendingInData']);
+    }
+    
+    // Handle pending out data
+    PendingData? pendingOutData;
+    if (map.containsKey('pendingOutData') && map['pendingOutData'] != null) {
+      pendingOutData = PendingData.fromMap(map['pendingOutData']);
+    }
+    
+    return DashboardInternalAccount(
+      accountID: map['accountID'] as String,
+      accountName: map['accountName'] as String,
+      accountType: map['accountType'] as String,
+      profilePictureThumbnail: map['profilePictureThumbnail'] as String?,
+      sendOffersTo: sendOffersTo,
+      balanceData: balanceData,
+      pendingInData: pendingInData,
+      pendingOutData: pendingOutData,
+    );
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is DashboardInternalAccount &&
+        other.accountID == accountID &&
+        other.accountName == accountName &&
+        other.accountType == accountType &&
+        other.profilePictureThumbnail == profilePictureThumbnail &&
+        other.sendOffersTo == sendOffersTo &&
+        other.balanceData == balanceData &&
+        other.pendingInData == pendingInData &&
+        other.pendingOutData == pendingOutData;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    accountID, 
+    accountName, 
+    accountType,
+    profilePictureThumbnail,
+    sendOffersTo,
+    balanceData,
+    pendingInData,
+    pendingOutData,
+  );
+}
+
 class Dashboard extends Entity {
   final DashboardMember member;
   final List<DashboardAccount> accounts;
+  final List<DashboardInternalAccount> accountsInternal;
+  final bool activateMarket;
 
   const Dashboard({
     required String id,
     required this.member,
     required this.accounts,
+    this.accountsInternal = const [],
+    this.activateMarket = false,
   }) : super(id);
 
   // Backward compatibility getters
@@ -88,23 +188,46 @@ class Dashboard extends Entity {
     'id': id,
     'member': member.toMap(),
     'accounts': accounts.map((account) => account.toMap()).toList(),
+    'accountsInternal': accountsInternal.map((account) => account.toMap()).toList(),
+    'activateMarket': activateMarket,
   };
 
-  factory Dashboard.fromMap(Map<String, dynamic> map) => Dashboard(
-    id: map['member']['memberID'] as String,
-    member: DashboardMember.fromMap(map['member']),
-    accounts: (map['accounts'] as List).map((account) => DashboardAccount.fromMap(account)).toList(),
-  );
+  factory Dashboard.fromMap(Map<String, dynamic> map) {
+    List<DashboardInternalAccount> internalAccounts = [];
+    if (map.containsKey('accountsInternal') && map['accountsInternal'] != null) {
+      internalAccounts = (map['accountsInternal'] as List)
+          .map((account) => DashboardInternalAccount.fromMap(account))
+          .toList();
+    }
+    
+    return Dashboard(
+      id: map['member']['memberID'] as String,
+      member: DashboardMember.fromMap(map['member']),
+      accounts: (map['accounts'] as List).map((account) => DashboardAccount.fromMap(account)).toList(),
+      accountsInternal: internalAccounts,
+      activateMarket: map['activateMarket'] as bool? ?? false,
+    );
+  }
 
   // Factory constructor for creating from Credex response
   factory Dashboard.fromCredexResponse(Map<String, dynamic> data) {
     final dashboardData = data['dashboard'];
+    
+    List<DashboardInternalAccount> internalAccounts = [];
+    if (dashboardData.containsKey('accountsInternal') && dashboardData['accountsInternal'] != null) {
+      internalAccounts = (dashboardData['accountsInternal'] as List)
+          .map((account) => DashboardInternalAccount.fromMap(account))
+          .toList();
+    }
+    
     return Dashboard(
       id: dashboardData['member']['memberID'],
       member: DashboardMember.fromMap(dashboardData['member']),
       accounts: (dashboardData['accounts'] as List).map((account) => 
         DashboardAccount.fromMap(account)
       ).toList(),
+      accountsInternal: internalAccounts,
+      activateMarket: dashboardData['activateMarket'] as bool? ?? false,
     );
   }
 
@@ -114,11 +237,19 @@ class Dashboard extends Entity {
     return other is Dashboard &&
         other.id == id &&
         other.member == member &&
-        listEquals(accounts, other.accounts);
+        listEquals(accounts, other.accounts) &&
+        listEquals(accountsInternal, other.accountsInternal) &&
+        other.activateMarket == activateMarket;
   }
 
   @override
-  int get hashCode => Object.hash(id, member, Object.hashAll(accounts));
+  int get hashCode => Object.hash(
+        id, 
+        member, 
+        Object.hashAll(accounts), 
+        Object.hashAll(accountsInternal), 
+        activateMarket
+      );
 }
 
 class DashboardMember {
@@ -128,6 +259,7 @@ class DashboardMember {
   final String lastname;
   final String? memberHandle;
   final String defaultDenom;
+  final String? profilePictureThumbnail;
 
   const DashboardMember({
     required this.memberID,
@@ -136,6 +268,7 @@ class DashboardMember {
     required this.lastname,
     this.memberHandle,
     required this.defaultDenom,
+    this.profilePictureThumbnail,
   });
 
   Map<String, dynamic> toMap() => {
@@ -145,6 +278,7 @@ class DashboardMember {
     'lastname': lastname,
     'memberHandle': memberHandle,
     'defaultDenom': defaultDenom,
+    'profilePictureThumbnail': profilePictureThumbnail,
   };
 
   factory DashboardMember.fromMap(Map<String, dynamic> map) => DashboardMember(
@@ -154,6 +288,7 @@ class DashboardMember {
     lastname: map['lastname'] as String,
     memberHandle: map['memberHandle'] as String?,
     defaultDenom: map['defaultDenom'] as String,
+    profilePictureThumbnail: map['profilePictureThumbnail'] as String?,
   );
 
   @override
@@ -204,6 +339,7 @@ class DashboardAccount {
   final PendingData pendingInData;
   final PendingData pendingOutData;
   final SendOffersTo sendOffersTo;
+  final String? accountType;
 
   const DashboardAccount({
     required this.accountID,
@@ -215,6 +351,7 @@ class DashboardAccount {
     required this.pendingInData,
     required this.pendingOutData,
     required this.sendOffersTo,
+    this.accountType,
   });
 
   Map<String, dynamic> toMap() => {
@@ -227,6 +364,7 @@ class DashboardAccount {
     'pendingInData': pendingInData.toMap(),
     'pendingOutData': pendingOutData.toMap(),
     'sendOffersTo': sendOffersTo.toMap(),
+    'accountType': accountType,
   };
 
   factory DashboardAccount.fromMap(Map<String, dynamic> map) => DashboardAccount(
@@ -239,6 +377,7 @@ class DashboardAccount {
     pendingInData: PendingData.fromMap(map['pendingInData']),
     pendingOutData: PendingData.fromMap(map['pendingOutData']),
     sendOffersTo: SendOffersTo.fromMap(map['sendOffersTo']),
+    accountType: map['accountType'] as String?,
   );
 }
 
@@ -298,6 +437,7 @@ class PendingOffer {
   final String formattedInitialAmount;
   final String counterpartyAccountName;
   final bool secured;
+  final DateTime? dueDate;
 
   String get uniqueIdentifier {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -311,6 +451,7 @@ class PendingOffer {
     required this.formattedInitialAmount,
     required this.counterpartyAccountName,
     required this.secured,
+    this.dueDate,
   });
 
   Map<String, dynamic> toMap() => {
@@ -318,6 +459,7 @@ class PendingOffer {
     'formattedInitialAmount': formattedInitialAmount,
     'counterpartyAccountName': counterpartyAccountName,
     'secured': secured,
+    'dueDate': dueDate?.toIso8601String(),
   };
 
   factory PendingOffer.fromMap(Map<String, dynamic> map) {
@@ -353,11 +495,24 @@ class PendingOffer {
       formattedAmount = '0.00 CXX';
     }
 
+    // Parse due date if available
+    DateTime? dueDate;
+    if (map.containsKey('dueDate') && map['dueDate'] != null) {
+      try {
+        if (map['dueDate'] is String) {
+          dueDate = DateTime.parse(map['dueDate'] as String);
+        }
+      } catch (e) {
+        // Ignore parsing errors and leave dueDate as null
+      }
+    }
+
     return PendingOffer(
       credexID: map['credexID'] as String,
       formattedInitialAmount: formattedAmount,
       counterpartyAccountName: map['counterpartyAccountName'] as String,
       secured: map['secured'] as bool,
+      dueDate: dueDate,
     );
   }
 }

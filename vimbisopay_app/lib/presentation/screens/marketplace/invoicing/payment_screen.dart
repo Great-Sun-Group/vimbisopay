@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repos
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
 /// A screen that allows buyers to pay for invoices.
 ///
@@ -18,18 +19,10 @@ class PaymentScreen extends StatefulWidget {
   /// The invoice to pay.
   final Invoice invoice;
 
-  /// The vendor who created the invoice.
-  final Vendor vendor;
-
-  /// Whether to show debug options for testing.
-  final bool showDebugOptions;
-
   /// Creates a new [PaymentScreen] instance.
   const PaymentScreen({
     super.key,
     required this.invoice,
-    required this.vendor,
-    this.showDebugOptions = true, // Enable by default for development
   });
 
   @override
@@ -45,9 +38,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String? _errorMessage;
   List<DashboardAccount> _accounts = [];
   DashboardAccount? _selectedAccount;
-  final _noteController = TextEditingController();
   String? _memberId;
-  bool _useDebugAccounts = false;
 
   @override
   void initState() {
@@ -58,7 +49,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
-    _noteController.dispose();
     super.dispose();
   }
 
@@ -70,12 +60,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _errorMessage = null;
     });
 
-    // If debug mode is enabled and user chooses to use debug accounts
-    if (widget.showDebugOptions && _useDebugAccounts) {
-      Logger.data('[PAYMENT_SCREEN] Using debug accounts');
-      _loadDebugAccounts();
-      return;
-    }
 
     try {
       // Load user's accounts directly from the dashboard
@@ -135,85 +119,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  void _loadDebugAccounts() {
-    Logger.data('[PAYMENT_SCREEN] Loading debug accounts');
-    
-    // Create mock accounts for testing
-    final mockAccounts = [
-      DashboardAccount(
-        accountID: 'debug-account-1',
-        accountName: 'Debug Account 1',
-        accountHandle: 'debug1',
-        defaultDenom: widget.invoice.currency,
-        isOwnedAccount: true,
-        balanceData: BalanceData(
-          securedNetBalancesByDenom: ['1000.00 ${widget.invoice.currency}'],
-          unsecuredBalances: UnsecuredBalances(
-            totalPayables: '0.00 ${widget.invoice.currency}',
-            totalReceivables: '0.00 ${widget.invoice.currency}',
-            netPayRec: '0.00 ${widget.invoice.currency}',
-          ),
-          netCredexAssetsInDefaultDenom: '1000.00 ${widget.invoice.currency}',
-        ),
-        pendingInData: PendingData(
-          success: true,
-          data: [],
-          message: 'No pending offers',
-        ),
-        pendingOutData: PendingData(
-          success: true,
-          data: [],
-          message: 'No pending outgoing offers',
-        ),
-        sendOffersTo: SendOffersTo(
-          memberID: 'debug-member',
-          firstname: 'Debug',
-          lastname: 'User',
-        ),
-      ),
-      DashboardAccount(
-        accountID: 'debug-account-2',
-        accountName: 'Debug Account 2 (Low Balance)',
-        accountHandle: 'debug2',
-        defaultDenom: widget.invoice.currency,
-        isOwnedAccount: true,
-        balanceData: BalanceData(
-          securedNetBalancesByDenom: ['10.00 ${widget.invoice.currency}'],
-          unsecuredBalances: UnsecuredBalances(
-            totalPayables: '0.00 ${widget.invoice.currency}',
-            totalReceivables: '0.00 ${widget.invoice.currency}',
-            netPayRec: '0.00 ${widget.invoice.currency}',
-          ),
-          netCredexAssetsInDefaultDenom: '10.00 ${widget.invoice.currency}',
-        ),
-        pendingInData: PendingData(
-          success: true,
-          data: [],
-          message: 'No pending offers',
-        ),
-        pendingOutData: PendingData(
-          success: true,
-          data: [],
-          message: 'No pending outgoing offers',
-        ),
-        sendOffersTo: SendOffersTo(
-          memberID: 'debug-member',
-          firstname: 'Debug',
-          lastname: 'User',
-        ),
-      ),
-    ];
-    
-    _memberId = 'debug-member';
-    
-    setState(() {
-      _isLoading = false;
-      _accounts = mockAccounts;
-      _selectedAccount = mockAccounts.first;
-    });
-    
-    Logger.data('[PAYMENT_SCREEN] Loaded ${mockAccounts.length} debug accounts');
-  }
 
   bool _hasSufficientBalance() {
     if (_selectedAccount == null) return false;
@@ -268,17 +173,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to add funds screen
-              Navigator.pushNamed(context, '/add-funds').then((_) {
-                // Refresh accounts when returning from add funds
-                _loadAccounts();
-              });
-            },
-            child: const Text('Add Funds'),
           ),
         ],
       ),
@@ -389,6 +283,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
+    // Validate that paymentAccountId is not null
+    if (widget.invoice.paymentAccountId == null) {
+      setState(() {
+        _errorMessage = 'Cannot process payment: Missing payment account ID';
+      });
+      Logger.error('[PAYMENT_SCREEN] Payment failed: Missing payment account ID');
+      return;
+    }
+
+    // Show loading dialog with Lottie animation
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const LoadingDialog(
+        message: 'Processing payment...',
+      ),
+    );
+
     setState(() {
       _isProcessingPayment = true;
       _errorMessage = null;
@@ -398,22 +310,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
       // Create a Credex request for the invoice payment
       final credexRequest = CredexRequest(
         issuerAccountID: _selectedAccount!.accountID,
-        receiverAccountID: widget.vendor.memberId, // Vendor's member ID
+        receiverAccountID: widget.invoice.paymentAccountId!, // Use non-null assertion since we've validated
         denomination: widget.invoice.currency,
         initialAmount: widget.invoice.totalAmount / 100, // Convert from smallest unit to decimal
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
         securedCredex: true,
+        invoiceID: widget.invoice.id, // Include the invoice ID in the request
       );
       
       Logger.data('[PAYMENT_SCREEN] Creating Credex payment:');
       Logger.data('[PAYMENT_SCREEN] - From account: ${_selectedAccount!.accountID}');
-      Logger.data('[PAYMENT_SCREEN] - To vendor: ${widget.vendor.memberId}');
+      Logger.data('[PAYMENT_SCREEN] - To vendor: ${widget.invoice.vendorId}');
       Logger.data('[PAYMENT_SCREEN] - Amount: ${widget.invoice.totalAmount / 100} ${widget.invoice.currency}');
       Logger.data('[PAYMENT_SCREEN] - Invoice ID: ${widget.invoice.id}');
       
       // Create the Credex transaction
       final result = await _accountRepository.createCredex(credexRequest);
+      
+      // Close loading dialog before showing result
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
       
       result.fold(
         (failure) {
@@ -427,7 +345,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           final invoiceResult = await _marketplaceRepository.updateInvoice(
             id: widget.invoice.id,
             status: InvoiceStatus.paid,
-            notes: _noteController.text.isNotEmpty ? _noteController.text : null,
             paidAt: DateTime.now(),
           );
           
@@ -449,6 +366,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       );
     } catch (e) {
+      // Close loading dialog on error
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      
       setState(() {
         _isProcessingPayment = false;
         _errorMessage = 'An unexpected error occurred: $e';
@@ -486,8 +408,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
         actions: [
           FilledButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context, true); // Return to invoice screen with success result
+              // Close the dialog first
+              Navigator.pop(context);
+              
+              // Navigate to home screen and remove all previous screens from the stack
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/home', // Home screen route
+                (route) => false, // Remove all previous routes
+              );
             },
             child: const Text('Done'),
           ),
@@ -500,71 +429,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment'),
+        title: const Text('Complete Payment'),
       ),
-      body: Column(
-        children: [
-          // Debug options
-          if (widget.showDebugOptions) _buildDebugOptions(),
-          
-          // Main content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildPaymentForm(),
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildPaymentForm(),
       bottomNavigationBar: _buildBottomBar(),
-    );
-  }
-
-  Widget _buildDebugOptions() {
-    return Container(
-      color: AppColors.surface,
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.bug_report, size: 16, color: AppColors.yellowPrimary),
-              const SizedBox(width: 4),
-              const Text(
-                'Debug Mode',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: AppColors.yellowPrimary,
-                ),
-              ),
-              const Spacer(),
-              Switch(
-                value: _useDebugAccounts,
-                onChanged: (value) {
-                  setState(() {
-                    _useDebugAccounts = value;
-                  });
-                  _loadAccounts();
-                },
-                activeColor: AppColors.yellowPrimary,
-              ),
-            ],
-          ),
-          if (_useDebugAccounts)
-            Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: Text(
-                'Using mock accounts with ${widget.invoice.currency}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          const Divider(),
-        ],
-      ),
     );
   }
 
@@ -658,24 +528,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Go Back'),
               ),
-              if (widget.showDebugOptions) ...[
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _useDebugAccounts = true;
-                    });
-                    _loadAccounts();
-                  },
-                  icon: const Icon(Icons.bug_report),
-                  label: const Text('Use Debug Accounts'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.yellowPrimary,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -688,43 +540,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Debug info in development mode
-          if (widget.showDebugOptions) ...[
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.yellowPrimary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.yellowPrimary),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Debug Info: ${_accounts.length} accounts available',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text('Selected: ${_selectedAccount?.accountName ?? 'None'}'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          
           _buildInvoiceSummary(),
           const SizedBox(height: 24),
           
-          // Account selection with visible border for debugging
-          Container(
-            decoration: BoxDecoration(
-              border: widget.showDebugOptions 
-                  ? Border.all(color: AppColors.yellowPrimary, width: 2)
-                  : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: _buildAccountSelection(),
-          ),
-          
-          const SizedBox(height: 24),
-          _buildNoteField(),
+          _buildAccountSelection(),
         ],
       ),
     );
@@ -750,28 +569,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: AppColors.primary.withOpacity(0.1),
-                  backgroundImage: widget.vendor.profileImageUrl != null
-                      ? NetworkImage(widget.vendor.profileImageUrl!)
-                      : null,
-                  child: widget.vendor.profileImageUrl == null
-                      ? const Icon(Icons.storefront, color: AppColors.primary)
-                      : null,
+                  child: const Icon(Icons.storefront, color: AppColors.primary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Pay to: ${widget.vendor.businessName}',
-                        style: const TextStyle(
+                      const Text(
+                        'Pay To: Vendor',
+                        style: TextStyle(
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Invoice #${widget.invoice.id.substring(0, 8)}',
+                        'Invoice #${widget.invoice.id.substring(0, 8) }****',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -818,33 +632,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Text(
-                  'Select Account',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (widget.showDebugOptions)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.yellowPrimary.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${_accounts.length} accounts',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.yellowPrimary,
-                      ),
-                    ),
-                  ),
-              ],
+            const Text(
+              'Select Account',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             
@@ -874,29 +667,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     
                     return DropdownMenuItem(
                       value: account,
+                      // Simplified dropdown item to prevent overflow
                       child: Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  account.accountName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '@${account.accountHandle}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              account.accountName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
@@ -965,39 +746,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildNoteField() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Add Note (Optional)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              decoration: InputDecoration(
-                hintText: 'Add a note to the vendor',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: AppColors.surface,
-              ),
-              maxLines: 3,
-              maxLength: 100,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildBottomBar() {
     return Container(
@@ -1042,7 +790,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             FilledButton.icon(
               icon: const Icon(Icons.payment),
-              label: const Text('Pay Now'),
+              label: const Text('Sign & Send'),
               onPressed: _isProcessingPayment || _isLoading ? null : _processPayment,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(

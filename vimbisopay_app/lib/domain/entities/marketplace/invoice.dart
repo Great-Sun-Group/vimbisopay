@@ -10,7 +10,8 @@ class Invoice extends Entity {
   final String id;
 
   /// The ID of the buyer (member).
-  final String buyerId;
+  /// This is optional as the invoice can be buyer-agnostic.
+  final String? buyerId;
 
   /// The ID of the seller (vendor).
   final String vendorId;
@@ -42,10 +43,16 @@ class Invoice extends Entity {
   /// The date when the invoice was paid, if applicable.
   final DateTime? paidAt;
 
+  /// The URL to the QR code for this invoice.
+  final String? invoiceQrLink;
+  
+  /// The ID of the account used for payment.
+  final String? paymentAccountId;
+
   /// Creates a new [Invoice] instance.
   Invoice({
     required this.id,
-    required this.buyerId,
+    this.buyerId,
     required this.vendorId,
     required this.lineItems,
     required this.totalAmount,
@@ -56,6 +63,8 @@ class Invoice extends Entity {
     required this.createdAt,
     required this.updatedAt,
     this.paidAt,
+    this.invoiceQrLink,
+    this.paymentAccountId,
   }) : super(id);
 
   /// Creates an [Invoice] from a JSON map.
@@ -78,6 +87,8 @@ class Invoice extends Entity {
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       paidAt: json['paid_at'] != null ? DateTime.parse(json['paid_at']) : null,
+      invoiceQrLink: json['invoice_qr_link'],
+      paymentAccountId: json['payment_account_id'],
     );
   }
 
@@ -96,6 +107,8 @@ class Invoice extends Entity {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'paid_at': paidAt?.toIso8601String(),
+      'invoice_qr_link': invoiceQrLink,
+      'payment_account_id': paymentAccountId,
     };
   }
 
@@ -114,9 +127,9 @@ class Invoice extends Entity {
         symbol = '£';
         break;
       default:
-        return '$currency ${totalAmount / 100}';
+        return '$currency ${(totalAmount / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalAmount / 100}';
+    return '$symbol${(totalAmount / 100).toStringAsFixed(2)}';
   }
 
   /// Creates a copy of this [Invoice] with the given fields replaced.
@@ -133,6 +146,8 @@ class Invoice extends Entity {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? paidAt,
+    String? invoiceQrLink,
+    String? paymentAccountId,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -147,6 +162,8 @@ class Invoice extends Entity {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       paidAt: paidAt ?? this.paidAt,
+      invoiceQrLink: invoiceQrLink ?? this.invoiceQrLink,
+      paymentAccountId: paymentAccountId ?? this.paymentAccountId,
     );
   }
 

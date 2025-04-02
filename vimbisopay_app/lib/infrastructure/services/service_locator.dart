@@ -2,27 +2,30 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/marketplace/marketplace_repository_impl.dart';
 import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/config_manager.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/remote_config_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class ServiceLocator {
-  // API configuration
-  static const String _apiBaseUrl = 'https://api.vimbisopay.com/v1';
+
   
   // Services
   static final SecurityService _securityService = SecurityService();
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
   static final http.Client _httpClient = http.Client();
   static final NotificationService _notificationService = NotificationService();
+  static final LocationService _locationService = LocationService();
   static final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   
@@ -47,7 +50,15 @@ class ServiceLocator {
   
   static final MarketplaceRepository marketplaceRepository = MarketplaceRepositoryImpl(
     httpClient: _httpClient,
-    baseUrl: '$_apiBaseUrl/marketplace',
+    baseUrl: ApiConfig.baseUrl,
+    databaseHelper: _databaseHelper,
+    accountRepository: accountRepository,
+  );
+  
+  static final StoreStatusService _storeStatusService = StoreStatusService(
+    marketplaceRepository: marketplaceRepository,
+    databaseHelper: _databaseHelper,
+    locationService: _locationService,
   );
 
   // Private constructor to prevent instantiation
@@ -59,6 +70,8 @@ class ServiceLocator {
   static DatabaseHelper get databaseHelper => _databaseHelper;
   static http.Client get httpClient => _httpClient;
   static NotificationService get notificationService => _notificationService;
+  static LocationService get locationService => _locationService;
+  static StoreStatusService get storeStatusService => _storeStatusService;
   static FirebaseAnalytics get analytics => _analytics;
   
   // Getter for FeatureFlagService with lazy initialization
@@ -117,11 +130,11 @@ class ServiceLocator {
     
     // Initialize RemoteConfigService
     final prefs = await SharedPreferences.getInstance();
-    _remoteConfigService = RemoteConfigService(_httpClient, prefs, _apiBaseUrl);
+    _remoteConfigService = RemoteConfigService(_httpClient, prefs, ApiConfig.baseUrl);
     await _remoteConfigService!.initialize();
     
     // Initialize AppUpdateService
-    _appUpdateService = AppUpdateService(_httpClient, prefs, _apiBaseUrl);
+    _appUpdateService = AppUpdateService(_httpClient, prefs, ApiConfig.baseUrl);
     
     // Initialize ConfigManager
     _configManager = ConfigManager(
@@ -135,5 +148,5 @@ class ServiceLocator {
   }
   
   // API configuration
-  static String get apiBaseUrl => _apiBaseUrl;
+  static String get apiBaseUrl => ApiConfig.baseUrl;
 }

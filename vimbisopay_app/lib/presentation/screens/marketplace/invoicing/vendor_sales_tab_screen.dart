@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'; // For ScrollDirection
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
@@ -14,13 +15,10 @@ import 'package:vimbisopay_app/presentation/widgets/marketplace/product_selectio
 /// This screen displays the vendor's products and allows them to add
 /// products to a basket for checkout.
 class VendorSalesTabScreen extends StatefulWidget {
-  /// The ID of the vendor creating the sales tab.
-  final String vendorId;
-
   /// Creates a new [VendorSalesTabScreen] instance.
   const VendorSalesTabScreen({
     super.key,
-    required this.vendorId,
+    String? vendorId, // Make vendorId optional since we use the current user
   });
 
   @override
@@ -32,26 +30,101 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   
   bool _isLoading = true;
   String _errorMessage = '';
-  Vendor? _vendor;
   List<Product> _products = [];
   SalesBasket? _basket;
   
-  late TabController _tabController;
+  late  TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  
+  // Track the current tab index
+  int _currentTabIndex = 0;
+  
+  // Scroll controllers for both tabs
+  late ScrollController _productsScrollController;
+  late ScrollController _basketScrollController;
+  
+  // Track FAB visibility
+  bool _isFabVisible = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    // Initialize with index 0 (Products tab) to default to browse mode
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
+    // Add listener to track tab changes
+    _tabController.addListener(_handleTabChange);
+    
+    // Initialize scroll controllers
+    _productsScrollController = ScrollController();
+    _basketScrollController = ScrollController();
+    
+    // Add scroll listeners
+    _productsScrollController.addListener(_handleProductsScroll);
+    _basketScrollController.addListener(_handleBasketScroll);
+    
     _loadVendorData();
   }
 
   @override
   void dispose() {
+    // Remove the listeners when disposing
+    _tabController.removeListener(_handleTabChange);
+    _productsScrollController.removeListener(_handleProductsScroll);
+    _basketScrollController.removeListener(_handleBasketScroll);
+    
+    // Dispose controllers
     _tabController.dispose();
     _searchController.dispose();
+    _productsScrollController.dispose();
+    _basketScrollController.dispose();
+    
     super.dispose();
+  }
+  
+  // Handle scroll events for products tab
+  void _handleProductsScroll() {
+    if (_productsScrollController.hasClients) {
+      if (_productsScrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_productsScrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_productsScrollController.hasClients && _productsScrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
+  }
+  
+  // Handle scroll events for basket tab
+  void _handleBasketScroll() {
+    if (_basketScrollController.hasClients) {
+      if (_basketScrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_basketScrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_basketScrollController.hasClients && _basketScrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
+  }
+  
+  // Handle tab changes
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging || _tabController.index != _currentTabIndex) {
+      setState(() {
+        _currentTabIndex = _tabController.index;
+      });
+    }
   }
 
   Future<void> _loadVendorData() async {
@@ -61,41 +134,78 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     });
 
     try {
-      // Load vendor data
-      final vendorResult = await _marketplaceRepository.getVendor(widget.vendorId);
-      
-      vendorResult.fold(
-        (failure) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = failure.message ?? 'Failed to load vendor data';
-          });
-        },
-        (vendor) async {
-          // Load vendor's products
-          final productsResult = await _marketplaceRepository.getProductsByVendor(vendor.id);
-          
-          productsResult.fold(
-            (failure) {
-              Logger.error('Failed to load vendor products', failure);
-              setState(() {
-                _isLoading = false;
-                _vendor = vendor;
-                _products = [];
-                _basket = SalesBasket(vendor: vendor);
-              });
-            },
-            (products) {
-              setState(() {
-                _isLoading = false;
-                _vendor = vendor;
-                _products = products;
-                _basket = SalesBasket(vendor: vendor);
-              });
-            },
-          );
-        },
+      // Get current user
+      final currentUser = await ServiceLocator.databaseHelper.getUser();
+      if (currentUser == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data';
+        });
+        return;
+      }
+
+      // Create a vendor object from the current user
+      final vendor = Vendor(
+        id: currentUser.memberId,
+        memberId: currentUser.memberId,
+        businessName: currentUser.dashboard?.member.firstname ?? 'My Business',
+        description: 'Vendor account',
+        email: '',
+        phone: currentUser.phone,
+        rating: 0,
+        ratingCount: 0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
+      
+      List<Product> allProducts = [];
+      
+      // Load internal accounts of type PHYSICAL_ASSET from user's dashboard
+      if (currentUser.dashboard != null) {
+        final dashboard = currentUser.dashboard!;
+        final physicalAsssetAccounts = dashboard.accountsInternal
+            .where((account) => account.accountType == 'PHYSICAL_ASSET')
+            .toList();
+        
+        Logger.data('[VENDOR_SALES] Found ${physicalAsssetAccounts.length} PHYSICAL_ASSET accounts');
+        
+        // Convert internal accounts to Product objects
+        final internalProducts = physicalAsssetAccounts.map((account) {
+          // Create image URLs list with profile picture thumbnail if available
+          List<String> imageUrls = [];
+          if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+            Logger.data('[VENDOR_SALES] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
+            imageUrls.add(account.profilePictureThumbnail!);
+          } else {
+            Logger.data('[VENDOR_SALES] No profile picture thumbnail available for account: ${account.accountID}');
+          }
+          
+          // Create a Product from the internal account
+          return Product(
+            id: account.accountID,
+            vendorId: vendor.id,
+            name: account.accountName,
+            description: 'Internal physical asset account',
+            price: 0, // Default price, would need to be updated from account balance
+            currency: 'USD', // Default currency
+            imageUrls: imageUrls, // Include profile picture thumbnail if available
+            isAvailable: true,
+            accountId: account.accountID,
+            createdAt: DateTime.now(), // We don't have creation date
+            updatedAt: DateTime.now(), // We don't have update date
+          );
+        }).toList();
+        
+        // Add internal products to the list
+        allProducts.addAll(internalProducts);
+      }
+      
+      setState(() {
+        _isLoading = false;
+        _products = allProducts;
+        _basket = SalesBasket(vendor: vendor);
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -156,6 +266,16 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
       );
       return;
     }
+    
+    // Check if all items have a positive amount
+    if (!_allItemsHavePositiveAmount()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All items must have a positive amount'),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -190,13 +310,15 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     final query = _searchQuery.toLowerCase();
     return _products.where((product) {
       return product.name.toLowerCase().contains(query) ||
-          product.description.toLowerCase().contains(query) ||
-          product.category.toLowerCase().contains(query);
+          product.description.toLowerCase().contains(query);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Check if basket has items
+    final bool hasItems = _basket != null && _basket!.isNotEmpty;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Sale'),
@@ -213,9 +335,86 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
           : _errorMessage.isNotEmpty
               ? _buildErrorView()
               : _buildTabView(),
-      bottomNavigationBar: _basket != null && _basket!.isNotEmpty
-          ? _buildBottomBar()
-          : null,
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+  
+  /// Formats a price string to ensure it has exactly 2 decimal places.
+  /// 
+  /// Takes a formatted price string like "$12.5" and returns "$12.50".
+  /// Also handles prices like "$12" and returns "$12.00".
+  String _formatPriceWithTwoDecimals(String formattedPrice) {
+    // Extract the currency symbol and numeric value
+    RegExp regex = RegExp(r'([^\d.]+)?([\d.]+)');
+    Match? match = regex.firstMatch(formattedPrice);
+    
+    if (match != null) {
+      String symbol = match.group(1) ?? '';
+      String numericPart = match.group(2) ?? '0';
+      
+      // Parse the numeric part and format to 2 decimal places
+      double value = double.tryParse(numericPart) ?? 0.0;
+      return '$symbol${value.toStringAsFixed(2)}';
+    }
+    
+    // Fallback if regex doesn't match
+    return formattedPrice;
+  }
+
+  /// Checks if all items in the basket have a positive amount set.
+  bool _allItemsHavePositiveAmount() {
+    if (_basket == null || _basket!.isEmpty) return false;
+    return _basket!.items.every((item) => item.amount > 0);
+  }
+  
+  Widget _buildFloatingActionButton() {
+    // Check if keyboard is visible
+    final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    
+    // If keyboard is visible, return an empty container (hide the FAB)
+    if (isKeyboardVisible) {
+      return Container();
+    }
+    
+    // Early return if basket is null or empty
+    if (_basket == null || _basket!.isEmpty) {
+      return FloatingActionButton.extended(
+        onPressed: null, // Disabled when basket is empty
+        icon: const Icon(Icons.receipt_long),
+        label: const Text('Generate Invoice'),
+        backgroundColor: Colors.grey, // Use a muted color for disabled state
+      );
+    }
+    
+    // Check if all items have a positive amount
+    final bool allItemsValid = _allItemsHavePositiveAmount();
+    
+    // Add animations for smooth appearance/disappearance
+    return AnimatedOpacity(
+      opacity: _isFabVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        transform: Matrix4.translationValues(
+          0, 
+          _isFabVisible ? 0 : 100, // Move down when hidden
+          0
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: _isFabVisible && allItemsValid ? _proceedToInvoice : null, // Disable if hidden or invalid items
+          icon: const Icon(Icons.receipt_long),
+          label: Row(
+            children: [
+              // Format the price to ensure 2 decimal places
+              Text(_formatPriceWithTwoDecimals(_basket!.formattedTotalPrice)),
+              const SizedBox(width: 8),
+              const Text('Generate Invoice'),
+            ],
+          ),
+          backgroundColor: allItemsValid ? AppColors.primary : Colors.grey, // Gray out if any item has zero amount
+          elevation: allItemsValid ? 4 : 2, // Reduce elevation for disabled state
+        ),
+      ),
     );
   }
 
@@ -352,7 +551,8 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
 
   Widget _buildProductsGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(16.0),
+      controller: _productsScrollController, // Use the products scroll controller
+      padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, _getBottomPadding()), // Dynamic bottom padding (non-const)
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.6,
@@ -373,6 +573,11 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         );
       },
     );
+  }
+  
+  /// Helper method to get bottom padding based on FAB visibility
+  double _getBottomPadding() {
+    return _isFabVisible ? 80.0 : 16.0;
   }
 
   Widget _buildBasketTab() {
@@ -428,7 +633,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Items: ${_basket!.totalQuantity}',
+                'Products: ${_basket!.itemCount}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -447,7 +652,8 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            controller: _basketScrollController, // Use the basket scroll controller
+            padding: EdgeInsets.fromLTRB(16.0, 0, 16.0, _getBottomPadding()), // Dynamic bottom padding
             itemCount: _basket!.items.length,
             itemBuilder: (context, index) {
               final item = _basket!.items[index];
@@ -469,6 +675,11 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   }
 
   Widget _buildBottomBar() {
+    // Early return with an empty container if basket is null or empty
+    if (_basket == null || _basket!.isEmpty) {
+      return Container(height: 0);
+    }
+    
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -497,7 +708,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
                     ),
                   ),
                   Text(
-                    _basket!.formattedTotalPrice,
+                    _formatPriceWithTwoDecimals(_basket!.formattedTotalPrice),
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,

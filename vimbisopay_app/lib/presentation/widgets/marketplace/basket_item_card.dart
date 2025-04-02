@@ -10,7 +10,7 @@ import 'package:vimbisopay_app/presentation/models/basket_item.dart';
 ///
 /// This widget shows the product information, quantity, and price
 /// for an item in the sales basket.
-class BasketItemCard extends StatelessWidget {
+class BasketItemCard extends StatefulWidget {
   /// The basket item to display.
   final BasketItem item;
 
@@ -29,142 +29,182 @@ class BasketItemCard extends StatelessWidget {
   });
 
   @override
+  State<BasketItemCard> createState() => _BasketItemCardState();
+}
+
+class _BasketItemCardState extends State<BasketItemCard> {
+  late TextEditingController _amountController;
+  late FocusNode _amountFocusNode;
+  bool _isFirstTap = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(text: widget.item.amount.toStringAsFixed(2));
+    _amountFocusNode = FocusNode();
+    _amountFocusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _amountFocusNode.removeListener(_handleFocusChange);
+    _amountFocusNode.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+  
+  void _handleFocusChange() {
+    if (_amountFocusNode.hasFocus && _isFirstTap) {
+      // Select all text when the field receives focus for the first time
+      _amountController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _amountController.text.length,
+      );
+    }
+  }
+  
+  @override
+  void didUpdateWidget(BasketItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update the controller if the item's amount has changed
+    if (oldWidget.item.amount != widget.item.amount) {
+      _amountController.text = widget.item.amount.toStringAsFixed(2);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: SizedBox(
-                width: 60,
-                height: 60,
-                child: _buildProductImage(item.product),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Product details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.product.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.product.formattedPrice,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Total: ${item.formattedTotalPrice}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Quantity controls
-            Column(
+      elevation: 2, // Add subtle elevation
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0), // More rounded corners
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center, // Center align vertically
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: onQuantityChanged != null
-                          ? () {
-                              if (item.quantity > 1) {
-                                item.decrementQuantity();
-                                onQuantityChanged!(item.quantity);
-                              }
-                            }
-                          : null,
-                      color: item.quantity > 1
-                          ? AppColors.primary
-                          : Colors.grey,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
+                // Product image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: _buildProductImage(widget.item.product),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Product name - takes available space
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Text(
+                      widget.item.product.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
+                      maxLines: 2, // Allow 2 lines for long names
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                
+                // Amount field - fixed width
+                SizedBox(
+                  width: 132, // Fixed comfortable width (increased by 10%)
+                  child: TextField(
+                    controller: _amountController,
+                    focusNode: _amountFocusNode,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount in USD',
+                      prefixText: '\$',
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        '${item.quantity}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline),
-                      onPressed: onQuantityChanged != null
-                          ? () {
-                              item.incrementQuantity();
-                              onQuantityChanged!(item.quantity);
+                    style: const TextStyle(fontSize: 16),
+                    onTap: () {
+                      if (_isFirstTap) {
+                        // Clear the field on first tap
+                        _amountController.clear();
+                        _isFirstTap = false;
+                      }
+                    },
+                    onChanged: (value) {
+                      Logger.data('Amount field changed: "$value"');
+                      
+                      // If this is the first keystroke and the value still contains the original value
+                      if (_isFirstTap && value.contains(widget.item.amount.toStringAsFixed(2))) {
+                        // Clear the field and set the value to just the new character
+                        final newChar = value.replaceAll(widget.item.amount.toStringAsFixed(2), "");
+                        _amountController.text = newChar;
+                        // Move cursor to the end
+                        _amountController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: newChar.length),
+                        );
+                        _isFirstTap = false;
+                        return;
+                      }
+                      
+                      if (value.isNotEmpty) {
+                        try {
+                          final newAmount = double.parse(value);
+                          if (newAmount >= 0) {
+                            Logger.data('Setting new amount: $newAmount');
+                            setState(() {
+                              widget.item.amount = newAmount;
+                            });
+                            // Force parent widget to rebuild
+                            if (widget.onQuantityChanged != null) {
+                              widget.onQuantityChanged!(widget.item.quantity);
+                              Logger.data('Notified parent of amount change');
                             }
-                          : null,
-                      color: AppColors.primary,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (onRemove != null)
-                  TextButton.icon(
-                    icon: const Icon(Icons.delete_outline, size: 16),
-                    label: const Text('Remove'),
-                    onPressed: onRemove,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.errorRed,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 0,
-                      ),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+                          } else {
+                            Logger.data('Rejected negative amount: $newAmount');
+                          }
+                        } catch (e) {
+                          Logger.data('Invalid amount input: "$value", error: $e');
+                        }
+                      } else {
+                        Logger.data('Empty amount input');
+                        // Set amount to 0 when field is empty
+                        setState(() {
+                          widget.item.amount = 0;
+                        });
+                        if (widget.onQuantityChanged != null) {
+                          widget.onQuantityChanged!(widget.item.quantity);
+                        }
+                      }
+                    },
                   ),
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          
+          // Remove button in top-right corner
+          if (widget.onRemove != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: widget.onRemove,
+                style: IconButton.styleFrom(
+                  foregroundColor: AppColors.errorRed,
+                  padding: const EdgeInsets.all(4),
+                  minimumSize: const Size(32, 32),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

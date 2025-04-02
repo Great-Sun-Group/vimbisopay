@@ -32,10 +32,10 @@ class FeatureFlagService {
       // Set fetch timeout and minimum fetch interval
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(minutes: 1),
-        minimumFetchInterval: Duration.zero, // Changed from hours: 1 to zero for testing
+        minimumFetchInterval: const Duration(hours: 1), // Changed back to 1 hour to improve startup time
       ));
       
-      Logger.data('Remote Config settings configured with zero minimum fetch interval');
+      Logger.data('Remote Config settings configured with 1 hour minimum fetch interval');
       
       // Fetch and activate
       return await fetchAndActivate();

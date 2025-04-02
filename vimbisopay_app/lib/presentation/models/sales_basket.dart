@@ -47,9 +47,9 @@ class SalesBasket {
         symbol = '£';
         break;
       default:
-        return '$currency ${totalPrice / 100}';
+        return '$currency ${(totalPrice / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalPrice / 100}';
+    return '$symbol${(totalPrice / 100).toStringAsFixed(2)}';
   }
 
   /// Gets the number of items in the basket.
@@ -134,8 +134,8 @@ class SalesBasket {
     return items.map((item) => InvoiceLineItem(
       productId: item.product.id,
       productName: item.product.name,
-      quantity: item.quantity,
-      unitPrice: item.product.price,
+      quantity: 1, // Set quantity to 1 since we're using custom amounts
+      unitPrice: item.totalPrice, // Use the total price as the unit price
       totalPrice: item.totalPrice,
     )).toList();
   }

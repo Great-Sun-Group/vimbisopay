@@ -28,6 +28,10 @@
 	<string>We use Face ID to securely authenticate you into the app</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need camera access to scan QR codes</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to help customers find your store when it's marked as open</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to help customers find your store when it's marked as open</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

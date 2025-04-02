@@ -1,0 +1,920 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
+import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_profile_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
+
+/// Vendor Profile Screen for the VimbisoPay app.
+///
+/// This screen displays a vendor's profile information, including business
+/// details, contact information, ratings, and products.
+class VendorProfileScreen extends StatefulWidget {
+  /// The ID of the vendor to display.
+  final String vendorId;
+
+  /// Whether the current user is the owner of this vendor profile.
+  final bool isOwner;
+  
+  /// Whether to show a success message when the screen is loaded.
+  final bool showSuccessMessage;
+
+  /// Creates a new [VendorProfileScreen] instance.
+  const VendorProfileScreen({
+    super.key,
+    required this.vendorId,
+    this.isOwner = false,
+    this.showSuccessMessage = false,
+  });
+
+  @override
+  State<VendorProfileScreen> createState() => _VendorProfileScreenState();
+}
+
+class _VendorProfileScreenState extends State<VendorProfileScreen> {
+  final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
+  final LocationService _locationService = ServiceLocator.locationService;
+  bool _isLoading = true;
+  bool _isUpdatingStoreStatus = false;
+  String _errorMessage = '';
+  Vendor? _vendor;
+  List<Product> _products = [];
+  User? _currentUser;
+  String? _profileThumbnailUrl;
+  bool _storeOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Logger.lifecycle('VendorProfileScreen initialized');
+    _loadVendorData();
+    
+    // Proactively request location permission when the screen is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.isOwner) {
+        _requestLocationPermission();
+      }
+    });
+    
+    // Show success message if needed
+    if (widget.showSuccessMessage) {
+      // Use post-frame callback to ensure the context is ready
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vendor profile created successfully'),
+              backgroundColor: AppColors.successGreen,
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    Logger.lifecycle('VendorProfileScreen disposed');
+    super.dispose();
+  }
+
+  Future<void> _loadVendorData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // Load current user data
+      try {
+        _currentUser = await _databaseHelper.getUser();
+        if (_currentUser == null) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'User not found';
+          });
+          return;
+        }
+        
+        // Get store status from user
+        _storeOpen = _currentUser!.storeOpen;
+        Logger.data('[VENDOR_PROFILE] Store status: ${_storeOpen ? 'Open' : 'Closed'}');
+        
+        if (_currentUser!.dashboard != null) {
+          _profileThumbnailUrl = _currentUser!.dashboard!.member.profilePictureThumbnail;
+          Logger.data('[VENDOR_PROFILE] User profile thumbnail URL: $_profileThumbnailUrl');
+          
+          // Additional logging to help debug profile image issues
+          if (_profileThumbnailUrl == null || _profileThumbnailUrl!.isEmpty) {
+            Logger.data('[VENDOR_PROFILE] Profile thumbnail URL is null or empty');
+          } else {
+            Logger.data('[VENDOR_PROFILE] Profile thumbnail URL is available: $_profileThumbnailUrl');
+          }
+        } else {
+          Logger.data('[VENDOR_PROFILE] Dashboard is null, cannot get profile thumbnail');
+        }
+      } catch (e) {
+        Logger.error('[VENDOR_PROFILE] Error loading user data', e);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load user data: $e';
+        });
+        return;
+      }
+
+      // Check if user is a vendor
+      if (!_currentUser!.activateMarket) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'User is not a vendor';
+        });
+        return;
+      }
+
+      // Create a vendor object from the user data
+      final vendor = Vendor(
+        id: widget.vendorId,
+        memberId: _currentUser!.memberId,
+        businessName: _currentUser!.dashboard?.member.firstname != null && _currentUser!.dashboard?.member.lastname != null
+            ? '${_currentUser!.dashboard!.member.firstname} ${_currentUser!.dashboard!.member.lastname}'
+            : 'My Business',
+        description: 'Vendor profile',
+        email: '',
+        phone: _currentUser!.phone,
+        profileImageUrl: _currentUser!.dashboard?.member.profilePictureThumbnail,
+        bannerImageUrl: null,
+        rating: 0.0,
+        ratingCount: 0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Load internal accounts from the user's dashboard
+      List<Product> vendorProducts = [];
+      if (_currentUser?.dashboard != null) {
+        // Filter for PHYSICAL_ASSET accounts
+        final physicalAssetAccounts = _currentUser!.dashboard!.accountsInternal
+            .where((account) => account.accountType == 'PHYSICAL_ASSET')
+            .toList();
+        
+        Logger.data('[VENDOR_PROFILE] Found ${physicalAssetAccounts.length} PHYSICAL_ASSET accounts');
+        
+        // Map internal accounts to Product objects
+        vendorProducts = physicalAssetAccounts.map((account) {
+          // Create image URLs list with profile picture thumbnail if available
+          List<String> imageUrls = [];
+          if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
+            imageUrls.add(account.profilePictureThumbnail!);
+            Logger.data('[VENDOR_PROFILE] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
+          }
+          
+          // Create a Product from the internal account
+          return Product(
+            id: account.accountID,
+            vendorId: vendor.id,
+            name: account.accountName,
+            description: 'Internal physical asset account',
+            price: 0, // Default price
+            currency: 'USD', // Default currency
+            imageUrls: imageUrls,
+            category: 'Internal',
+            tags: ['internal', 'physical_asset'],
+            isAvailable: true,
+            accountId: account.accountID,
+            createdAt: DateTime.now(), // We don't have creation date
+            updatedAt: DateTime.now(), // We don't have update date
+          );
+        }).toList();
+      }
+      
+      setState(() {
+        _isLoading = false;
+        _vendor = vendor;
+        _products = vendorProducts;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'An unexpected error occurred: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+              ? _buildErrorView()
+              : _buildVendorProfile(),
+      // Add FloatingActionButton here, only visible if user is the owner AND products list is not empty
+      floatingActionButton: (widget.isOwner && _products.isNotEmpty)
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/vendor-sales-tab',
+                  arguments: {
+                    'vendorId': widget.vendorId,
+                  },
+                );
+              },
+              icon: const Icon(Icons.point_of_sale),
+              label: const Text('New Sale'),
+              backgroundColor: AppColors.primary,
+            )
+          : null,
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppColors.errorRed,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.errorRed,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _loadVendorData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVendorProfile() {
+    final vendor = _vendor!;
+    
+    return CustomScrollView(
+      slivers: [
+        _buildAppBar(vendor),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildBusinessInfo(vendor),
+                const SizedBox(height: 24),
+                _buildAccountsSection(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppBar(Vendor vendor) {
+    return SliverAppBar(
+      expandedHeight: 200,
+      pinned: true,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          children: [
+            // Banner image
+            Positioned.fill(
+              child: _buildImageFromUrl(
+                vendor.bannerImageUrl,
+                placeholder: Container(
+                  color: AppColors.primary.withOpacity(0.2),
+                  child: const Center(
+                    child: Icon(
+                      Icons.storefront,
+                      color: AppColors.primary,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Gradient overlay for better text visibility
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.transparent,
+                      AppColors.black.withOpacity(0.7),
+                    ],
+                    stops: const [0.6, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // Profile image
+            Positioned(
+              left: 16,
+              bottom: 16,
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: AppColors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(2.0),
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 76,
+                      height: 76,
+                      child: _buildProfileImage(vendor),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Business name and rating
+            Positioned(
+              left: 108,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    vendor.businessName,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(1, 1),
+                          blurRadius: 3,
+                          color: AppColors.black45,
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star,
+                        color: AppColors.amber,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        vendor.ratingDisplay,
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(1, 1),
+                              blurRadius: 2,
+                              color: AppColors.black45,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+            if (widget.isOwner) ...[
+              IconButton(
+                icon: const Icon(Icons.inventory_2),
+                tooltip: 'Manage Inventory',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => InventoryManagementScreen(
+                        vendorId: widget.vendorId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit),
+                tooltip: 'Edit Profile',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditVendorProfileScreen(
+                        vendorId: widget.vendorId,
+                      ),
+                    ),
+                  ).then((result) {
+                    // Check if we got a success result
+                    if (result != null && result is Map && result['success'] == true) {
+                      // Show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'Vendor profile updated successfully'),
+                            backgroundColor: AppColors.successGreen,
+                          ),
+                        );
+                      }
+                    }
+                    
+                    // Refresh the vendor data
+                    if (mounted) {
+                      _loadVendorData();
+                    }
+                  });
+                },
+              ),
+            ],
+      ],
+    );
+  }
+
+  Widget _buildBusinessInfo(Vendor vendor) {
+    return SettingsContainer(
+      title: 'About',
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                vendor.description,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
+              if (widget.isOwner) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text(
+                      'Status:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: vendor.isActive
+                            ? AppColors.successGreen.withOpacity(0.2)
+                            : AppColors.errorRed.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        vendor.isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          color: vendor.isActive ? AppColors.successGreen : AppColors.errorRed,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      icon: const Icon(Icons.settings),
+                      label: const Text('Settings'),
+                      onPressed: () {
+                        // TODO: Navigate to vendor settings
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vendor settings coming soon'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text(
+                      'Store:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _isUpdatingStoreStatus
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Switch(
+                            value: _storeOpen,
+                            activeColor: AppColors.successGreen,
+                            onChanged: _updateStoreStatus,
+                          ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _storeOpen ? 'Open' : 'Closed',
+                      style: TextStyle(
+                        color: _storeOpen ? AppColors.successGreen : AppColors.errorRed,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_currentUser?.latitude != null && _currentUser?.longitude != null)
+                      Tooltip(
+                        message: 'Location: ${_currentUser!.latitude!.toStringAsFixed(4)}, ${_currentUser!.longitude!.toStringAsFixed(4)}',
+                        child: const Icon(
+                          Icons.location_on,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Accounts',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (widget.isOwner)
+              TextButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Add Account'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddEditSkuScreen(
+                        vendorId: widget.vendorId,
+                      ),
+                    ),
+                  ).then((result) {
+                    // Check if we got a success result
+                    if (result != null && result is Map && result['success'] == true) {
+                      // Show success message
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'Account added successfully'),
+                            backgroundColor: AppColors.successGreen,
+                          ),
+                        );
+                      }
+                      
+                      // Check if the result contains a product
+                      if (result.containsKey('product') && result['product'] != null) {
+                        final productMap = result['product'] as Map<String, dynamic>;
+                        Logger.data('[VENDOR_PROFILE] Retrieved product data from AddEditSkuScreen');
+                        
+                        try {
+                          // Create a new Product object from the data
+                          final retrievedProduct = Product(
+                            id: productMap['id'],
+                            vendorId: productMap['vendorId'],
+                            name: productMap['name'],
+                            description: productMap['description'],
+                            price: productMap['price'],
+                            currency: productMap['currency'],
+                            imageUrls: List<String>.from(productMap['imageUrls']),
+                            category: productMap['category'],
+                            tags: List<String>.from(productMap['tags']),
+                            isAvailable: productMap['isAvailable'],
+                            accountId: productMap['accountId'],
+                            createdAt: DateTime.parse(productMap['createdAt']),
+                            updatedAt: DateTime.parse(productMap['updatedAt']),
+                          );
+                          
+                          // Check if the product has image URLs
+                          if (retrievedProduct.imageUrls.isNotEmpty) {
+                            Logger.data('[VENDOR_PROFILE] Retrieved product has image URLs: ${retrievedProduct.imageUrls}');
+                            
+                            // Update the state with the new product
+                            setState(() {
+                              // Add the new product to the list
+                              _products.add(retrievedProduct);
+                            });
+                            
+                            // No need to reload all vendor data
+                            return;
+                          }
+                        } catch (e) {
+                          Logger.error('[VENDOR_PROFILE] Error creating Product from result data', e);
+                          // Continue to reload all vendor data
+                        }
+                      }
+                    }
+                    
+                    // If we didn't get a product or it didn't have image URLs, refresh all data
+                    if (mounted) {
+                      _loadVendorData();
+                    }
+                  });
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _products.isEmpty
+            ? _buildEmptyAccountsView()
+            : _buildAccountsGrid(),
+      ],
+    );
+  }
+
+  /// Checks if location services are enabled and prompts the user to enable them if not.
+  Future<bool> _checkLocationServicesEnabled() async {
+    Logger.data('[VENDOR_PROFILE] Checking if location services are enabled');
+    
+    // Check if location services are enabled
+    bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
+    if (servicesEnabled) {
+      Logger.data('[VENDOR_PROFILE] Location services are enabled');
+      return true;
+    }
+    
+    // Show a dialog explaining why we need location services enabled
+    if (mounted) {
+      final shouldOpenSettings = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Services Disabled'),
+          content: const Text(
+            'Your device\'s location services are turned off. To mark your store as open, '
+            'we need your location to help customers find you.\n\n'
+            'Would you like to open settings to enable location services?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        ),
+      ) ?? false;
+      
+      if (shouldOpenSettings) {
+        Logger.data('[VENDOR_PROFILE] Opening location settings');
+        await _locationService.openLocationSettings();
+        
+        // Give the user some time to change settings
+        await Future.delayed(const Duration(seconds: 2));
+        
+        // Check again if location services are now enabled
+        servicesEnabled = await _locationService.checkLocationServicesEnabled();
+        if (servicesEnabled) {
+          Logger.data('[VENDOR_PROFILE] Location services are now enabled');
+          return true;
+        } else {
+          Logger.data('[VENDOR_PROFILE] Location services are still disabled');
+          return false;
+        }
+      } else {
+        Logger.data('[VENDOR_PROFILE] User declined to open location settings');
+        return false;
+      }
+    }
+    
+    return false;
+  }
+
+  /// Requests location permission with a clear explanation to the user.
+  Future<bool> _requestLocationPermission() async {
+    Logger.data('[VENDOR_PROFILE] Requesting location permission');
+    
+    // First check if location services are enabled
+    bool servicesEnabled = await _checkLocationServicesEnabled();
+    if (!servicesEnabled) {
+      Logger.data('[VENDOR_PROFILE] Location services are disabled, cannot proceed with permission request');
+      return false;
+    }
+    
+    // Check if permission is already granted
+    bool hasPermission = await _locationService.checkLocationPermission();
+    if (hasPermission) {
+      Logger.data('[VENDOR_PROFILE] Location permission already granted');
+      return true;
+    }
+    
+    // Show a dialog explaining why we need location permission
+    if (mounted) {
+      final shouldRequest = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Permission'),
+          content: const Text(
+            'To mark your store as open, we need your location to help customers find you. '
+            'Would you like to grant location permission?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not Now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Grant Permission'),
+            ),
+          ],
+        ),
+      ) ?? false;
+      
+      if (!shouldRequest) {
+        Logger.data('[VENDOR_PROFILE] User declined to request location permission');
+        return false;
+      }
+    }
+    
+    // Request permission
+    final permissionGranted = await _locationService.requestLocationPermission();
+    Logger.data('[VENDOR_PROFILE] Location permission request result: $permissionGranted');
+    
+    return permissionGranted;
+  }
+
+  /// Updates the store status and location.
+  Future<void> _updateStoreStatus(bool value) async {
+    if (_isUpdatingStoreStatus) return;
+    
+    setState(() {
+      _isUpdatingStoreStatus = true;
+    });
+    
+    try {
+      Logger.data('[VENDOR_PROFILE] Updating store status to: ${value ? 'Open' : 'Closed'}');
+      
+      // Get current location if opening the store
+      double? latitude;
+      double? longitude;
+      
+      if (value) {
+        // First check if location services are enabled
+        final servicesEnabled = await _checkLocationServicesEnabled();
+        if (!servicesEnabled) {
+          Logger.error('[VENDOR_PROFILE] Location services are disabled');
+          if (mounted) {
+            // Ask if the user wants to continue without location
+            final continueWithoutLocation = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('Location Services Disabled'),
+                content: const Text(
+                  'Your store will be marked as open, but customers won\'t be able to see your location. '
+                  'Would you like to continue without location?'
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Continue Without Location'),
+                  ),
+                ],
+              ),
+            ) ?? false;
+            
+            if (!continueWithoutLocation) {
+              Logger.data('[VENDOR_PROFILE] User cancelled store status update due to disabled location services');
+              setState(() {
+                _isUpdatingStoreStatus = false;
+              });
+              return;
+            }
+            
+            // User chose to continue without location
+            Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+          } else {
+            setState(() {
+              _isUpdatingStoreStatus = false;
+            });
+            return;
+          }
+        } else {
+          // Location services are enabled, now check and request permission if needed
+          final hasPermission = await _requestLocationPermission();
+          if (!hasPermission) {
+            Logger.error('[VENDOR_PROFILE] Location permission not granted');
+            if (mounted) {
+              // Ask if the user wants to continue without location
+              final continueWithoutLocation = await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('Location Permission Denied'),
+                  content: const Text(
+                    'Your store will be marked as open, but customers won\'t be able to see your location. '
+                    'Would you like to continue without location?'
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Continue Without Location'),
+                    ),
+                  ],
+                ),
+              ) ?? false;
+              
+              if (!continueWithoutLocation) {
+                Logger.data('[VENDOR_PROFILE] User cancelled store status update due to denied location permission');
+                setState(() {
+                  _isUpdatingStoreStatus = false;
+                });
+                return;
+              }
+              
+              // User chose to continue without location
+              Logger.data('[VENDOR_PROFILE] User chose to continue without location');
+            } else {
+              setState(() {
+                _isUpdatingStoreStatus = false;
+              });
+              return;
+            }
+          } else {
+            // Permission granted, get current location
+            final position = await _locationService.getCurrentPosition();
+            if (position != null) {
+              latitude = position.latitude;
+              longitude = position.longitude;
+              Logger.data('[VENDOR_PROFILE] Got location: ($latitude, $longitude)');
+            } else {
+              Logger.error('[VENDOR_PROFILE] Failed to get location');
+              // Ask if the user wants to continue without location
+              if (mounted) {
+                final continueWithoutLocation = await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Location Not Available'),
+                    content: const Text(
+                      'We couldn\'t get your current location. Your store will be marked as open, '
+                      'but customers won\'t be

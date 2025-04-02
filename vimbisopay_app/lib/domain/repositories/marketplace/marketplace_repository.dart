@@ -7,16 +7,21 @@ import 'package:dartz/dartz.dart';
 /// This repository handles all marketplace-related operations, including
 /// vendor management, product listings, and invoicing.
 abstract class MarketplaceRepository {
-  /// Gets a vendor by ID.
+  /// Enables vendor functionality for a member.
   ///
-  /// Returns a [Vendor] if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, Vendor>> getVendor(String id);
+  /// When enabled, creates required internal accounts if they don't exist.
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> enableVendorFunctionality();
 
-  /// Gets a vendor by member ID.
+  /// Updates a member's profile with vendor details.
   ///
-  /// Returns a [Vendor] if found, or a [Failure] if an error occurs.
-  /// If the member is not a vendor, returns a NotFoundFailure.
-  Future<Either<Failure, Vendor>> getVendorByMemberId(String memberId);
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateMemberWithVendorDetails({
+    String? firstname,
+    String? lastname,
+    String? memberHandle,
+    String? vendorBio,
+  });
   
   /// Checks if a member is a vendor.
   ///
@@ -36,39 +41,33 @@ abstract class MarketplaceRepository {
     String? bannerImageUrl,
   });
 
-  /// Updates an existing vendor.
-  ///
-  /// Returns the updated [Vendor] if successful, or a [Failure] if an error occurs.
-  Future<Either<Failure, Vendor>> updateVendor({
-    required String id,
-    String? businessName,
-    String? description,
-    String? email,
-    String? phone,
-    String? profileImageUrl,
-    String? bannerImageUrl,
-    bool? isActive,
-  });
-
   /// Gets a product by ID.
   ///
   /// Returns a [Product] if found, or a [Failure] if an error occurs.
   Future<Either<Failure, Product>> getProduct(String id);
 
-  /// Gets products by vendor ID.
-  ///
-  /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> getProductsByVendor(String vendorId);
-
-  /// Gets products by category.
-  ///
-  /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> getProductsByCategory(String category);
-
   /// Searches for products by query.
   ///
+  /// If latitude and longitude are provided, the search will prioritize products
+  /// from nearby vendors.
+  ///
   /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> searchProducts(String query);
+  Future<Either<Failure, List<Product>>> searchProducts(
+    String query, {
+    double? latitude,
+    double? longitude,
+  });
+
+  /// Creates an internal account for a product.
+  ///
+  /// Returns the account ID if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, String>> createInternalAccount({
+    required String accountName,
+    required String defaultDenom,
+    required String accountType,
+    String? storeAccountID,
+    String? accountDescription,
+  });
 
   /// Creates a new product.
   ///
@@ -80,10 +79,8 @@ abstract class MarketplaceRepository {
     required int price,
     required String currency,
     required List<String> imageUrls,
-    required String category,
-    required List<String> tags,
     required bool isAvailable,
-    int? inventory,
+    String? accountId,
   });
 
   /// Updates an existing product.
@@ -96,10 +93,8 @@ abstract class MarketplaceRepository {
     int? price,
     String? currency,
     List<String>? imageUrls,
-    String? category,
-    List<String>? tags,
     bool? isAvailable,
-    int? inventory,
+    String? accountId,
   });
 
   /// Gets an invoice by ID.
@@ -121,7 +116,6 @@ abstract class MarketplaceRepository {
   ///
   /// Returns the created [Invoice] if successful, or a [Failure] if an error occurs.
   Future<Either<Failure, Invoice>> createInvoice({
-    required String buyerId,
     required String vendorId,
     required List<InvoiceLineItem> lineItems,
     required int totalAmount,
@@ -196,4 +190,48 @@ abstract class MarketplaceRepository {
     required String id,
     required String newOwnerId,
   });
+  
+  /// Uploads a profile image and optimizes it.
+  ///
+  /// Returns a map of asset IDs if successful, or a [Failure] if an error occurs.
+  /// The map contains keys: 'originalAssetID', 'asset200ID', and 'asset600ID'.
+  Future<Either<Failure, Map<String, String>>> uploadProfileImage({
+    required String imagePath,
+    required String drAccountId,
+    String? crAccountId,
+  });
+
+  /// Updates a member's profile pictures with the given asset IDs.
+  ///
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateProfilePictures({
+    required String sourceId,
+    required String originalAssetId,
+    required String thumbnailAssetId,
+    required String asset200Id,
+    required String asset600Id,
+  });
+  
+  /// Updates a vendor's store status and location.
+  ///
+  /// Returns true if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, bool>> updateStoreStatus({
+    required String accountId,
+    required bool storeOpen,
+    double? latitude,
+    double? longitude,
+  });
+  
+  /// Gets storefront information for a vendor using their personal account ID.
+  ///
+  /// Returns storefront data if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, Map<String, dynamic>>> getStorefront(String accountId);
+  
+  /// Gets account dashboard information for a vendor using their account ID.
+  ///
+  /// This API is only visible to vendors and not the general population.
+  /// Vendors will use the product images from the internal accounts records and match on accountID.
+  ///
+  /// Returns account dashboard data if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, Map<String, dynamic>>> getAccountDashboard(String accountId);
 }

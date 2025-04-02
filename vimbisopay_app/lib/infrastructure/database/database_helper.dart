@@ -5,7 +5,25 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dash;
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;
+import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+
+/// Class to represent cached store data
+class CachedStore {
+  final String storeId;
+  final Vendor vendor;
+  final List<Product> products;
+  final String? profileImageUrl;
+  final DateTime lastUpdated;
+  
+  CachedStore({
+    required this.storeId,
+    required this.vendor,
+    required this.products,
+    this.profileImageUrl,
+    required this.lastUpdated,
+  });
+}
 
 class DatabaseHelper {
   final _userController = StreamController<User?>.broadcast();
@@ -20,7 +38,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 14,
+      version: 20,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -35,6 +53,171 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 20) {
+      Logger.data('Starting database upgrade to version 20');
+      
+      // Create cached_stores table
+      try {
+        await db.execute('''
+          CREATE TABLE cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+        Logger.data('Created cached_stores table');
+      } catch (e) {
+        Logger.error('Failed to create cached_stores table', e);
+        // Don't throw here as the table might already exist
+      }
+    }
+    
+    if (oldVersion < 19) {
+      Logger.data('Starting database upgrade to version 19');
+      
+      // Add store_open, latitude, and longitude columns to users table
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN store_open INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE users ADD COLUMN latitude REAL');
+        await db.execute('ALTER TABLE users ADD COLUMN longitude REAL');
+        Logger.data('Added store_open, latitude, and longitude columns to users table');
+      } catch (e) {
+        Logger.error('Failed to add store status columns to users table', e);
+        // Don't throw here as the columns might already exist
+      }
+    }
+    
+    if (oldVersion < 18) {
+      Logger.data('Starting database upgrade to version 18');
+      
+      // Add accountType column to accounts table
+      try {
+        await db.execute('ALTER TABLE accounts ADD COLUMN accountType TEXT');
+        Logger.data('Added accountType column to accounts table');
+      } catch (e) {
+        Logger.error('Failed to add accountType column to accounts table', e);
+        // Don't throw here as the column might already exist
+      }
+    }
+    
+    if (oldVersion < 17) {
+      Logger.data('Starting database upgrade to version 17');
+      
+      // Add profilePictureThumbnail column to internal_accounts table
+      try {
+        await db.execute('ALTER TABLE internal_accounts ADD COLUMN profilePictureThumbnail TEXT');
+        Logger.data('Added profilePictureThumbnail column to internal_accounts table');
+      } catch (e) {
+        Logger.error('Failed to add profilePictureThumbnail column to internal_accounts', e);
+        // Don't throw here as the column might already exist
+      }
+      
+      // Create internal_account_balance_data table
+      try {
+        await db.execute('''
+          CREATE TABLE internal_account_balance_data(
+            accountId TEXT PRIMARY KEY,
+            netCredexAssetsInDefaultDenom TEXT NOT NULL,
+            securedNetBalances TEXT NOT NULL,
+            totalPayables TEXT NOT NULL,
+            totalReceivables TEXT NOT NULL,
+            netPayRec TEXT NOT NULL,
+            FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+          )
+        ''');
+        Logger.data('Created internal_account_balance_data table');
+      } catch (e) {
+        Logger.error('Failed to create internal_account_balance_data table', e);
+        // Don't throw here as the table might already exist
+      }
+      
+      // Create internal_account_pending_transactions table
+      try {
+        await db.execute('''
+          CREATE TABLE internal_account_pending_transactions(
+            credexId TEXT PRIMARY KEY,
+            accountId TEXT NOT NULL,
+            amount TEXT NOT NULL,
+            counterpartyName TEXT NOT NULL,
+            isSecured INTEGER NOT NULL,
+            direction TEXT NOT NULL,
+            dueDate TEXT,
+            FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+          )
+        ''');
+        Logger.data('Created internal_account_pending_transactions table');
+      } catch (e) {
+        Logger.error('Failed to create internal_account_pending_transactions table', e);
+        // Don't throw here as the table might already exist
+      }
+      
+      // Create internal_account_send_offers_to table
+      try {
+        await db.execute('''
+          CREATE TABLE internal_account_send_offers_to(
+            accountId TEXT PRIMARY KEY,
+            memberId TEXT NOT NULL,
+            firstname TEXT NOT NULL,
+            lastname TEXT NOT NULL,
+            FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+          )
+        ''');
+        Logger.data('Created internal_account_send_offers_to table');
+      } catch (e) {
+        Logger.error('Failed to create internal_account_send_offers_to table', e);
+        // Don't throw here as the table might already exist
+      }
+    }
+    
+    if (oldVersion < 16) {
+      Logger.data('Starting database upgrade to version 16');
+      
+      // Add profilePictureThumbnail column to member_tiers table
+      try {
+        await db.execute('ALTER TABLE member_tiers ADD COLUMN profilePictureThumbnail TEXT');
+        Logger.data('Added profilePictureThumbnail column to member_tiers table');
+      } catch (e) {
+        Logger.error('Failed to add profilePictureThumbnail column', e);
+        // Don't throw here as the column might already exist
+      }
+    }
+    
+    if (oldVersion < 15) {
+      Logger.data('Starting database upgrade to version 15');
+      
+      // Add internal_accounts table
+      try {
+        await db.execute('''
+          CREATE TABLE internal_accounts(
+            accountId TEXT PRIMARY KEY,
+            memberId TEXT NOT NULL,
+            accountName TEXT NOT NULL,
+            accountType TEXT NOT NULL,
+            FOREIGN KEY (memberId) REFERENCES users (memberId)
+          )
+        ''');
+        Logger.data('Created internal_accounts table');
+      } catch (e) {
+        Logger.error('Failed to create internal_accounts table', e);
+        // Don't throw here as the table might already exist
+      }
+    }
+    
+    if (oldVersion < 14) {
+      Logger.data('Starting database upgrade to version 14');
+      
+      // Add activate_market column
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN activate_market INTEGER DEFAULT 0');
+        Logger.data('Added activate_market column to users table');
+      } catch (e) {
+        Logger.error('Failed to add activate_market column', e);
+        // Don't throw here as the column might already exist
+      }
+    }
+    
     if (oldVersion < 13) {
       Logger.data('Starting database upgrade to version 13');
       
@@ -159,7 +342,11 @@ class DatabaseHelper {
         memberHandle TEXT,
         version TEXT,
         authMethod TEXT,
-        otpVerified INTEGER DEFAULT 0
+        otpVerified INTEGER DEFAULT 0,
+        activate_market INTEGER DEFAULT 0,
+        store_open INTEGER DEFAULT 0,
+        latitude REAL,
+        longitude REAL
       )
     ''');
     
@@ -172,6 +359,7 @@ class DatabaseHelper {
         firstname TEXT,
         lastname TEXT,
         defaultDenom TEXT,
+        profilePictureThumbnail TEXT,
         FOREIGN KEY (memberId) REFERENCES users (memberId)
       )
     ''');
@@ -194,6 +382,7 @@ class DatabaseHelper {
         accountHandle TEXT NOT NULL,
         defaultDenom TEXT NOT NULL,
         isOwnedAccount INTEGER NOT NULL,
+        accountType TEXT,
         FOREIGN KEY (memberId) REFERENCES users (memberId)
       )
     ''');
@@ -245,6 +434,67 @@ class DatabaseHelper {
         FOREIGN KEY (accountId) REFERENCES accounts (accountId)
       )
     ''');
+    
+    // Add internal_accounts table with enhanced structure
+    await db.execute('''
+      CREATE TABLE internal_accounts(
+        accountId TEXT PRIMARY KEY,
+        memberId TEXT NOT NULL,
+        accountName TEXT NOT NULL,
+        accountType TEXT NOT NULL,
+        profilePictureThumbnail TEXT,
+        FOREIGN KEY (memberId) REFERENCES users (memberId)
+      )
+    ''');
+    
+    // Add internal_account_balance_data table
+    await db.execute('''
+      CREATE TABLE internal_account_balance_data(
+        accountId TEXT PRIMARY KEY,
+        netCredexAssetsInDefaultDenom TEXT NOT NULL,
+        securedNetBalances TEXT NOT NULL,
+        totalPayables TEXT NOT NULL,
+        totalReceivables TEXT NOT NULL,
+        netPayRec TEXT NOT NULL,
+        FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+      )
+    ''');
+    
+    // Add internal_account_pending_transactions table
+    await db.execute('''
+      CREATE TABLE internal_account_pending_transactions(
+        credexId TEXT PRIMARY KEY,
+        accountId TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        counterpartyName TEXT NOT NULL,
+        isSecured INTEGER NOT NULL,
+        direction TEXT NOT NULL,
+        dueDate TEXT,
+        FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+      )
+    ''');
+    
+    // Add internal_account_send_offers_to table
+    await db.execute('''
+      CREATE TABLE internal_account_send_offers_to(
+        accountId TEXT PRIMARY KEY,
+        memberId TEXT NOT NULL,
+        firstname TEXT NOT NULL,
+        lastname TEXT NOT NULL,
+        FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
+      )
+    ''');
+    
+    // Add cached_stores table
+    await db.execute('''
+      CREATE TABLE cached_stores(
+        storeId TEXT PRIMARY KEY,
+        vendor TEXT NOT NULL,
+        products TEXT NOT NULL,
+        profileImageUrl TEXT,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future<void> saveUser(User user) async {
@@ -263,6 +513,7 @@ class DatabaseHelper {
         await txn.delete('pending_transactions');
         await txn.delete('balance_data');
         await txn.delete('accounts');
+        await txn.delete('internal_accounts');
         await txn.delete('remaining_available');
         await txn.delete('member_tiers');
         await txn.delete('users');
@@ -279,6 +530,10 @@ class DatabaseHelper {
           'version': user.version,
           'authMethod': user.authMethod,
           'otpVerified': user.otpVerified ? 1 : 0,
+          'activate_market': user.activateMarket ? 1 : 0,
+          'store_open': user.storeOpen ? 1 : 0,
+          'latitude': user.latitude,
+          'longitude': user.longitude,
         };
         Logger.data('[DATABASE] Inserting user data: ${userData.map((k, v) => MapEntry(k, k == 'token' ? '[REDACTED]' : v))}');
         await txn.insert('users', userData);
@@ -293,9 +548,88 @@ class DatabaseHelper {
             'firstname': dashboard.member.firstname,
             'lastname': dashboard.member.lastname,
             'defaultDenom': dashboard.member.defaultDenom,
+            'profilePictureThumbnail': dashboard.member.profilePictureThumbnail,
           });
           
-          // Rest of the saveUser code remains unchanged...
+          // Log the profile thumbnail URL for debugging
+          Logger.data('[DATABASE] Saving profile thumbnail URL: ${dashboard.member.profilePictureThumbnail}');
+          
+          // Save internal accounts if available
+          if (dashboard.accountsInternal.isNotEmpty) {
+            Logger.data('[DATABASE] Saving ${dashboard.accountsInternal.length} internal accounts');
+            for (final internalAccount in dashboard.accountsInternal) {
+              // Insert basic internal account data
+              await txn.insert('internal_accounts', {
+                'accountId': internalAccount.accountID,
+                'memberId': user.memberId,
+                'accountName': internalAccount.accountName,
+                'accountType': internalAccount.accountType,
+                'profilePictureThumbnail': internalAccount.profilePictureThumbnail,
+              });
+              
+              // Insert balance data if available
+              if (internalAccount.balanceData != null) {
+                await txn.insert('internal_account_balance_data', {
+                  'accountId': internalAccount.accountID,
+                  'netCredexAssetsInDefaultDenom': internalAccount.balanceData!.netCredexAssetsInDefaultDenom,
+                  'securedNetBalances': jsonEncode(internalAccount.balanceData!.securedNetBalancesByDenom),
+                  'totalPayables': internalAccount.balanceData!.unsecuredBalances.totalPayables,
+                  'totalReceivables': internalAccount.balanceData!.unsecuredBalances.totalReceivables,
+                  'netPayRec': internalAccount.balanceData!.unsecuredBalances.netPayRec,
+                });
+              }
+              
+              // Insert send offers to data if available
+              if (internalAccount.sendOffersTo != null) {
+                await txn.insert('internal_account_send_offers_to', {
+                  'accountId': internalAccount.accountID,
+                  'memberId': internalAccount.sendOffersTo!.memberID,
+                  'firstname': internalAccount.sendOffersTo!.firstname,
+                  'lastname': internalAccount.sendOffersTo!.lastname,
+                });
+              }
+              
+              // Insert pending in transactions if available
+              if (internalAccount.pendingInData != null && internalAccount.pendingInData!.data.isNotEmpty) {
+                for (final pending in internalAccount.pendingInData!.data) {
+                  if (!processedCredexIds.contains(pending.credexID)) {
+                    await txn.insert('internal_account_pending_transactions', {
+                      'credexId': pending.credexID,
+                      'accountId': internalAccount.accountID,
+                      'amount': pending.formattedInitialAmount,
+                      'counterpartyName': pending.counterpartyAccountName,
+                      'isSecured': pending.secured ? 1 : 0,
+                      'direction': 'in',
+                      'dueDate': pending.dueDate?.toIso8601String(),
+                    });
+                    processedCredexIds.add(pending.credexID);
+                  }
+                }
+              }
+              
+              // Insert pending out transactions if available
+              if (internalAccount.pendingOutData != null && internalAccount.pendingOutData!.data.isNotEmpty) {
+                for (final pending in internalAccount.pendingOutData!.data) {
+                  if (!processedCredexIds.contains(pending.credexID)) {
+                    await txn.insert('internal_account_pending_transactions', {
+                      'credexId': pending.credexID,
+                      'accountId': internalAccount.accountID,
+                      'amount': pending.formattedInitialAmount,
+                      'counterpartyName': pending.counterpartyAccountName,
+                      'isSecured': pending.secured ? 1 : 0,
+                      'direction': 'out',
+                      'dueDate': pending.dueDate?.toIso8601String(),
+                    });
+                    processedCredexIds.add(pending.credexID);
+                  }
+                }
+              }
+            }
+          } else {
+            Logger.data('[DATABASE] No internal accounts to save');
+          }
+          
+          // Save regular accounts
           for (final account in dashboard.accounts) {
             await txn.insert('accounts', {
               'accountId': account.accountID,
@@ -304,6 +638,7 @@ class DatabaseHelper {
               'accountHandle': account.accountHandle,
               'defaultDenom': account.defaultDenom ?? '',
               'isOwnedAccount': account.isOwnedAccount ? 1 : 0,
+              'accountType': account.accountType,
             });
             
             await txn.insert('balance_data', {
@@ -424,6 +759,7 @@ class DatabaseHelper {
             accountHandle: account['accountHandle'] as String,
             defaultDenom: account['defaultDenom'] as String,
             isOwnedAccount: account['isOwnedAccount'] == 1,
+            accountType: account['accountType'] as String?,
             balanceData: dash.BalanceData(
               securedNetBalancesByDenom: securedBalances,
               unsecuredBalances: dash.UnsecuredBalances(
@@ -462,9 +798,159 @@ class DatabaseHelper {
         }
       }
       
+      // Query internal accounts with enhanced data
+      final List<Map<String, dynamic>> internalAccountsData = await db.query(
+        'internal_accounts',
+        where: 'memberId = ?',
+        whereArgs: [memberId],
+      );
+      
+      final List<dash.DashboardInternalAccount> internalAccounts = [];
+      
+      for (final account in internalAccountsData) {
+        final accountId = account['accountId'] as String;
+        
+        // Get profile picture thumbnail
+        final String? profilePictureThumbnail = account['profilePictureThumbnail'] as String?;
+        
+        // Get balance data if available
+        final List<Map<String, dynamic>> balanceData = await db.query(
+          'internal_account_balance_data',
+          where: 'accountId = ?',
+          whereArgs: [accountId],
+        );
+        
+        dash.BalanceData? accountBalanceData;
+        if (balanceData.isNotEmpty) {
+          final balance = balanceData.first;
+          
+          List<String> securedBalances;
+          try {
+            final decoded = jsonDecode(balance['securedNetBalances'] as String);
+            if (decoded is List) {
+              securedBalances = List<String>.from(decoded);
+            } else {
+              securedBalances = [];
+            }
+          } catch (e) {
+            securedBalances = [];
+            Logger.error('Error decoding internal account secured balances', e);
+          }
+          
+          accountBalanceData = dash.BalanceData(
+            securedNetBalancesByDenom: securedBalances,
+            unsecuredBalances: dash.UnsecuredBalances(
+              totalPayables: balance['totalPayables'] as String,
+              totalReceivables: balance['totalReceivables'] as String,
+              netPayRec: balance['netPayRec'] as String,
+            ),
+            netCredexAssetsInDefaultDenom: balance['netCredexAssetsInDefaultDenom'] as String,
+          );
+        }
+        
+        // Get send offers to data if available
+        final List<Map<String, dynamic>> sendOffersToData = await db.query(
+          'internal_account_send_offers_to',
+          where: 'accountId = ?',
+          whereArgs: [accountId],
+        );
+        
+        dash.SendOffersTo? sendOffersTo;
+        if (sendOffersToData.isNotEmpty) {
+          final data = sendOffersToData.first;
+          sendOffersTo = dash.SendOffersTo(
+            memberID: data['memberId'] as String,
+            firstname: data['firstname'] as String,
+            lastname: data['lastname'] as String,
+          );
+        }
+        
+        // Get pending transactions
+        final List<Map<String, dynamic>> pendingTxs = await db.query(
+          'internal_account_pending_transactions',
+          where: 'accountId = ?',
+          whereArgs: [accountId],
+        );
+        
+        final pendingIn = pendingTxs.where((tx) => tx['direction'] == 'in').toList();
+        final pendingOut = pendingTxs.where((tx) => tx['direction'] == 'out').toList();
+        
+        dash.PendingData? pendingInData;
+        if (pendingIn.isNotEmpty) {
+          pendingInData = dash.PendingData(
+            success: true,
+            data: pendingIn.map((tx) {
+              // Parse due date if available
+              DateTime? dueDate;
+              if (tx['dueDate'] != null) {
+                try {
+                  dueDate = DateTime.parse(tx['dueDate'] as String);
+                } catch (e) {
+                  // Ignore parsing errors
+                }
+              }
+              
+              return dash.PendingOffer(
+                credexID: tx['credexId'] as String,
+                formattedInitialAmount: tx['amount'] as String,
+                counterpartyAccountName: tx['counterpartyName'] as String,
+                secured: tx['isSecured'] == 1,
+                dueDate: dueDate,
+              );
+            }).toList(),
+            message: 'Retrieved ${pendingIn.length} pending offers',
+          );
+        }
+        
+        dash.PendingData? pendingOutData;
+        if (pendingOut.isNotEmpty) {
+          pendingOutData = dash.PendingData(
+            success: true,
+            data: pendingOut.map((tx) {
+              // Parse due date if available
+              DateTime? dueDate;
+              if (tx['dueDate'] != null) {
+                try {
+                  dueDate = DateTime.parse(tx['dueDate'] as String);
+                } catch (e) {
+                  // Ignore parsing errors
+                }
+              }
+              
+              return dash.PendingOffer(
+                credexID: tx['credexId'] as String,
+                formattedInitialAmount: tx['amount'] as String,
+                counterpartyAccountName: tx['counterpartyName'] as String,
+                secured: tx['isSecured'] == 1,
+                dueDate: dueDate,
+              );
+            }).toList(),
+            message: 'Retrieved ${pendingOut.length} pending outgoing offers',
+          );
+        }
+        
+        // Create internal account with all data
+        internalAccounts.add(dash.DashboardInternalAccount(
+          accountID: accountId,
+          accountName: account['accountName'] as String,
+          accountType: account['accountType'] as String,
+          profilePictureThumbnail: profilePictureThumbnail,
+          balanceData: accountBalanceData,
+          sendOffersTo: sendOffersTo,
+          pendingInData: pendingInData,
+          pendingOutData: pendingOutData,
+        ));
+      }
+      
+      Logger.data('[DATABASE] Found ${internalAccounts.length} internal accounts with enhanced data');
+      
       dash.Dashboard? dashboardData;
       if (tiers.isNotEmpty && dashboardAccounts.isNotEmpty) {
         final tierData = tiers.first;
+        
+        // Get profilePictureThumbnail from member_tiers table
+        final String? profilePictureThumbnail = tierData['profilePictureThumbnail'] as String?;
+        Logger.data('[DATABASE] Retrieved profile thumbnail URL: $profilePictureThumbnail');
         
         dashboardData = dash.Dashboard(
           id: memberId,
@@ -475,8 +961,10 @@ class DatabaseHelper {
             lastname: tierData['lastname'] as String,
             memberHandle: userData['memberHandle'] as String?,
             defaultDenom: tierData['defaultDenom'] as String,
+            profilePictureThumbnail: profilePictureThumbnail,
           ),
           accounts: dashboardAccounts,
+          accountsInternal: internalAccounts,
         );
       }
       
@@ -492,6 +980,10 @@ class DatabaseHelper {
         authMethod: userData['authMethod'] as String?,
         otpVerified: (userData['otpVerified'] as int? ?? 0) == 1,
         dashboard: dashboardData,
+        activateMarket: (userData['activate_market'] as int? ?? 0) == 1,
+        storeOpen: (userData['store_open'] as int? ?? 0) == 1,
+        latitude: userData['latitude'] != null ? (userData['latitude'] as num).toDouble() : null,
+        longitude: userData['longitude'] != null ? (userData['longitude'] as num).toDouble() : null,
       );
       
       Logger.data('[DATABASE] Returning user with token: ${user.token}');
@@ -691,5 +1183,167 @@ class DatabaseHelper {
   Future<void> clearLedgerEntries() async {
     final Database db = await database;
     await db.delete('ledger_entries');
+  }
+  
+  /// Caches store data in the database
+  Future<void> cacheStoreData({
+    required String storeId,
+    required Vendor vendor,
+    required List<Product> products,
+    String? profileImageUrl,
+  }) async {
+    try {
+      Logger.data('[DATABASE] Caching store data for store ID: $storeId');
+      Logger.data('[DATABASE] Vendor: ${vendor.businessName}, Products count: ${products.length}');
+      
+      final Database db = await database;
+      
+      // Verify that the cached_stores table exists
+      final tableCheck = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='cached_stores'");
+      if (tableCheck.isEmpty) {
+        Logger.error('[DATABASE] cached_stores table does not exist, creating it now');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+      }
+      
+      // Convert vendor and products to JSON strings
+      final vendorJson = jsonEncode(vendor.toJson());
+      final productsJson = jsonEncode(products.map((p) => p.toJson()).toList());
+      
+      Logger.data('[DATABASE] Vendor JSON size: ${vendorJson.length} characters');
+      Logger.data('[DATABASE] Products JSON size: ${productsJson.length} characters');
+      
+      // Prepare data for insertion
+      final data = {
+        'storeId': storeId,
+        'vendor': vendorJson,
+        'products': productsJson,
+        'profileImageUrl': profileImageUrl,
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      // Insert or replace the cached store data
+      final result = await db.insert(
+        'cached_stores',
+        data,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      Logger.data('[DATABASE] Store data cached successfully for store ID: $storeId, result: $result');
+      
+      // Verify the data was inserted by querying it back
+      final verifyData = await db.query(
+        'cached_stores',
+        where: 'storeId = ?',
+        whereArgs: [storeId],
+      );
+      
+      if (verifyData.isNotEmpty) {
+        Logger.data('[DATABASE] Verified data was inserted successfully');
+      } else {
+        Logger.error('[DATABASE] Data was not inserted successfully');
+      }
+    } catch (e, stackTrace) {
+      Logger.error('[DATABASE] Error caching store data', e);
+      Logger.error('[DATABASE] Stack trace: $stackTrace');
+      throw Exception('Failed to cache store data: $e');
+    }
+  }
+  
+  /// Retrieves cached store data from the database
+  Future<CachedStore?> getCachedStore(String storeId) async {
+    try {
+      Logger.data('[DATABASE] Getting cached store data for store ID: $storeId');
+      final Database db = await database;
+      
+      // Check if the cached_stores table exists
+      final tableCheck = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='cached_stores'");
+      if (tableCheck.isEmpty) {
+        Logger.error('[DATABASE] cached_stores table does not exist');
+        
+        // Create the table if it doesn't exist
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS cached_stores(
+            storeId TEXT PRIMARY KEY,
+            vendor TEXT NOT NULL,
+            products TEXT NOT NULL,
+            profileImageUrl TEXT,
+            lastUpdated INTEGER NOT NULL
+          )
+        ''');
+        Logger.data('[DATABASE] Created cached_stores table');
+        return null;
+      }
+      
+      // Query the cached_stores table
+      final List<Map<String, dynamic>> results = await db.query(
+        'cached_stores',
+        where: 'storeId = ?',
+        whereArgs: [storeId],
+        limit: 1,
+      );
+      
+      if (results.isEmpty) {
+        Logger.data('[DATABASE] No cached store data found for store ID: $storeId');
+        
+        // Check if there are any records in the table
+        final countCheck = await db.rawQuery('SELECT COUNT(*) as count FROM cached_stores');
+        final count = Sqflite.firstIntValue(countCheck) ?? 0;
+        Logger.data('[DATABASE] Total records in cached_stores table: $count');
+        
+        return null;
+      }
+      
+      final data = results.first;
+      Logger.data('[DATABASE] Found cached store data with lastUpdated: ${DateTime.fromMillisecondsSinceEpoch(data['lastUpdated'] as int)}');
+      
+      try {
+        // Parse the vendor JSON
+        final vendorJson = jsonDecode(data['vendor'] as String);
+        final vendor = Vendor.fromJson(vendorJson);
+        
+        // Parse the products JSON
+        final productsJson = jsonDecode(data['products'] as String);
+        final products = (productsJson as List).map((p) => Product.fromJson(p)).toList();
+        
+        Logger.data('[DATABASE] Successfully parsed vendor and ${products.length} products from cached data');
+        
+        // Create and return the CachedStore object
+        return CachedStore(
+          storeId: storeId,
+          vendor: vendor,
+          products: products,
+          profileImageUrl: data['profileImageUrl'] as String?,
+          lastUpdated: DateTime.fromMillisecondsSinceEpoch(data['lastUpdated'] as int),
+        );
+      } catch (parseError) {
+        Logger.error('[DATABASE] Error parsing cached store data JSON', parseError);
+        
+        // Log the data that failed to parse
+        Logger.error('[DATABASE] Vendor JSON length: ${(data['vendor'] as String).length}');
+        Logger.error('[DATABASE] Products JSON length: ${(data['products'] as String).length}');
+        
+        // Delete the corrupted record
+        await db.delete(
+          'cached_stores',
+          where: 'storeId = ?',
+          whereArgs: [storeId],
+        );
+        Logger.data('[DATABASE] Deleted corrupted cached store data');
+        
+        return null;
+      }
+    } catch (e, stackTrace) {
+      Logger.error('[DATABASE] Error getting cached store data', e);
+      Logger.error('[DATABASE] Stack trace: $stackTrace');
+      return null;
+    }
   }
 }

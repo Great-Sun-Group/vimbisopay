@@ -10,17 +10,26 @@ class BasketItem {
 
   /// The quantity of the product being purchased.
   int quantity;
+  
+  /// The custom amount for this item.
+  double amount;
 
   /// Creates a new [BasketItem] instance.
   BasketItem({
     required this.product,
     this.quantity = 1,
-  });
+    this.amount = 0.0, // Default to 0
+  }) {
+    // Initialize amount based on product price if not specified
+    if (amount == 0.0) {
+      amount = product.price / 100; // Convert cents to dollars
+    }
+  }
 
   /// Gets the total price for this basket item.
   ///
-  /// The total price is the product price multiplied by the quantity.
-  int get totalPrice => product.price * quantity;
+  /// The total price is based on the custom amount.
+  int get totalPrice => (amount * 100).round(); // Convert dollars to cents
 
   /// Gets the formatted total price with currency symbol.
   String get formattedTotalPrice {
@@ -37,9 +46,9 @@ class BasketItem {
         symbol = '£';
         break;
       default:
-        return '${product.currency} ${totalPrice / 100}';
+        return '${product.currency} ${(totalPrice / 100).toStringAsFixed(2)}';
     }
-    return '$symbol${totalPrice / 100}';
+    return '$symbol${(totalPrice / 100).toStringAsFixed(2)}';
   }
 
   /// Increments the quantity by 1.

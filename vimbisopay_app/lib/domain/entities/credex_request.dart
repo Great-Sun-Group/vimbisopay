@@ -6,7 +6,13 @@ class CredexRequest {
   final String credexType;
   final String offersOrRequests;
   final bool securedCredex;
+  final String? dueDate;
+  final String? invoiceID;
 
+  /// Creates a new [CredexRequest] instance.
+  ///
+  /// [dueDate] defaults to 30 days from now if not provided.
+  /// [invoiceID] is optional and can be null.
   CredexRequest({
     required this.issuerAccountID,
     required this.receiverAccountID,
@@ -15,10 +21,17 @@ class CredexRequest {
     required this.credexType,
     required this.offersOrRequests,
     required this.securedCredex,
-  });
+    String? dueDate,
+    this.invoiceID,
+  }) : dueDate = _getDefaultDueDate();
+
+  /// Generates a default due date 30 days from now in the format YYYY-MM-DD.
+  static String? _getDefaultDueDate() {
+    return null;
+  }
 
   Map<String, dynamic> toJson() {
-    return {
+    final Map<String, dynamic> json = {
       'issuerAccountID': issuerAccountID,
       'receiverAccountID': receiverAccountID,
       'Denomination': denomination,
@@ -26,6 +39,14 @@ class CredexRequest {
       'credexType': credexType,
       'OFFERSorREQUESTS': offersOrRequests,
       'securedCredex': securedCredex,
+      'dueDate': dueDate,
     };
+    
+    // Only add invoiceID if it's not null
+    if (invoiceID != null) {
+      json['invoiceID'] = invoiceID;
+    }
+    
+    return json;
   }
 }

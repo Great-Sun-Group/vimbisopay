@@ -30,7 +30,8 @@ class AccountSelectionBottomSheet extends StatelessWidget {
   }) : super(key: key);
 
   void _handleAccountSelection(BuildContext context, DashboardAccount account) {
-    Navigator.pop(context); // Close bottom sheet
+    // Return the selected account to the caller
+    Navigator.pop(context, account);
 
     if (action == AccountSelectionAction.receive) {
       Logger.interaction('Showing QR for selected account');

@@ -10,6 +10,10 @@ class User {
   final String? passwordHash;  // Hashed password
   final DateTime? passwordChanged;  // When the password was last changed
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
+  final bool activateMarket;  // Whether the user is already a vendor in the marketplace
+  final bool storeOpen;  // Whether the vendor's store is currently open
+  final double? latitude;  // The vendor's current location (latitude)
+  final double? longitude;  // The vendor's current location (longitude)
 
   const User({
     required this.memberId,
@@ -21,6 +25,10 @@ class User {
     this.passwordHash,
     this.passwordChanged,
     this.dashboard,
+    this.activateMarket = false,
+    this.storeOpen = false,
+    this.latitude,
+    this.longitude,
   });
 
   MemberTier? get tier => dashboard?.memberTier;
@@ -41,10 +49,26 @@ class User {
       'password_hash': passwordHash,
       'password_changed': passwordChanged?.millisecondsSinceEpoch,
       'dashboard': dashboard?.toMap(),
+      'activate_market': activateMarket,
+      'store_open': storeOpen,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
   factory User.fromMap(Map<String, dynamic> map) {
+    // Get dashboard if available
+    final dashboardMap = map['dashboard'] as Map<String, dynamic>?;
+    final dashboard = dashboardMap != null ? Dashboard.fromMap(dashboardMap) : null;
+    
+    // Check for activateMarket in the map or in the dashboard for backward compatibility
+    bool activateMarket = false;
+    if (map.containsKey('activate_market')) {
+      activateMarket = map['activate_market'] as bool? ?? false;
+    } else if (dashboard != null && dashboardMap!.containsKey('activateMarket')) {
+      activateMarket = dashboardMap['activateMarket'] as bool? ?? false;
+    }
+    
     return User(
       memberId: map['memberId'] as String,
       phone: map['phone'] as String,
@@ -56,9 +80,11 @@ class User {
       passwordChanged: map['password_changed'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['password_changed'] as int)
           : null,
-      dashboard: map['dashboard'] != null 
-          ? Dashboard.fromMap(map['dashboard'] as Map<String, dynamic>)
-          : null,
+      dashboard: dashboard,
+      activateMarket: activateMarket,
+      storeOpen: map['store_open'] as bool? ?? false,
+      latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
+      longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
     );
   }
 
@@ -72,6 +98,10 @@ class User {
     String? passwordHash,
     DateTime? passwordChanged,
     Dashboard? dashboard,
+    bool? activateMarket,
+    bool? storeOpen,
+    double? latitude,
+    double? longitude,
   }) {
     return User(
       memberId: memberId ?? this.memberId,
@@ -83,6 +113,10 @@ class User {
       passwordHash: passwordHash ?? this.passwordHash,
       passwordChanged: passwordChanged ?? this.passwordChanged,
       dashboard: dashboard ?? this.dashboard,
+      activateMarket: activateMarket ?? this.activateMarket,
+      storeOpen: storeOpen ?? this.storeOpen,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 
@@ -98,7 +132,11 @@ class User {
         other.authMethod == authMethod &&
         other.passwordHash == passwordHash &&
         other.passwordChanged == passwordChanged &&
-        other.dashboard == dashboard;
+        other.dashboard == dashboard &&
+        other.activateMarket == activateMarket &&
+        other.storeOpen == storeOpen &&
+        other.latitude == latitude &&
+        other.longitude == longitude;
   }
 
   @override
@@ -109,6 +147,10 @@ class User {
         passwordHash,
         passwordChanged,
         dashboard,
+        activateMarket,
+        storeOpen,
+        latitude,
+        longitude,
       );
 
   @override
@@ -121,7 +163,10 @@ class User {
   authMethod: $authMethod,
   passwordHash: ${passwordHash != null ? '[REDACTED]' : 'null'},
   passwordChanged: $passwordChanged,
-  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'}
+  dashboard: ${dashboard != null ? '[Dashboard Present]' : 'null'},
+  activateMarket: $activateMarket,
+  storeOpen: $storeOpen,
+  location: ${latitude != null && longitude != null ? '($latitude, $longitude)' : 'null'}
 }''';
   }
 }
