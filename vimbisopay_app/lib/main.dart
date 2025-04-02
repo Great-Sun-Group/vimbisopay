@@ -128,7 +128,7 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     print('Background message handler set up');
 
-    // Initialize config services
+    // Initialize config services with cached values first
     print('Initializing config services...');
     final configManager = await ServiceLocator.initializeConfigServices();
 
@@ -136,31 +136,38 @@ void main() async {
     Logger.data(
         'Marketplace feature enabled: ${configManager.isFeatureEnabled('enable_marketplace')}');
 
-    // Check for app updates
-    print('Checking for app updates...');
-    final updateInfo = await configManager.checkForUpdate();
-    if (updateInfo != null) {
-      Logger.data('Update available: ${updateInfo['latest_version']}');
-      Logger.data('Update required: ${updateInfo['update_required']}');
-    } else {
-      Logger.data('No updates available');
-    }
+    // Schedule app updates check for after UI is rendered
+    Future.delayed(const Duration(seconds: 2), () async {
+      print('Checking for app updates in background...');
+      final updateInfo = await configManager.checkForUpdate();
+      if (updateInfo != null) {
+        Logger.data('Update available: ${updateInfo['latest_version']}');
+        Logger.data('Update required: ${updateInfo['update_required']}');
+      } else {
+        Logger.data('No updates available');
+      }
+    });
 
-    // Initialize NotificationService after Firebase is ready
+    // Initialize NotificationService with basic setup first
     print('Initializing NotificationService...');
     final notificationService = ServiceLocator.notificationService;
-    final initialized = await notificationService.initialize();
-
-    if (!initialized) {
-      Logger.error('Failed to initialize NotificationService');
-      // Don't proceed if notification service fails to initialize
-      return;
-    }
-    Logger.data('''
+    
+    // Schedule full notification service initialization for after UI is rendered
+    Future.delayed(const Duration(seconds: 1), () async {
+      print('Completing NotificationService initialization in background...');
+      final initialized = await notificationService.initialize();
+      
+      if (!initialized) {
+        Logger.error('Failed to initialize NotificationService');
+        return;
+      }
+      
+      Logger.data('''
 NotificationService initialized successfully:
 - Has refresh controller: ${notificationService.onRefreshNeeded != null}
 - Has notification controller: ${notificationService.onNotification != null}
 ''');
+    });
 
     print('=== APP INITIALIZATION COMPLETE ===');
   } catch (e, stackTrace) {

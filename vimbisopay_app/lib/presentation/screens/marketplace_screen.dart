@@ -629,16 +629,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.inventory_2, color: AppColors.primary),
-            title: const Text('Manage Inventory'),
-            onTap: () {
-              Navigator.pop(context);
-              _navigateToInventoryManagement();
-            },
-          ),
-          ListTile(
             leading: const Icon(Icons.store, color: AppColors.primary),
-            title: const Text('Store Information'),
+            title: const Text('My Store'),
             onTap: () {
               Navigator.pop(context);
               _navigateToStoreInformation();
