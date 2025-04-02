@@ -129,8 +129,6 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             price: 0, // Default price, would need to be updated from account balance
             currency: 'USD', // Default currency
             imageUrls: imageUrls, // Include profile picture thumbnail if available
-            category: 'Internal',
-            tags: ['internal', 'physical_asset'],
             isAvailable: true,
             accountId: account.accountID,
             createdAt: DateTime.now(), // We don't have creation date
@@ -251,8 +249,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     final query = _searchQuery.toLowerCase();
     return _products.where((product) {
       return product.name.toLowerCase().contains(query) ||
-          product.description.toLowerCase().contains(query) ||
-          product.category.toLowerCase().contains(query);
+          product.description.toLowerCase().contains(query);
     }).toList();
   }
 

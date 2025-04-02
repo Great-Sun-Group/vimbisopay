@@ -86,7 +86,6 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
           'description': 'Internal physical asset account',
           'price': 0, // Default price
           'currency': 'USD', // Default currency
-          'category': 'Internal',
           'accountId': account.accountID,
           'isAvailable': true,
         };
@@ -138,7 +137,6 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
             'description': productMap['description'],
             'price': productMap['price'],
             'currency': productMap['currency'],
-            'category': productMap['category'],
             'accountId': productMap['accountId'],
             'isAvailable': productMap['isAvailable'],
           };
@@ -197,7 +195,6 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
             'description': productMap['description'],
             'price': productMap['price'],
             'currency': productMap['currency'],
-            'category': productMap['category'],
             'accountId': productMap['accountId'],
             'isAvailable': productMap['isAvailable'],
           };
@@ -363,26 +360,6 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Category',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          Text(
-                            sku['category'],
-                            style: const TextStyle(
-                              fontSize: 16,
                             ),
                           ),
                         ],

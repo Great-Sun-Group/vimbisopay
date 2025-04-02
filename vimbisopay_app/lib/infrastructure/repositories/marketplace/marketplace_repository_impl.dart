@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
+import 'package:vimbisopay_app/domain/entities/marketplace/store.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
@@ -456,98 +457,131 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           // Parse the response body
           final responseData = jsonDecode(response.body);
           Logger.data('[MARKETPLACE] Response data received successfully');
+          Logger.data('[MARKETPLACE] Full response: $responseData');
 
-          // Check if the response contains profile picture URLs
-          List<String> imageUrls = [];
-
+          // Initialize variables for product, store, and vendor data
+          Map<String, dynamic>? productData;
+          Map<String, dynamic>? storeData;
+          Map<String, dynamic>? vendorData;
+          
+          // Extract dashboard data from the response
           try {
             if (responseData.containsKey('data') &&
                 responseData['data'] is Map<String, dynamic> &&
                 responseData['data'].containsKey('dashboard') &&
-                responseData['data']['dashboard'] is Map<String, dynamic> &&
-                responseData['data']['dashboard'].containsKey('product') &&
-                responseData['data']['dashboard']['product']
-                    is Map<String, dynamic> &&
-                responseData['data']['dashboard']['product']
-                    .containsKey('profilePictureUrls')) {
-              final profilePictureUrls = responseData['data']['dashboard']
-                  ['product']['profilePictureUrls'] as Map<String, dynamic>;
-              Logger.data(
-                  '[MARKETPLACE] Found profile picture URLs in response: $profilePictureUrls');
-
-              // Add the profile picture URLs to the image URLs list
-              // Prefer pic600 if available, then pic200, then thumbnail, then original
-              if (profilePictureUrls.containsKey('pic600') &&
-                  profilePictureUrls['pic600'] != null) {
-                imageUrls.add(profilePictureUrls['pic600']);
-                Logger.data('[MARKETPLACE] Using pic600 as image URL');
-              } else if (profilePictureUrls.containsKey('pic200') &&
-                  profilePictureUrls['pic200'] != null) {
-                imageUrls.add(profilePictureUrls['pic200']);
-                Logger.data('[MARKETPLACE] Using pic200 as image URL');
-              } else if (profilePictureUrls.containsKey('thumbnail') &&
-                  profilePictureUrls['thumbnail'] != null) {
-                imageUrls.add(profilePictureUrls['thumbnail']);
-                Logger.data('[MARKETPLACE] Using thumbnail as image URL');
-              } else if (profilePictureUrls.containsKey('original') &&
-                  profilePictureUrls['original'] != null) {
-                imageUrls.add(profilePictureUrls['original']);
-                Logger.data('[MARKETPLACE] Using original as image URL');
+                responseData['data']['dashboard'] is Map<String, dynamic>) {
+              
+              final dashboard = responseData['data']['dashboard'] as Map<String, dynamic>;
+              Logger.data('[MARKETPLACE] Found dashboard data in response');
+              
+              // Extract product data
+              if (dashboard.containsKey('product') && dashboard['product'] is Map<String, dynamic>) {
+                productData = dashboard['product'] as Map<String, dynamic>;
+                Logger.data('[MARKETPLACE] Found product data in dashboard: $productData');
+              }
+              
+              // Extract store data
+              if (dashboard.containsKey('store') && dashboard['store'] is Map<String, dynamic>) {
+                storeData = dashboard['store'] as Map<String, dynamic>;
+                Logger.data('[MARKETPLACE] Found store data in dashboard: $storeData');
+              }
+              
+              // Extract vendor data
+              if (dashboard.containsKey('vendor') && dashboard['vendor'] is Map<String, dynamic>) {
+                vendorData = dashboard['vendor'] as Map<String, dynamic>;
+                Logger.data('[MARKETPLACE] Found vendor data in dashboard: $vendorData');
               }
             } else {
-              Logger.data(
-                  '[MARKETPLACE] No profile picture URLs found in response');
+              Logger.data('[MARKETPLACE] No dashboard data found in response');
             }
           } catch (e) {
-            Logger.error(
-                '[MARKETPLACE] Error extracting profile picture URLs from response',
-                e);
-            // Continue with empty image URLs
+            Logger.error('[MARKETPLACE] Error extracting dashboard data from response', e);
           }
-
-          // Extract product details from the response
+          
+          // Extract product details
           String productId = id;
           String vendorId = '';
           String name = '';
           String description = '';
           int price = 0;
           String currency = 'USD';
-          String category = '';
-          List<String> tags = [];
           bool isAvailable = true;
           String? accountId;
-
-          try {
-            if (responseData.containsKey('data') &&
-                responseData['data'] is Map<String, dynamic> &&
-                responseData['data'].containsKey('dashboard') &&
-                responseData['data']['dashboard'] is Map<String, dynamic> &&
-                responseData['data']['dashboard'].containsKey('product') &&
-                responseData['data']['dashboard']['product']
-                    is Map<String, dynamic>) {
-              final productData = responseData['data']['dashboard']['product']
-                  as Map<String, dynamic>;
-
-              productId = productData['productID'] ?? id;
-              name = productData['productName'] ?? '';
-              description = productData['productDescription'] ?? '';
-
-              // Try to get the account ID
-              accountId = productId; // Use the product ID as the account ID
-
-              Logger.data(
-                  '[MARKETPLACE] Extracted product details from response: name=$name, description=$description');
-            } else {
-              Logger.data('[MARKETPLACE] No product details found in response');
-            }
-          } catch (e) {
-            Logger.error(
-                '[MARKETPLACE] Error extracting product details from response',
-                e);
-            // Continue with default values
+          String? storeName;
+          List<String> imageUrls = [];
+          
+          // Create Store object if store data is available
+          Store? store;
+          if (storeData != null) {
+            // Add ID to store data for Store.fromJson
+            storeData['id'] = storeData['storeHandle'] ?? '';
+            
+            // Create Store object
+            store = Store.fromJson(storeData);
+            storeName = storeData['storeName'] as String?;
+            Logger.data('[MARKETPLACE] Created Store object: ${store.name}');
           }
-
-          // Create the product object
+          
+          // Create Vendor object if vendor data is available
+          Vendor? vendor;
+          if (vendorData != null) {
+            vendorId = vendorData['memberID'] as String? ?? '';
+            
+            // Create a map with the correct keys for Vendor.fromJson
+            final vendorJson = {
+              'id': vendorId,
+              'member_id': vendorId,
+              'business_name': storeName ?? 'Store',
+              'description': vendorData['vendorBio'] ?? '',
+              'email': '',
+              'phone': vendorData['memberHandle'] ?? '',
+              'profile_image_url': vendorData['profilePictureUrl'],
+              'rating': 0,
+              'rating_count': 0,
+              'is_active': true,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            
+            // Create Vendor object
+            vendor = Vendor.fromJson(vendorJson);
+            Logger.data('[MARKETPLACE] Created Vendor object: ${vendor.id}');
+          }
+          
+          // Extract product information
+          if (productData != null) {
+            productId = productData['productID'] ?? id;
+            name = productData['productName'] ?? '';
+            description = productData['productDescription'] ?? '';
+            
+            // Use the product ID as the account ID
+            accountId = productId;
+            
+            // Extract profile picture URLs
+            if (productData.containsKey('profilePictureUrls') && 
+                productData['profilePictureUrls'] is Map<String, dynamic>) {
+              final profilePictureUrls = productData['profilePictureUrls'] as Map<String, dynamic>;
+              Logger.data('[MARKETPLACE] Found profile picture URLs in product data: $profilePictureUrls');
+              
+              // Add the profile picture URLs to the image URLs list
+              // Prefer pic600 if available, then pic200, then thumbnail, then original
+              if (profilePictureUrls.containsKey('pic600') && profilePictureUrls['pic600'] != null) {
+                imageUrls.add(profilePictureUrls['pic600']);
+                Logger.data('[MARKETPLACE] Using pic600 as image URL');
+              } else if (profilePictureUrls.containsKey('pic200') && profilePictureUrls['pic200'] != null) {
+                imageUrls.add(profilePictureUrls['pic200']);
+                Logger.data('[MARKETPLACE] Using pic200 as image URL');
+              } else if (profilePictureUrls.containsKey('thumbnail') && profilePictureUrls['thumbnail'] != null) {
+                imageUrls.add(profilePictureUrls['thumbnail']);
+                Logger.data('[MARKETPLACE] Using thumbnail as image URL');
+              } else if (profilePictureUrls.containsKey('original') && profilePictureUrls['original'] != null) {
+                imageUrls.add(profilePictureUrls['original']);
+                Logger.data('[MARKETPLACE] Using original as image URL');
+              }
+            }
+          }
+          
+          // Create the product object with all extracted information
           final product = Product(
             id: productId,
             vendorId: vendorId,
@@ -556,10 +590,11 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             price: price,
             currency: currency,
             imageUrls: imageUrls,
-            category: category,
-            tags: tags,
             isAvailable: isAvailable,
             accountId: accountId,
+            storeName: storeName,
+            store: store,
+            vendor: vendor,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           );
@@ -582,93 +617,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }
 
   @override
-  Future<Either<Failure, List<Product>>> getProductsByCategory(
-      String category) async {
-    final stopwatch = Stopwatch()..start();
-    Logger.data(
-        '[MARKETPLACE] Starting getProductsByCategory operation for category: $category');
-
-    return _executeAuthenticatedRequest<List<Product>>(
-      request: (token) async {
-        // Call the API endpoint to get products by category
-        Logger.data(
-            '[MARKETPLACE] Sending GET request to $_baseUrl/getProductsByCategory/$category');
-        final response = await _loggedRequest(
-          () => _httpClient.get(
-            Uri.parse('$_baseUrl/getProductsByCategory/$category'),
-            headers: _authHeaders(token),
-          ),
-          '$_baseUrl/getProductsByCategory/$category',
-          'GET',
-          headers: _authHeaders(token),
-        );
-
-        if (response.statusCode == 200) {
-          // Parse the response body
-          final responseData = jsonDecode(response.body);
-          Logger.data('[MARKETPLACE] Response data received successfully');
-
-          // Extract products from the response
-          try {
-            if (responseData.containsKey('data') &&
-                responseData['data'] is Map<String, dynamic> &&
-                responseData['data'].containsKey('products') &&
-                responseData['data']['products'] is List) {
-              final productsData = responseData['data']['products'] as List;
-              final products = productsData.map((productData) {
-                return Product(
-                  id: productData['id'] ?? '',
-                  vendorId: productData['vendorId'] ?? '',
-                  name: productData['name'] ?? '',
-                  description: productData['description'] ?? '',
-                  price: (productData['price'] as num?)?.toInt() ?? 0,
-                  currency: productData['currency'] ?? 'USD',
-                  imageUrls: (productData['imageUrls'] as List?)
-                          ?.map((url) => url.toString())
-                          .toList() ??
-                      [],
-                  category: productData['category'] ?? category,
-                  tags: (productData['tags'] as List?)
-                          ?.map((tag) => tag.toString())
-                          .toList() ??
-                      [],
-                  isAvailable: productData['isAvailable'] as bool? ?? true,
-                  accountId: productData['accountId'],
-                  createdAt: productData['createdAt'] != null
-                      ? DateTime.parse(productData['createdAt'])
-                      : DateTime.now(),
-                  updatedAt: productData['updatedAt'] != null
-                      ? DateTime.parse(productData['updatedAt'])
-                      : DateTime.now(),
-                );
-              }).toList();
-
-              stopwatch.stop();
-              Logger.performance(
-                  '[MARKETPLACE] getProductsByCategory completed successfully in ${stopwatch.elapsedMilliseconds}ms');
-              return Right(products);
-            } else {
-              // If no products found, return empty list
-              Logger.data(
-                  '[MARKETPLACE] No products found for category: $category');
-              return const Right([]);
-            }
-          } catch (e) {
-            Logger.error(
-                '[MARKETPLACE] Error parsing products data from response', e);
-            return Left(ServerFailure('Failed to parse products data: $e'));
-          }
-        } else {
-          Logger.error(
-              '[MARKETPLACE] Server error with status code ${response.statusCode}');
-          return Left(ServerFailure(
-              'Failed to get products by category: ${response.body}'));
-        }
-      },
-    );
-  }
-
-  @override
   Future<Either<Failure, List<Product>>> searchProducts(
     String query, {
     double? latitude,
@@ -683,7 +631,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
     // If query is empty and we have location, use "a" as default query
     final effectiveQuery =
-        query.isEmpty && (latitude != null || longitude != null) ? "a" : query;
+        query.isEmpty && (latitude != null || longitude != null) ? "*" : query;
 
     return _executeAuthenticatedRequest<List<Product>>(
       request: (token) async {
@@ -721,34 +669,93 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           try {
             if (responseData.containsKey('data') &&
                 responseData['data'] is Map<String, dynamic> &&
-                responseData['data'].containsKey('products') &&
-                responseData['data']['products'] is List) {
-              final productsData = responseData['data']['products'] as List;
+                responseData['data'].containsKey('dashboard') &&
+                responseData['data']['dashboard'] is Map<String, dynamic> &&
+                responseData['data']['dashboard'].containsKey('products') &&
+                responseData['data']['dashboard']['products'] is List) {
+              
+              final productsData = responseData['data']['dashboard']['products'] as List;
+              Logger.data('[MARKETPLACE] Found ${productsData.length} products in search results');
+              
               final products = productsData.map((productData) {
+                // Extract vendor info if available
+                String? vendorId;
+                Vendor? vendor;
+                if (productData.containsKey('vendor') && 
+                    productData['vendor'] is Map<String, dynamic>) {
+                  final vendorData = productData['vendor'] as Map<String, dynamic>;
+                  vendorId = vendorData['memberID'];
+                  Logger.data('[MARKETPLACE] Extracted vendor ID: $vendorId from product');
+                  
+                  // Create a Vendor object
+                  if (vendorId != null) {
+                    // Create a map with the correct keys for Vendor.fromJson
+                    final vendorJson = {
+                      'id': vendorId,
+                      'member_id': vendorId,
+                      'business_name': vendorData['businessName'] ?? 'Store',
+                      'description': vendorData['vendorBio'] ?? '',
+                      'email': '',
+                      'phone': vendorData['memberHandle'] ?? '',
+                      'profile_image_url': vendorData['profilePictureUrl'],
+                      'rating': 0,
+                      'rating_count': 0,
+                      'is_active': true,
+                      'created_at': DateTime.now().toIso8601String(),
+                      'updated_at': DateTime.now().toIso8601String(),
+                    };
+                    
+                    vendor = Vendor.fromJson(vendorJson);
+                    Logger.data('[MARKETPLACE] Created Vendor object for search result');
+                  }
+                }
+                
+                // Extract store info if available
+                String? storeName;
+                String? storeHandle;
+                double? storeDistance;
+                Store? store;
+                if (productData.containsKey('store') && 
+                    productData['store'] is Map<String, dynamic>) {
+                  final storeData = productData['store'] as Map<String, dynamic>;
+                  storeName = storeData['storeName'] as String?;
+                  storeHandle = storeData['storeHandle'] as String?;
+                  storeDistance = (storeData['distance'] as num?)?.toDouble();
+                  Logger.data('[MARKETPLACE] Extracted store info: name=$storeName, handle=$storeHandle, distance=$storeDistance');
+                  
+                  // Create a Store object
+                  if (storeName != null && storeHandle != null) {
+                    // Add ID to store data for Store.fromJson
+                    storeData['id'] = storeHandle;
+                    
+                    // Create Store object
+                    store = Store.fromJson(storeData);
+                    Logger.data('[MARKETPLACE] Created Store object for search result');
+                  }
+                }
+                
+                // Build image URLs list
+                List<String> imageUrls = [];
+                if (productData['thumbnailPicUrl'] != null) {
+                  imageUrls.add(productData['thumbnailPicUrl']);
+                  Logger.data('[MARKETPLACE] Added thumbnail URL to image URLs');
+                }
+                
                 return Product(
-                  id: productData['id'] ?? '',
-                  vendorId: productData['vendorId'] ?? '',
-                  name: productData['name'] ?? '',
-                  description: productData['description'] ?? '',
-                  price: (productData['price'] as num?)?.toInt() ?? 0,
-                  currency: productData['currency'] ?? 'USD',
-                  imageUrls: (productData['imageUrls'] as List?)
-                          ?.map((url) => url.toString())
-                          .toList() ??
-                      [],
-                  category: productData['category'] ?? '',
-                  tags: (productData['tags'] as List?)
-                          ?.map((tag) => tag.toString())
-                          .toList() ??
-                      [],
-                  isAvailable: productData['isAvailable'] as bool? ?? true,
-                  accountId: productData['accountId'],
-                  createdAt: productData['createdAt'] != null
-                      ? DateTime.parse(productData['createdAt'])
-                      : DateTime.now(),
-                  updatedAt: productData['updatedAt'] != null
-                      ? DateTime.parse(productData['updatedAt'])
-                      : DateTime.now(),
+                  id: productData['productID'] ?? '',
+                  vendorId: vendorId ?? '',
+                  name: productData['productName'] ?? '',
+                  description: productData['productDescription'] ?? '',
+                  price: 0, // Price not available in the new API response
+                  currency: 'USD', // Default currency
+                  imageUrls: imageUrls,
+                  isAvailable: true, // Availability not specified in the new API response
+                  accountId: productData['productID'], // Use productID as accountId
+                  storeName: storeName, // Add store name from the API response
+                  store: store, // Add store object
+                  vendor: vendor, // Add vendor object
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
                 );
               }).toList();
 
@@ -856,8 +863,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required int price,
     required String currency,
     required List<String> imageUrls,
-    required String category,
-    required List<String> tags,
     required bool isAvailable,
     String? accountId,
   }) async {
@@ -905,8 +910,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           'price': price,
           'currency': currency,
           'imageUrls': imageUrls,
-          'category': category,
-          'tags': tags,
           'isAvailable': isAvailable,
           'accountId': finalProductAccountId,
         };
@@ -953,11 +956,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                         ?.map((url) => url.toString())
                         .toList() ??
                     imageUrls,
-                category: productData['category'] ?? category,
-                tags: (productData['tags'] as List?)
-                        ?.map((tag) => tag.toString())
-                        .toList() ??
-                    tags,
                 isAvailable: productData['isAvailable'] as bool? ?? isAvailable,
                 accountId: productData['accountId'] ?? finalProductAccountId,
                 createdAt: productData['createdAt'] != null
@@ -983,8 +981,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                 price: price,
                 currency: currency,
                 imageUrls: imageUrls,
-                category: category,
-                tags: tags,
                 isAvailable: isAvailable,
                 accountId: finalProductAccountId,
                 createdAt: now,
@@ -1019,8 +1015,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     int? price,
     String? currency,
     List<String>? imageUrls,
-    String? category,
-    List<String>? tags,
     bool? isAvailable,
     String? accountId,
   }) async {
@@ -1039,8 +1033,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         if (price != null) requestBody['price'] = price;
         if (currency != null) requestBody['currency'] = currency;
         if (imageUrls != null) requestBody['imageUrls'] = imageUrls;
-        if (category != null) requestBody['category'] = category;
-        if (tags != null) requestBody['tags'] = tags;
         if (isAvailable != null) requestBody['isAvailable'] = isAvailable;
         if (accountId != null) requestBody['accountId'] = accountId;
 
@@ -1097,12 +1089,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                         ?.map((url) => url.toString())
                         .toList() ??
                     imageUrls ??
-                    [],
-                category: productData['category'] ?? category ?? '',
-                tags: (productData['tags'] as List?)
-                        ?.map((tag) => tag.toString())
-                        .toList() ??
-                    tags ??
                     [],
                 isAvailable:
                     productData['isAvailable'] as bool? ?? isAvailable ?? true,
@@ -2196,6 +2182,62 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
               '[STOREFRONT] Server error with status code ${response.statusCode}');
           return Left(
               ServerFailure('Failed to get storefront: ${response.body}'));
+        }
+      },
+    );
+  }
+  
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getAccountDashboard(
+      String accountId) async {
+    final stopwatch = Stopwatch()..start();
+    Logger.data(
+        '[ACCOUNT_DASHBOARD] Starting getAccountDashboard operation for account ID: $accountId');
+
+    return _executeAuthenticatedRequest<Map<String, dynamic>>(
+      request: (token) async {
+        // Call the getAccountDashboard API endpoint with authentication
+        final url = '$_baseUrl/getAccountDashboard/$accountId';
+        Logger.data('[ACCOUNT_DASHBOARD] Sending GET request to $url');
+
+        final response = await _loggedRequest(
+          () => _httpClient.get(
+            Uri.parse(url),
+            headers: _authHeaders(token),
+          ),
+          url,
+          'GET',
+          headers: _authHeaders(token),
+        );
+
+        if (response.statusCode == 200) {
+          // Parse the response body
+          final responseData = jsonDecode(response.body);
+          Logger.data('[ACCOUNT_DASHBOARD] Response data received successfully');
+
+          // Log the response message
+          if (responseData.containsKey('message')) {
+            Logger.data(
+                '[ACCOUNT_DASHBOARD] Response message: ${responseData['message']}');
+          }
+
+          // Extract the data from the response
+          if (responseData.containsKey('data')) {
+            final data = responseData['data'] as Map<String, dynamic>;
+
+            stopwatch.stop();
+            Logger.performance(
+                '[ACCOUNT_DASHBOARD] getAccountDashboard completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+            return Right(data);
+          } else {
+            Logger.error('[ACCOUNT_DASHBOARD] Response does not contain data field');
+            return Left(ServerFailure('Response does not contain data field'));
+          }
+        } else {
+          Logger.error(
+              '[ACCOUNT_DASHBOARD] Server error with status code ${response.statusCode}');
+          return Left(
+              ServerFailure('Failed to get account dashboard: ${response.body}'));
         }
       },
     );

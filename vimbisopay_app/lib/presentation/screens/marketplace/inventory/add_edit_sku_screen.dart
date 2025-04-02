@@ -36,8 +36,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _tagsController = TextEditingController();
 
   String _currency = 'USD';
   bool _isAvailable = true;
@@ -54,16 +52,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
   bool _isImageLoading = false;
 
   final List<String> _currencies = ['USD', 'EUR', 'GBP'];
-  final List<String> _categories = [
-    'Electronics',
-    'Clothing',
-    'Food',
-    'Home',
-    'Beauty',
-    'Sports',
-    'Toys',
-    'Other',
-  ];
 
   @override
   void initState() {
@@ -72,8 +60,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
     
     // Set default values for simplified form
     _priceController.text = '0'; // Default price is 0
-    _categoryController.text = 'Other'; // Default category is 'Other'
-    _tagsController.text = 'product'; // Default tag
     
     if (_isEditing) {
       _loadSkuData();
@@ -85,8 +71,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
-    _categoryController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
@@ -241,8 +225,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             _nameController.text = product.name;
             _descriptionController.text = product.description;
             _priceController.text = (product.price / 100).toString(); // Convert from cents to dollars
-            _categoryController.text = product.category;
-            _tagsController.text = product.tags.join(', ');
             _accountId = product.accountId;
             _currency = product.currency;
             _isAvailable = product.isAvailable;
@@ -383,11 +365,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
       final name = _nameController.text.trim();
       final description = _descriptionController.text.trim();
       final price = (double.parse(_priceController.text) * 100).round(); // Convert to cents
-      final category = _categoryController.text.trim();
-      final tags = _tagsController.text.split(',')
-          .map((tag) => tag.trim())
-          .where((tag) => tag.isNotEmpty)
-          .toList();
 
       // Initialize image URLs
       List<String> imageUrls = [];
@@ -405,7 +382,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
           }
         }
         
-        // Update existing product TODO
+        // Update existing product
         final result = await _marketplaceRepository.updateProduct(
           id: widget.skuId!,
           name: name,
@@ -413,8 +390,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
           price: price,
           currency: _currency,
           imageUrls: imageUrls,
-          category: category,
-          tags: tags,
           isAvailable: _isAvailable,
           accountId: _accountId,
         );
@@ -484,8 +459,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
               price: price,
               currency: _currency,
               imageUrls: imageUrls.isEmpty ? ['https://example.com/product_placeholder.jpg'] : imageUrls,
-              category: category,
-              tags: tags,
               isAvailable: _isAvailable,
               accountId: accountId,
               createdAt: now,
@@ -519,8 +492,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                   price: product.price,
                   currency: product.currency,
                   imageUrls: [imageUrl],
-                  category: product.category,
-                  tags: product.tags,
                   isAvailable: product.isAvailable,
                   accountId: product.accountId,
                   createdAt: product.createdAt,
@@ -546,8 +517,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                   'price': product.price,
                   'currency': product.currency,
                   'imageUrls': product.imageUrls,
-                  'category': product.category,
-                  'tags': product.tags,
                   'isAvailable': product.isAvailable,
                   'accountId': product.accountId,
                   'createdAt': product.createdAt.toIso8601String(),
@@ -810,92 +779,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                 return null;
               },
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPricingSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Pricing',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Price',
-                      hintText: 'Enter the price',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a price';
-                      }
-                      try {
-                        final price = double.parse(value);
-                        if (price <= 0) {
-                          return 'Price must be greater than zero';
-                        }
-                      } catch (e) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16.0),
-                Expanded(
-                  flex: 1,
-                  child: DropdownButtonFormField<String>(
-                    value: _currency,
-                    decoration: const InputDecoration(
-                      labelText: 'Currency',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _currencies.map((currency) {
-                      return DropdownMenuItem<String>(
-                        value: currency,
-                        child: Text(currency),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _currency = value!;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16.0),
-            SwitchListTile(
-              title: const Text('Available for Sale'),
-              subtitle: const Text('Toggle to make this Product Account available or unavailable'),
-              value: _isAvailable,
-              onChanged: (value) {
-                setState(() {
-                  _isAvailable = value;
-                });
-              },
-              activeColor: AppColors.primary,
-            ),
             const SizedBox(height: 8.0),
             const Text(
               'Note: Creating a product will automatically create an internal account for tracking inventory using the accounting-based system.',
@@ -904,65 +787,6 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
                 fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategorySection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Categorization',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            DropdownButtonFormField<String>(
-              value: _categoryController.text.isNotEmpty ? _categoryController.text : null,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                hintText: 'Select a category',
-                border: OutlineInputBorder(),
-              ),
-              items: _categories.map((category) {
-                return DropdownMenuItem<String>(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _categoryController.text = value!;
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select a category';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16.0),
-            TextFormField(
-              controller: _tagsController,
-              decoration: const InputDecoration(
-                labelText: 'Tags',
-                hintText: 'Enter tags separated by commas',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                // Tags are optional
-                return null;
-              },
             ),
           ],
         ),

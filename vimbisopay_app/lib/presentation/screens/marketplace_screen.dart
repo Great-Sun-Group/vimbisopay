@@ -426,15 +426,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     });
 
     try {
-      // If we have a selected category, use getProductsByCategory
-      // Otherwise use searchProducts with location data if available
-      final result = _selectedCategory != null
-          ? await _marketplaceRepository.getProductsByCategory(_selectedCategory!)
-          : await _marketplaceRepository.searchProducts(
-              '', // Empty query or "a" will be used as default in the repository
-              latitude: _latitude,
-              longitude: _longitude,
-            );
+      // Use searchProducts with either the category or an empty string
+      final result = await _marketplaceRepository.searchProducts(
+        _selectedCategory ?? '', // Use category as search query if selected, otherwise empty string
+        latitude: _latitude,
+        longitude: _longitude,
+      );
 
       result.fold(
         (failure) {
@@ -452,17 +449,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             Logger.data('[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
           }
           
-          // Extract unique categories
-          final categories = filteredProducts
-              .map((p) => p.category)
-              .toSet()
-              .toList()
-            ..sort();
-
           setState(() {
             _isLoading = false;
             _products = filteredProducts;
-            _categories = categories;
+            _categories = []; // Empty categories list since category field is removed
           });
         },
       );
@@ -1183,39 +1173,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product.formattedPrice,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
                     Flexible(
                       child: Row(
                         children: [
                           Icon(
-                            product.isAvailable
-                                ? Icons.check_circle
-                                : Icons.cancel,
+                            Icons.store,
                             size: 16,
-                            color: product.isAvailable
-                                ? AppColors.success
-                                : AppColors.error,
+                            color: AppColors.textSecondary,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              product.isAvailable
-                                  ? 'Available'
-                                  : 'Unavailable',
+                              product.storeName ?? 'Unknown Store',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: product.isAvailable
-                                    ? AppColors.success
-                                    : AppColors.error,
+                                color: AppColors.textSecondary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

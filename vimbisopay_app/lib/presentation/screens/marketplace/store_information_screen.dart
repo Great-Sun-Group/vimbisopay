@@ -235,10 +235,10 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       
       Logger.data('[STORE_INFO] Using personal account ID: $_operationsAccountId to fetch storefront data');
       
-      // Use the getStorefront API to get vendor information
-      final storefrontResult = await _marketplaceRepository.getStorefront(_operationsAccountId!);
+      // Use the getAccountDashboard API to get vendor information
+      final dashboardResult = await _marketplaceRepository.getAccountDashboard(_operationsAccountId!);
       
-      return storefrontResult.fold(
+      return dashboardResult.fold(
         (failure) {
           Logger.error('[STORE_INFO] Failed to get storefront: ${failure.message}');
           if (mounted) {
@@ -263,55 +263,29 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
             if (!data.containsKey('dashboard')) {
               throw Exception('Missing dashboard key in response data');
             }
-            if (!data['dashboard'].containsKey('store')) {
-              throw Exception('Missing store key in dashboard data');
-            }
-            if (!data['dashboard'].containsKey('vendor')) {
-              throw Exception('Missing vendor key in dashboard data');
-            }
             
-            // Extract store information
-            final store = data['dashboard']['store'];
-            final storeId = store['storeID'] as String?;
-            final storeName = store['storeName'] as String?;
-            final storeDescription = store['storeDescription'] as String?;
-            final storeOpen = store['storeOpen'] as bool?;
+            // Extract account information
+            final dashboard = data['dashboard'];
+            final accountId = dashboard['accountID'] as String?;
+            final accountName = dashboard['accountName'] as String?;
+            final accountHandle = dashboard['accountHandle'] as String?;
+            final accountType = dashboard['accountType'] as String?;
+            final defaultDenom = dashboard['defaultDenom'] as String?;
+            final isOwnedAccount = dashboard['isOwnedAccount'] as bool?;
             
-            Logger.data('[STORE_INFO] Extracted store info - ID: $storeId, Name: $storeName');
+            Logger.data('[STORE_INFO] Extracted account info - ID: $accountId, Name: $accountName, Type: $accountType');
             
-            // Extract profile picture URLs
-            Map<String, dynamic>? profilePictureUrls = store['profilePictureUrls'] as Map<String, dynamic>?;
-            String? profileImageUrl;
-            if (profilePictureUrls != null) {
-              Logger.data('[STORE_INFO] Found profile picture URLs: ${profilePictureUrls.keys.join(', ')}');
-              
-              // Prefer pic600 if available, then pic200, then thumbnail, then original
-              if (profilePictureUrls['pic600'] != null) {
-                profileImageUrl = profilePictureUrls['pic600'] as String?;
-                Logger.data('[STORE_INFO] Using pic600 as profile image URL');
-              } else if (profilePictureUrls['pic200'] != null) {
-                profileImageUrl = profilePictureUrls['pic200'] as String?;
-                Logger.data('[STORE_INFO] Using pic200 as profile image URL');
-              } else if (profilePictureUrls['thumbnail'] != null) {
-                profileImageUrl = profilePictureUrls['thumbnail'] as String?;
-                Logger.data('[STORE_INFO] Using thumbnail as profile image URL');
-              } else if (profilePictureUrls['original'] != null) {
-                profileImageUrl = profilePictureUrls['original'] as String?;
-                Logger.data('[STORE_INFO] Using original as profile image URL');
-              }
-            } else {
-              Logger.data('[STORE_INFO] No profile picture URLs found');
+            // Extract sender information
+            Map<String, dynamic>? sendOffersTo;
+            if (dashboard.containsKey('sendOffersTo') && dashboard['sendOffersTo'] is Map<String, dynamic>) {
+              sendOffersTo = dashboard['sendOffersTo'] as Map<String, dynamic>;
             }
             
-            // Extract vendor information
-            final vendor = data['dashboard']['vendor'];
-            final memberId = vendor['memberID'] as String?;
-            final firstname = vendor['firstname'] as String?;
-            final lastname = vendor['lastname'] as String?;
-            final memberHandle = vendor['memberHandle'] as String?;
-            final vendorBio = vendor['vendorBio'] as String?;
+            final memberId = sendOffersTo?['memberID'] as String?;
+            final firstname = sendOffersTo?['firstname'] as String?;
+            final lastname = sendOffersTo?['lastname'] as String?;
             
-            Logger.data('[STORE_INFO] Extracted vendor info - Member ID: $memberId, Name: $firstname $lastname');
+            Logger.data('[STORE_INFO] Extracted sender info - Member ID: $memberId, Name: $firstname $lastname');
             
             // Create a Vendor object
             // Always use personal account ID as the store ID if available
@@ -321,11 +295,11 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
             final vendorObj = Vendor(
               id: vendorStoreId,
               memberId: memberId ?? _currentUser!.memberId,
-              businessName: storeName ?? (firstname != null && lastname != null ? '$firstname $lastname' : 'My Business'),
-              description: storeDescription ?? vendorBio ?? 'Store profile',
+              businessName: accountName ?? (firstname != null && lastname != null ? '$firstname $lastname' : 'My Business'),
+              description: 'Store profile for $accountName', // No description in the new API response
               email: '',
               phone: _currentUser!.phone,
-              profileImageUrl: profileImageUrl,
+              profileImageUrl: null, // No profile image in the new API response
               bannerImageUrl: null,
               rating: 0.0,
               ratingCount: 0,
@@ -334,42 +308,28 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               updatedAt: DateTime.now(),
             );
             
-            // Update store status
-            if (storeOpen != null) {
-              _storeOpen = storeOpen;
-              Logger.data('[STORE_INFO] Updated store status: ${_storeOpen ? 'Open' : 'Closed'}');
-            }
-            
             // Extract products
             List<Product> vendorProducts = [];
-            if (data['dashboard'].containsKey('products') && data['dashboard']['products'] is List) {
-              final products = data['dashboard']['products'] as List;
+            if (dashboard.containsKey('products') && dashboard['products'] is List) {
+              final products = dashboard['products'] as List;
               Logger.data('[STORE_INFO] Found ${products.length} products in response');
               
               vendorProducts = products.map((product) {
                 // Extract product details
-                final productId = product['productID'] as String?;
-                final productName = product['productName'] as String?;
-                final productDescription = product['productDescription'] as String?;
-                
-                // Extract thumbnail URL
-                String? thumbnailUrl = product['thumbnailPicUrl'] as String?;
-                List<String> imageUrls = [];
-                if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-                  imageUrls.add(thumbnailUrl);
-                }
+                final productId = product['accountID'] as String?;
+                final productName = product['accountName'] as String?;
+                final productType = product['accountType'] as String?;
+                final productBalance = product['accountBalanceUSD'] as num?;
                 
                 // Create a Product object
                 return Product(
                   id: productId ?? '',
                   vendorId: vendorObj.id,
                   name: productName ?? 'Unknown Product',
-                  description: productDescription ?? 'No description',
-                  price: 0, // Default price
+                  description: 'Product type: $productType',
+                  price: productBalance != null ? (productBalance * 100).toInt() : 0, // Convert from dollars to cents
                   currency: 'USD', // Default currency
-                  imageUrls: imageUrls,
-                  category: 'Internal',
-                  tags: ['internal', 'physical_asset'],
+                  imageUrls: [], // No image URLs in the new API response
                   isAvailable: true,
                   accountId: productId,
                   createdAt: DateTime.now(),
@@ -389,7 +349,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 storeId: vendorObj.id,
                 vendor: vendorObj,
                 products: vendorProducts,
-                profileImageUrl: profileImageUrl ?? "",
+                profileImageUrl: "",  // No profile image in the new API response
               );
               Logger.data('[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
               
@@ -412,7 +372,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 _isRefreshing = false;
                 _vendor = vendorObj;
                 _products = vendorProducts;
-                _profileThumbnailUrl = profileImageUrl;
+                _profileThumbnailUrl = ""; // No profile image in the new API response
               });
             }
             
@@ -1407,39 +1367,21 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product.formattedPrice,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
                     Flexible(
                       child: Row(
                         children: [
                           Icon(
-                            product.isAvailable
-                                ? Icons.check_circle
-                                : Icons.cancel,
+                            Icons.store,
                             size: 16,
-                            color: product.isAvailable
-                                ? AppColors.successGreen
-                                : AppColors.errorRed,
+                            color: AppColors.textSecondary,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              product.isAvailable
-                                  ? 'Available'
-                                  : 'Unavailable',
+                              product.storeName ?? 'Unknown Store',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: product.isAvailable
-                                    ? AppColors.successGreen
-                                    : AppColors.errorRed,
+                                color: AppColors.textSecondary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

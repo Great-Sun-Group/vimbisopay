@@ -277,7 +277,6 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (context) => SearchResultsScreen(
                 initialQuery: args?['query'] as String?,
-                initialCategory: args?['category'] as String?,
                 vendorId: args?['vendorId'] as String?,
                 filterOwnProducts: args?['filterOwnProducts'] as bool? ?? false,
               ),

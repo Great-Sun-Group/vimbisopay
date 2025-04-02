@@ -251,8 +251,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                   price: 0, // Default price
                   currency: 'USD', // Default currency
                   imageUrls: imageUrls,
-                  category: 'Internal',
-                  tags: ['internal', 'physical_asset'],
                   isAvailable: true,
                   accountId: productId,
                   createdAt: DateTime.now(),
@@ -926,8 +924,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                             price: productMap['price'],
                             currency: productMap['currency'],
                             imageUrls: List<String>.from(productMap['imageUrls']),
-                            category: productMap['category'],
-                            tags: List<String>.from(productMap['tags']),
                             isAvailable: productMap['isAvailable'],
                             accountId: productMap['accountId'],
                             createdAt: DateTime.parse(productMap['createdAt']),
@@ -1033,8 +1029,6 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                             price: productMap['price'],
                             currency: productMap['currency'],
                             imageUrls: List<String>.from(productMap['imageUrls']),
-                            category: productMap['category'],
-                            tags: List<String>.from(productMap['tags']),
                             isAvailable: productMap['isAvailable'],
                             accountId: productMap['accountId'],
                             createdAt: DateTime.parse(productMap['createdAt']),

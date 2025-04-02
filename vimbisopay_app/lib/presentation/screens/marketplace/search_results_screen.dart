@@ -8,14 +8,12 @@ import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String? initialQuery;
-  final String? initialCategory;
   final String? vendorId;
   final bool filterOwnProducts;
 
   const SearchResultsScreen({
     super.key,
     this.initialQuery,
-    this.initialCategory,
     this.vendorId,
     this.filterOwnProducts = false,
   });
@@ -32,8 +30,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<Product> _products = [];
-  List<String> _categories = [];
-  String? _selectedCategory;
   double? _latitude;
   double? _longitude;
   
@@ -41,7 +37,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void initState() {
     super.initState();
     _searchController.text = widget.initialQuery ?? '';
-    _selectedCategory = widget.initialCategory;
     _getCurrentLocation().then((_) {
       _loadProducts();
     });
@@ -87,15 +82,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     });
 
     try {
-      // If we have a selected category, use getProductsByCategory
-      // Otherwise use searchProducts with location data if available
-      final result = _selectedCategory != null
-          ? await _marketplaceRepository.getProductsByCategory(_selectedCategory!)
-          : await _marketplaceRepository.searchProducts(
-              _searchController.text,
-              latitude: _latitude,
-              longitude: _longitude,
-            );
+      // Use searchProducts with the search query
+      final result = await _marketplaceRepository.searchProducts(
+        _searchController.text,
+        latitude: _latitude,
+        longitude: _longitude,
+      );
 
       result.fold(
         (failure) {
@@ -112,18 +104,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             filteredProducts = products.where((product) => product.vendorId != widget.vendorId).toList();
             Logger.data('[SEARCH_RESULTS] Filtered ${products.length - filteredProducts.length} products');
           }
-          
-          // Extract unique categories
-          final categories = filteredProducts
-              .map((p) => p.category)
-              .toSet()
-              .toList()
-            ..sort();
 
           setState(() {
             _isLoading = false;
             _products = filteredProducts;
-            _categories = categories;
           });
         },
       );
@@ -136,17 +120,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     }
   }
 
-  void _selectCategory(String? category) {
-    setState(() {
-      _selectedCategory = category;
-    });
-    _loadProducts();
-  }
-
   void _onSearch(String query) {
-    setState(() {
-      _selectedCategory = null; // Clear category when searching
-    });
     _loadProducts();
   }
 
@@ -192,39 +166,21 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product.formattedPrice,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
                     Flexible(
                       child: Row(
                         children: [
                           Icon(
-                            product.isAvailable
-                                ? Icons.check_circle
-                                : Icons.cancel,
+                            Icons.store,
                             size: 16,
-                            color: product.isAvailable
-                                ? AppColors.success
-                                : AppColors.error,
+                            color: AppColors.textSecondary,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              product.isAvailable
-                                  ? 'Available'
-                                  : 'Unavailable',
+                              product.storeName ?? 'Unknown Store',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: product.isAvailable
-                                    ? AppColors.success
-                                    : AppColors.error,
+                                color: AppColors.textSecondary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -302,44 +258,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 onSubmitted: _onSearch,
               ),
             ),
-            
-            // Category filter
-            if (_categories.isNotEmpty)
-              SizedBox(
-                height: 50,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: const Text('All'),
-                        selected: _selectedCategory == null,
-                        onSelected: (selected) {
-                          if (selected) {
-                            _selectCategory(null);
-                          }
-                        },
-                      ),
-                    ),
-                    ..._categories.map((category) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text(category),
-                          selected: _selectedCategory == category,
-                          onSelected: (selected) {
-                            if (selected) {
-                              _selectCategory(category);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ],
-                ),
-              ),
             
             // Loading indicator or error message
             if (_isLoading)
@@ -419,7 +337,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Try a different search or category',
+                        'Try a different search term',
                         style: TextStyle(
                           fontSize: 16,
                           color: AppColors.textSecondary,

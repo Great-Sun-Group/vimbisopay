@@ -46,12 +46,6 @@ abstract class MarketplaceRepository {
   /// Returns a [Product] if found, or a [Failure] if an error occurs.
   Future<Either<Failure, Product>> getProduct(String id);
 
-
-  /// Gets products by category.
-  ///
-  /// Returns a list of [Product]s if found, or a [Failure] if an error occurs.
-  Future<Either<Failure, List<Product>>> getProductsByCategory(String category);
-
   /// Searches for products by query.
   ///
   /// If latitude and longitude are provided, the search will prioritize products
@@ -85,8 +79,6 @@ abstract class MarketplaceRepository {
     required int price,
     required String currency,
     required List<String> imageUrls,
-    required String category,
-    required List<String> tags,
     required bool isAvailable,
     String? accountId,
   });
@@ -101,8 +93,6 @@ abstract class MarketplaceRepository {
     int? price,
     String? currency,
     List<String>? imageUrls,
-    String? category,
-    List<String>? tags,
     bool? isAvailable,
     String? accountId,
   });
@@ -236,4 +226,12 @@ abstract class MarketplaceRepository {
   ///
   /// Returns storefront data if successful, or a [Failure] if an error occurs.
   Future<Either<Failure, Map<String, dynamic>>> getStorefront(String accountId);
+  
+  /// Gets account dashboard information for a vendor using their account ID.
+  ///
+  /// This API is only visible to vendors and not the general population.
+  /// Vendors will use the product images from the internal accounts records and match on accountID.
+  ///
+  /// Returns account dashboard data if successful, or a [Failure] if an error occurs.
+  Future<Either<Failure, Map<String, dynamic>>> getAccountDashboard(String accountId);
 }
