@@ -27,7 +27,7 @@ class StoreInformationScreen extends StatefulWidget {
 
   /// Whether the current user is the owner of this store.
   final bool isOwner;
-  
+
   /// Whether to show a success message when the screen is loaded.
   final bool showSuccessMessage;
 
@@ -44,18 +44,20 @@ class StoreInformationScreen extends StatefulWidget {
 }
 
 class _StoreInformationScreenState extends State<StoreInformationScreen> {
-  final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final MarketplaceRepository _marketplaceRepository =
+      ServiceLocator.marketplaceRepository;
   final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
-  final StoreStatusService _storeStatusService = ServiceLocator.storeStatusService;
-  
+  final StoreStatusService _storeStatusService =
+      ServiceLocator.storeStatusService;
+
   // Scroll controller for FAB visibility
   late ScrollController _scrollController;
-  
+
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isUpdatingStoreStatus = false;
   String _errorMessage = '';
-  
+
   Vendor? _vendor;
   List<Product> _products = [];
   User? _currentUser;
@@ -68,21 +70,21 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   void initState() {
     super.initState();
     Logger.lifecycle('StoreInformationScreen initialized');
-    
+
     // Initialize scroll controller
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
-    
+
     // Initially set loading to false until we determine if we need to show the loading indicator
     setState(() {
       _isLoading = false;
     });
-    
+
     // Check database status
     DatabaseChecker.checkDatabaseStatus().then((_) {
       Logger.data('[STORE_INFO] Database status check completed');
     });
-    
+
     // Load cached data first, then fetch fresh data
     _loadCachedData().then((cachedDataFound) {
       // Only show loading indicator if no cached data was found
@@ -91,16 +93,16 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           _isLoading = true;
         });
       }
-      
+
       _loadFreshData();
-      
+
       // Proactively request location permission when the screen is initialized
       if (mounted && widget.isOwner) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _storeStatusService.requestLocationPermission(context);
         });
       }
-      
+
       // Show success message if needed
       if (widget.showSuccessMessage) {
         // Use post-frame callback to ensure the context is ready
@@ -117,17 +119,20 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       }
     });
   }
-  
+
   void _scrollListener() {
     // Show/hide FAB based on scroll direction
     if (_scrollController.hasClients) {
-      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+      if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.reverse) {
         // Scrolling down - hide FAB
         if (_isFabVisible) {
           setState(() => _isFabVisible = false);
         }
-      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward ||
-                (_scrollController.hasClients && _scrollController.position.pixels == 0)) {
+      } else if (_scrollController.position.userScrollDirection ==
+              ScrollDirection.forward ||
+          (_scrollController.hasClients &&
+              _scrollController.position.pixels == 0)) {
         // Scrolling up or at the top - show FAB
         if (!_isFabVisible) {
           setState(() => _isFabVisible = true);
@@ -143,7 +148,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
     Logger.lifecycle('StoreInformationScreen disposed');
     super.dispose();
   }
-  
+
   /// Helper method to get bottom padding based on FAB visibility
   double _getBottomPadding() {
     return widget.isOwner && _isFabVisible ? 80.0 : 16.0;
@@ -154,7 +159,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   Future<bool> _loadCachedData() async {
     try {
       Logger.data('[STORE_INFO] Loading cached store data');
-      
+
       // Load current user data
       _currentUser = await _databaseHelper.getUser();
       if (_currentUser == null) {
@@ -164,55 +169,63 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         });
         return false;
       }
-      
+
       // Get store status from user
       _storeOpen = _currentUser!.storeOpen;
-      Logger.data('[STORE_INFO] Store status from cache: ${_storeOpen ? 'Open' : 'Closed'}');
-      
+      Logger.data(
+          '[STORE_INFO] Store status from cache: ${_storeOpen ? 'Open' : 'Closed'}');
+
       // Find the user's personal account ID
-      if (_currentUser?.dashboard != null && _currentUser!.dashboard!.accounts.isNotEmpty) {
+      if (_currentUser?.dashboard != null &&
+          _currentUser!.dashboard!.accounts.isNotEmpty) {
         // Try to find an account with accountType OPERATIONS
         for (final account in _currentUser!.dashboard!.accounts) {
           if (account.accountType == 'OPERATIONS') {
             _operationsAccountId = account.accountID;
-            Logger.data('[STORE_INFO] Found OPERATIONS account: $_operationsAccountId (${account.accountName})');
+            Logger.data(
+                '[STORE_INFO] Found OPERATIONS account: $_operationsAccountId (${account.accountName})');
             break;
           }
         }
-        
+
         // If no account with accountType OPERATIONS found, try to find by name
         if (_operationsAccountId == null) {
           for (final account in _currentUser!.dashboard!.accounts) {
             if (account.accountName.toUpperCase().contains('OPERATIONS')) {
               _operationsAccountId = account.accountID;
-              Logger.data('[STORE_INFO] Found account with OPERATIONS in name: $_operationsAccountId (${account.accountName})');
+              Logger.data(
+                  '[STORE_INFO] Found account with OPERATIONS in name: $_operationsAccountId (${account.accountName})');
               break;
             }
           }
         }
       }
-      
+
       // Load cached store data from database
       // First try with personal account ID if available
       CachedStore? cachedStore;
       if (_operationsAccountId != null) {
-        Logger.data('[STORE_INFO] Trying to get cached store data with personal account ID: $_operationsAccountId');
-        cachedStore = await _databaseHelper.getCachedStore(_operationsAccountId!);
+        Logger.data(
+            '[STORE_INFO] Trying to get cached store data with personal account ID: $_operationsAccountId');
+        cachedStore =
+            await _databaseHelper.getCachedStore(_operationsAccountId!);
       }
-      
+
       // If not found with personal account ID, try with widget.storeId
       if (cachedStore == null) {
-        Logger.data('[STORE_INFO] No cached store data found with personal account ID, trying with widget.storeId: ${widget.storeId}');
+        Logger.data(
+            '[STORE_INFO] No cached store data found with personal account ID, trying with widget.storeId: ${widget.storeId}');
         cachedStore = await _databaseHelper.getCachedStore(widget.storeId);
       }
-      
+
       if (cachedStore != null) {
-        Logger.data('[STORE_INFO] Found cached store data with ID: ${cachedStore.storeId}');
-        
+        Logger.data(
+            '[STORE_INFO] Found cached store data with ID: ${cachedStore.storeId}');
+
         final vendor = cachedStore.vendor;
         final products = cachedStore.products;
         final profileImageUrl = cachedStore.profileImageUrl;
-        
+
         setState(() {
           _isLoading = false;
           _vendor = vendor;
@@ -235,17 +248,19 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   /// Loads fresh store data from the API
   Future<void> _loadFreshData() async {
     if (_isRefreshing) return;
-    
+
     setState(() {
       _isRefreshing = true;
       if (_vendor == null) {
-        _isLoading = true; // Only show loading indicator if we don't have cached data
+        _isLoading =
+            true; // Only show loading indicator if we don't have cached data
       }
     });
 
     try {
-      Logger.data('[STORE_INFO] Starting to load fresh store data for store ID: ${widget.storeId}');
-      
+      Logger.data(
+          '[STORE_INFO] Starting to load fresh store data for store ID: ${widget.storeId}');
+
       // Check if user is a vendor
       if (_currentUser == null || !_currentUser!.activateMarket) {
         Logger.error('[STORE_INFO] User is not a vendor or user is null');
@@ -259,7 +274,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
 
       // Check if we have a personal account ID
       if (_operationsAccountId == null) {
-        Logger.error('[STORE_INFO] No personal account ID found for user: ${_currentUser!.memberId}');
+        Logger.error(
+            '[STORE_INFO] No personal account ID found for user: ${_currentUser!.memberId}');
         setState(() {
           _isLoading = false;
           _isRefreshing = false;
@@ -267,15 +283,18 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         });
         return;
       }
-      
-      Logger.data('[STORE_INFO] Using personal account ID: $_operationsAccountId to fetch storefront data');
-      
+
+      Logger.data(
+          '[STORE_INFO] Using personal account ID: $_operationsAccountId to fetch storefront data');
+
       // Use the getAccountDashboard API to get vendor information
-      final dashboardResult = await _marketplaceRepository.getAccountDashboard(_operationsAccountId!);
-      
+      final dashboardResult = await _marketplaceRepository
+          .getAccountDashboard(_operationsAccountId!);
+
       return dashboardResult.fold(
         (failure) {
-          Logger.error('[STORE_INFO] Failed to get storefront: ${failure.message}');
+          Logger.error(
+              '[STORE_INFO] Failed to get storefront: ${failure.message}');
           if (mounted) {
             setState(() {
               _isLoading = false;
@@ -290,15 +309,16 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         (data) async {
           try {
             Logger.data('[STORE_INFO] Successfully received storefront data');
-            
+
             // Log the structure of the data for debugging
-            Logger.data('[STORE_INFO] Data structure: ${_getDataStructure(data)}');
-            
+            Logger.data(
+                '[STORE_INFO] Data structure: ${_getDataStructure(data)}');
+
             // Validate the expected data structure
             if (!data.containsKey('dashboard')) {
               throw Exception('Missing dashboard key in response data');
             }
-            
+
             // Extract account information
             final dashboard = data['dashboard'];
             final accountId = dashboard['accountID'] as String?;
@@ -307,31 +327,39 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
             final accountType = dashboard['accountType'] as String?;
             final defaultDenom = dashboard['defaultDenom'] as String?;
             final isOwnedAccount = dashboard['isOwnedAccount'] as bool?;
-            
-            Logger.data('[STORE_INFO] Extracted account info - ID: $accountId, Name: $accountName, Type: $accountType');
-            
+
+            Logger.data(
+                '[STORE_INFO] Extracted account info - ID: $accountId, Name: $accountName, Type: $accountType');
+
             // Extract sender information
             Map<String, dynamic>? sendOffersTo;
-            if (dashboard.containsKey('sendOffersTo') && dashboard['sendOffersTo'] is Map<String, dynamic>) {
+            if (dashboard.containsKey('sendOffersTo') &&
+                dashboard['sendOffersTo'] is Map<String, dynamic>) {
               sendOffersTo = dashboard['sendOffersTo'] as Map<String, dynamic>;
             }
-            
+
             final memberId = sendOffersTo?['memberID'] as String?;
             final firstname = sendOffersTo?['firstname'] as String?;
             final lastname = sendOffersTo?['lastname'] as String?;
-            
-            Logger.data('[STORE_INFO] Extracted sender info - Member ID: $memberId, Name: $firstname $lastname');
-            
+
+            Logger.data(
+                '[STORE_INFO] Extracted sender info - Member ID: $memberId, Name: $firstname $lastname');
+
             // Create a Vendor object
             // Always use personal account ID as the store ID if available
             final vendorStoreId = _operationsAccountId ?? widget.storeId;
-            Logger.data('[STORE_INFO] Using store ID for vendor object: $vendorStoreId');
-            
+            Logger.data(
+                '[STORE_INFO] Using store ID for vendor object: $vendorStoreId');
+
             final vendorObj = Vendor(
               id: vendorStoreId,
               memberId: memberId ?? _currentUser!.memberId,
-              businessName: accountName ?? (firstname != null && lastname != null ? '$firstname $lastname' : 'My Business'),
-              description: 'Store profile for $accountName', // No description in the new API response
+              businessName: accountName ??
+                  (firstname != null && lastname != null
+                      ? '$firstname $lastname'
+                      : 'My Business'),
+              description:
+                  'Store profile for $accountName', // No description in the new API response
               email: '',
               phone: _currentUser!.phone,
               profileImageUrl: null, // No profile image in the new API response
@@ -342,74 +370,90 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
             );
-            
+
             // Extract products
             List<Product> vendorProducts = [];
-            if (dashboard.containsKey('products') && dashboard['products'] is List) {
+            if (dashboard.containsKey('products') &&
+                dashboard['products'] is List) {
               final products = dashboard['products'] as List;
-              Logger.data('[STORE_INFO] Found ${products.length} products in response');
-              
+              Logger.data(
+                  '[STORE_INFO] Found ${products.length} products in response');
+
               vendorProducts = products.map((product) {
                 // Extract product details
                 final productId = product['accountID'] as String?;
                 final productName = product['accountName'] as String?;
                 final productType = product['accountType'] as String?;
                 final productBalance = product['accountBalanceUSD'] as num?;
-                final profilePictureThumbnail = product['profilePictureThumbnail'] as String?;
-                
+                final profilePictureThumbnail =
+                    product['profilePictureThumbnail'] as String?;
+
                 // Create image URLs list with profile picture thumbnail if available
                 List<String> imageUrls = [];
-                if (profilePictureThumbnail != null && profilePictureThumbnail.isNotEmpty) {
-                  Logger.data('[STORE_INFO] Adding profile picture thumbnail to product: $profilePictureThumbnail');
+                if (profilePictureThumbnail != null &&
+                    profilePictureThumbnail.isNotEmpty) {
+                  Logger.data(
+                      '[STORE_INFO] Adding profile picture thumbnail to product: $profilePictureThumbnail');
                   imageUrls.add(profilePictureThumbnail);
                 } else {
-                  Logger.data('[STORE_INFO] No profile picture thumbnail available for product: $productId');
+                  Logger.data(
+                      '[STORE_INFO] No profile picture thumbnail available for product: $productId');
                 }
-                
+
                 // Create a Product object
                 return Product(
                   id: productId ?? '',
                   vendorId: vendorObj.id,
                   name: productName ?? 'Unknown Product',
                   description: '',
-                  price: productBalance != null ? (productBalance * 100).toInt() : 0, // Convert from dollars to cents
+                  price: productBalance != null
+                      ? (productBalance * 100).toInt()
+                      : 0, // Convert from dollars to cents
                   currency: 'USD', // Default currency
-                  imageUrls: imageUrls, // Use the profile picture thumbnail as the product image
+                  imageUrls:
+                      imageUrls, // Use the profile picture thumbnail as the product image
                   isAvailable: true,
                   accountId: productId,
                   createdAt: DateTime.now(),
                   updatedAt: DateTime.now(),
                 );
               }).toList();
-              
-              Logger.data('[STORE_INFO] Created ${vendorProducts.length} Product objects');
+
+              Logger.data(
+                  '[STORE_INFO] Created ${vendorProducts.length} Product objects');
             } else {
-              Logger.data('[STORE_INFO] No products found in response or invalid format');
+              Logger.data(
+                  '[STORE_INFO] No products found in response or invalid format');
             }
-            
+
             // Cache the store data in the database
-            Logger.data('[STORE_INFO] Attempting to cache store data in database with ID: ${vendorObj.id}');
+            Logger.data(
+                '[STORE_INFO] Attempting to cache store data in database with ID: ${vendorObj.id}');
             try {
               await _databaseHelper.cacheStoreData(
                 storeId: vendorObj.id,
                 vendor: vendorObj,
                 products: vendorProducts,
-                profileImageUrl: "",  // No profile image in the new API response
+                profileImageUrl: "", // No profile image in the new API response
               );
-              Logger.data('[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
-              
+              Logger.data(
+                  '[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
+
               // Verify the data was cached by retrieving it
-              final cachedStore = await _databaseHelper.getCachedStore(vendorObj.id);
+              final cachedStore =
+                  await _databaseHelper.getCachedStore(vendorObj.id);
               if (cachedStore != null) {
-                Logger.data('[STORE_INFO] Verified cached data can be retrieved with ID: ${cachedStore.storeId}');
+                Logger.data(
+                    '[STORE_INFO] Verified cached data can be retrieved with ID: ${cachedStore.storeId}');
               } else {
-                Logger.error('[STORE_INFO] Failed to verify cached data - could not retrieve it');
+                Logger.error(
+                    '[STORE_INFO] Failed to verify cached data - could not retrieve it');
               }
             } catch (cacheError) {
               Logger.error('[STORE_INFO] Error caching store data', cacheError);
               // Continue even if caching fails, as we still have the data in memory
             }
-            
+
             // Update state
             if (mounted) {
               setState(() {
@@ -417,11 +461,13 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 _isRefreshing = false;
                 _vendor = vendorObj;
                 _products = vendorProducts;
-                _profileThumbnailUrl = ""; // No profile image in the new API response
+                _profileThumbnailUrl =
+                    ""; // No profile image in the new API response
               });
             }
-            
-            Logger.data('[STORE_INFO] Successfully updated UI with fresh store data');
+
+            Logger.data(
+                '[STORE_INFO] Successfully updated UI with fresh store data');
           } catch (e, stackTrace) {
             Logger.error('[STORE_INFO] Error parsing storefront data', e);
             Logger.error('[STORE_INFO] Stack trace: $stackTrace');
@@ -453,13 +499,13 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       }
     }
   }
-  
+
   /// Helper method to log the structure of a data object without exposing sensitive data
   String _getDataStructure(dynamic data, {int level = 0}) {
     if (data == null) {
       return 'null';
     }
-    
+
     if (data is Map) {
       final keys = data.keys.map((k) {
         final value = data[k];
@@ -488,7 +534,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               ? _buildErrorView()
               : _vendor != null
                   ? _buildStoreProfile()
-                  : const Center(child: CircularProgressIndicator()), // Fallback if vendor is null
+                  : const Center(
+                      child:
+                          CircularProgressIndicator()), // Fallback if vendor is null
       // Add FloatingActionButton here with animation
       floatingActionButton: (widget.isOwner && _products.isNotEmpty)
           ? AnimatedOpacity(
@@ -497,22 +545,21 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 transform: Matrix4.translationValues(
-                  0, 
-                  _isFabVisible ? 0 : 100, // Move down when hidden
-                  0
-                ),
+                    0,
+                    _isFabVisible ? 0 : 100, // Move down when hidden
+                    0),
                 child: FloatingActionButton.extended(
-                  onPressed: _isFabVisible 
-                    ? () {
-                        Navigator.pushNamed(
-                          context,
-                          '/vendor-sales-tab',
-                          arguments: {
-                            'vendorId': widget.storeId,
-                          },
-                        );
-                      }
-                    : null, // Disable button when hidden
+                  onPressed: _isFabVisible
+                      ? () {
+                          Navigator.pushNamed(
+                            context,
+                            '/vendor-sales-tab',
+                            arguments: {
+                              'vendorId': widget.storeId,
+                            },
+                          );
+                        }
+                      : null, // Disable button when hidden
                   icon: const Icon(Icons.point_of_sale),
                   label: const Text('New Sale'),
                   backgroundColor: AppColors.primary,
@@ -564,7 +611,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   Widget _buildStoreProfile() {
     // Add null check to prevent exception
     if (_vendor == null) {
-      Logger.error('[STORE_INFO] Attempted to build store profile with null vendor');
+      Logger.error(
+          '[STORE_INFO] Attempted to build store profile with null vendor');
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -576,9 +624,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         ),
       );
     }
-    
+
     final vendor = _vendor!;
-    
+
     return RefreshIndicator(
       onRefresh: () async {
         await _loadFreshData();
@@ -676,111 +724,88 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 ),
               ),
             ),
-            // Business name and rating
+            // Business name - aligned exactly with the profile image (same top and bottom)
             Positioned(
               left: 108,
               right: 16,
-              bottom: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    vendor.businessName,
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          offset: Offset(1, 1),
-                          blurRadius: 3,
-                          color: AppColors.black45,
-                        ),
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star,
-                        color: AppColors.amber,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        vendor.ratingDisplay,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 14,
-                          shadows: [
-                            Shadow(
-                              offset: Offset(1, 1),
-                              blurRadius: 2,
-                              color: AppColors.black45,
-                            ),
-                          ],
-                        ),
+              bottom: 16, // Same bottom position as the profile image
+              height: 80, // Same height as the profile image (radius * 2)
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  vendor.businessName,
+                  style: const TextStyle(
+                    color: AppColors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(1, 1),
+                        blurRadius: 3,
+                        color: AppColors.black45,
                       ),
                     ],
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],
         ),
       ),
       actions: [
-            if (widget.isOwner) ...[
-              IconButton(
-                icon: const Icon(Icons.inventory_2),
-                tooltip: 'Manage Inventory',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => InventoryManagementScreen(
-                        vendorId: widget.storeId,
+        if (widget.isOwner) ...[
+          IconButton(
+            icon: const Icon(Icons.inventory_2),
+            tooltip: 'Manage Inventory',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => InventoryManagementScreen(
+                    vendorId: widget.storeId,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Edit Profile',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditVendorProfileScreen(
+                    vendorId: widget.storeId,
+                  ),
+                ),
+              ).then((result) {
+                // Check if we got a success result
+                if (result != null &&
+                    result is Map &&
+                    result['success'] == true) {
+                  // Show success message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['message'] ??
+                            'Store information updated successfully'),
+                        backgroundColor: AppColors.successGreen,
                       ),
-                    ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit),
-                tooltip: 'Edit Profile',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EditVendorProfileScreen(
-                        vendorId: widget.storeId,
-                      ),
-                    ),
-                  ).then((result) {
-                    // Check if we got a success result
-                    if (result != null && result is Map && result['success'] == true) {
-                      // Show success message
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(result['message'] ?? 'Store information updated successfully'),
-                            backgroundColor: AppColors.successGreen,
-                          ),
-                        );
-                      }
-                    }
-                    
-                    // Refresh the store data
-                    if (mounted) {
-                      _loadFreshData();
-                    }
-                  });
-                },
-              ),
-            ],
+                    );
+                  }
+                }
+
+                // Refresh the store data
+                if (mounted) {
+                  _loadFreshData();
+                }
+              });
+            },
+          ),
+        ],
       ],
     );
   }
@@ -788,55 +813,58 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   /// Updates the store status and location.
   Future<void> _updateStoreStatus(bool value) async {
     if (_isUpdatingStoreStatus) return;
-    
+
     setState(() {
       _isUpdatingStoreStatus = true;
     });
-    
+
     try {
-      Logger.data('[STORE_INFO] Updating store status to: ${value ? 'Open' : 'Closed'}');
-      
+      Logger.data(
+          '[STORE_INFO] Updating store status to: ${value ? 'Open' : 'Closed'}');
+
       // Get current location if opening the store
       double? latitude;
       double? longitude;
-      
+
       if (value) {
         // First check if location services are enabled
-        final servicesEnabled = await _storeStatusService.checkLocationServicesEnabled(context);
+        final servicesEnabled =
+            await _storeStatusService.checkLocationServicesEnabled(context);
         if (!servicesEnabled) {
           Logger.error('[STORE_INFO] Location services are disabled');
           if (mounted) {
             // Ask if the user wants to continue without location
             final continueWithoutLocation = await showDialog<bool>(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: const Text('Location Services Disabled'),
-                content: const Text(
-                  'Your store will be marked as open, but customers won\'t be able to see your location. '
-                  'Would you like to continue without location?'
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Location Services Disabled'),
+                    content: const Text(
+                        'Your store will be marked as open, but customers won\'t be able to see your location. '
+                        'Would you like to continue without location?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Continue Without Location'),
+                      ),
+                    ],
                   ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Continue Without Location'),
-                  ),
-                ],
-              ),
-            ) ?? false;
-            
+                ) ??
+                false;
+
             if (!continueWithoutLocation) {
-              Logger.data('[STORE_INFO] User cancelled store status update due to disabled location services');
+              Logger.data(
+                  '[STORE_INFO] User cancelled store status update due to disabled location services');
               setState(() {
                 _isUpdatingStoreStatus = false;
               });
               return;
             }
-            
+
             // User chose to continue without location
             Logger.data('[STORE_INFO] User chose to continue without location');
           } else {
@@ -847,43 +875,46 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           }
         } else {
           // Location services are enabled, now check and request permission if needed
-          final hasPermission = await _storeStatusService.requestLocationPermission(context);
+          final hasPermission =
+              await _storeStatusService.requestLocationPermission(context);
           if (!hasPermission) {
             Logger.error('[STORE_INFO] Location permission not granted');
             if (mounted) {
               // Ask if the user wants to continue without location
               final continueWithoutLocation = await showDialog<bool>(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => AlertDialog(
-                  title: const Text('Location Permission Denied'),
-                  content: const Text(
-                    'Your store will be marked as open, but customers won\'t be able to see your location. '
-                    'Would you like to continue without location?'
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Location Permission Denied'),
+                      content: const Text(
+                          'Your store will be marked as open, but customers won\'t be able to see your location. '
+                          'Would you like to continue without location?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('Continue Without Location'),
+                        ),
+                      ],
                     ),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Continue Without Location'),
-                    ),
-                  ],
-                ),
-              ) ?? false;
-              
+                  ) ??
+                  false;
+
               if (!continueWithoutLocation) {
-                Logger.data('[STORE_INFO] User cancelled store status update due to denied location permission');
+                Logger.data(
+                    '[STORE_INFO] User cancelled store status update due to denied location permission');
                 setState(() {
                   _isUpdatingStoreStatus = false;
                 });
                 return;
               }
-              
+
               // User chose to continue without location
-              Logger.data('[STORE_INFO] User chose to continue without location');
+              Logger.data(
+                  '[STORE_INFO] User chose to continue without location');
             } else {
               setState(() {
                 _isUpdatingStoreStatus = false;
@@ -901,38 +932,40 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               // Ask if the user wants to continue without location
               if (mounted) {
                 final continueWithoutLocation = await showDialog<bool>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Location Not Available'),
-                    content: const Text(
-                      'We couldn\'t get your current location. Your store will be marked as open, '
-                      'but customers won\'t be able to see your location. '
-                      'Would you like to continue without location?'
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancel'),
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Location Not Available'),
+                        content: const Text(
+                            'We couldn\'t get your current location. Your store will be marked as open, '
+                            'but customers won\'t be able to see your location. '
+                            'Would you like to continue without location?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Continue Without Location'),
+                          ),
+                        ],
                       ),
-                      FilledButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Continue Without Location'),
-                      ),
-                    ],
-                  ),
-                ) ?? false;
-                
+                    ) ??
+                    false;
+
                 if (!continueWithoutLocation) {
-                  Logger.data('[STORE_INFO] User cancelled store status update due to location not available');
+                  Logger.data(
+                      '[STORE_INFO] User cancelled store status update due to location not available');
                   setState(() {
                     _isUpdatingStoreStatus = false;
                   });
                   return;
                 }
-                
+
                 // User chose to continue without location
-                Logger.data('[STORE_INFO] User chose to continue without location');
+                Logger.data(
+                    '[STORE_INFO] User chose to continue without location');
               } else {
                 setState(() {
                   _isUpdatingStoreStatus = false;
@@ -943,14 +976,15 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           }
         }
       }
-      
+
       // Update store status
-      final (success, errorMessage) = await _storeStatusService.updateStoreStatus(
+      final (success, errorMessage) =
+          await _storeStatusService.updateStoreStatus(
         storeOpen: value,
         latitude: latitude,
         longitude: longitude,
       );
-      
+
       if (success) {
         Logger.data('[STORE_INFO] Store status updated successfully');
         // Update local state
@@ -958,17 +992,19 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           setState(() {
             _storeOpen = value;
           });
-          
+
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Store is now ${value ? 'open' : 'closed'}${latitude != null ? ' with location' : ''}'),
+              content: Text(
+                  'Store is now ${value ? 'open' : 'closed'}${latitude != null ? ' with location' : ''}'),
               backgroundColor: AppColors.successGreen,
             ),
           );
         }
       } else {
-        Logger.error('[STORE_INFO] Failed to update store status: $errorMessage');
+        Logger.error(
+            '[STORE_INFO] Failed to update store status: $errorMessage');
         // Show error message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1046,7 +1082,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                       child: Text(
                         vendor.isActive ? 'Active' : 'Inactive',
                         style: TextStyle(
-                          color: vendor.isActive ? AppColors.successGreen : AppColors.errorRed,
+                          color: vendor.isActive
+                              ? AppColors.successGreen
+                              : AppColors.errorRed,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1093,14 +1131,18 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                     Text(
                       _storeOpen ? 'Open' : 'Closed',
                       style: TextStyle(
-                        color: _storeOpen ? AppColors.successGreen : AppColors.errorRed,
+                        color: _storeOpen
+                            ? AppColors.successGreen
+                            : AppColors.errorRed,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const Spacer(),
-                    if (_currentUser?.latitude != null && _currentUser?.longitude != null)
+                    if (_currentUser?.latitude != null &&
+                        _currentUser?.longitude != null)
                       Tooltip(
-                        message: 'Location: ${_currentUser!.latitude!.toStringAsFixed(4)}, ${_currentUser!.longitude!.toStringAsFixed(4)}',
+                        message:
+                            'Location: ${_currentUser!.latitude!.toStringAsFixed(4)}, ${_currentUser!.longitude!.toStringAsFixed(4)}',
                         child: const Icon(
                           Icons.location_on,
                           color: AppColors.primary,
@@ -1144,17 +1186,20 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                     ),
                   ).then((result) {
                     // Check if we got a success result
-                    if (result != null && result is Map && result['success'] == true) {
+                    if (result != null &&
+                        result is Map &&
+                        result['success'] == true) {
                       // Show success message
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'Product added successfully'),
+                            content: Text(result['message'] ??
+                                'Product added successfully'),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
-                      
+
                       // Refresh the store data
                       if (mounted) {
                         _loadFreshData();
@@ -1166,9 +1211,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        _products.isEmpty
-            ? _buildEmptyProductsView()
-            : _buildProductsGrid(),
+        _products.isEmpty ? _buildEmptyProductsView() : _buildProductsGrid(),
       ],
     );
   }
@@ -1229,7 +1272,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _products.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
-      padding: EdgeInsets.fromLTRB(0, 0, 0, _getBottomPadding()), // Add bottom padding based on FAB visibility
+      padding: EdgeInsets.fromLTRB(0, 0, 0,
+          _getBottomPadding()), // Add bottom padding based on FAB visibility
       itemBuilder: (context, index) {
         final product = _products[index];
         return _buildProductListItem(product);
@@ -1251,9 +1295,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         ),
       );
     }
-    
+
     final imageUrl = product.imageUrls.first;
-    
+
     if (imageUrl.startsWith('file://')) {
       // Show local file image
       final filePath = imageUrl.substring(7); // Remove 'file://' prefix
@@ -1261,7 +1305,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         File(filePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          Logger.error('[STORE_INFO] Error loading local image: $filePath', error);
+          Logger.error(
+              '[STORE_INFO] Error loading local image: $filePath', error);
           return Container(
             color: AppColors.grey300,
             child: const Center(
@@ -1301,7 +1346,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   Widget _buildProfileImage(Vendor vendor) {
     // Use profile thumbnail URL if available
     if (_profileThumbnailUrl != null && _profileThumbnailUrl!.isNotEmpty) {
-      Logger.data('[STORE_INFO] Using profile thumbnail URL: $_profileThumbnailUrl');
+      Logger.data(
+          '[STORE_INFO] Using profile thumbnail URL: $_profileThumbnailUrl');
       return _buildImageFromUrl(
         _profileThumbnailUrl,
         placeholder: Container(
@@ -1316,7 +1362,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         ),
       );
     }
-    
+
     // Otherwise use vendor's profile image URL
     return vendor.profileImageUrl != null
         ? _buildImageFromUrl(
@@ -1350,7 +1396,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       Logger.data('[STORE_INFO] Image URL is null or empty, using placeholder');
       return placeholder ?? Container(color: AppColors.grey300);
     }
-    
+
     if (imageUrl.startsWith('file://')) {
       // Show local file image
       final filePath = imageUrl.substring(7); // Remove 'file://' prefix
@@ -1359,7 +1405,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         File(filePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          Logger.error('[STORE_INFO] Error loading local image: $filePath', error);
+          Logger.error(
+              '[STORE_INFO] Error loading local image: $filePath', error);
           return placeholder ?? Container(color: AppColors.grey300);
         },
       );
@@ -1369,10 +1416,12 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       return CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
-        placeholder: (context, url) => placeholder ?? Container(
-          color: AppColors.grey200,
-          child: const Center(child: CircularProgressIndicator()),
-        ),
+        placeholder: (context, url) =>
+            placeholder ??
+            Container(
+              color: AppColors.grey200,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         errorWidget: (context, url, error) {
           Logger.error('[STORE_INFO] Error loading remote image: $url', error);
           return placeholder ?? Container(color: AppColors.grey300);
@@ -1389,9 +1438,10 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   Widget _buildProductListItem(Product product) {
     // Extract account balance from product price (which is stored in cents)
     final accountBalance = product.price / 100;
-    
+
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       leading: SizedBox(
         width: 48,
         height: 48,

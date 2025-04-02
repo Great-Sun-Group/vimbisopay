@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'; // For ScrollDirection
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
@@ -38,6 +39,13 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   
   // Track the current tab index
   int _currentTabIndex = 0;
+  
+  // Scroll controllers for both tabs
+  late ScrollController _productsScrollController;
+  late ScrollController _basketScrollController;
+  
+  // Track FAB visibility
+  bool _isFabVisible = true;
 
   @override
   void initState() {
@@ -46,16 +54,68 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     // Add listener to track tab changes
     _tabController.addListener(_handleTabChange);
+    
+    // Initialize scroll controllers
+    _productsScrollController = ScrollController();
+    _basketScrollController = ScrollController();
+    
+    // Add scroll listeners
+    _productsScrollController.addListener(_handleProductsScroll);
+    _basketScrollController.addListener(_handleBasketScroll);
+    
     _loadVendorData();
   }
 
   @override
   void dispose() {
-    // Remove the listener when disposing
+    // Remove the listeners when disposing
     _tabController.removeListener(_handleTabChange);
+    _productsScrollController.removeListener(_handleProductsScroll);
+    _basketScrollController.removeListener(_handleBasketScroll);
+    
+    // Dispose controllers
     _tabController.dispose();
     _searchController.dispose();
+    _productsScrollController.dispose();
+    _basketScrollController.dispose();
+    
     super.dispose();
+  }
+  
+  // Handle scroll events for products tab
+  void _handleProductsScroll() {
+    if (_productsScrollController.hasClients) {
+      if (_productsScrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_productsScrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_productsScrollController.hasClients && _productsScrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
+  }
+  
+  // Handle scroll events for basket tab
+  void _handleBasketScroll() {
+    if (_basketScrollController.hasClients) {
+      if (_basketScrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_basketScrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_basketScrollController.hasClients && _basketScrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
   }
   
   // Handle tab changes
@@ -329,19 +389,32 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     // Check if all items have a positive amount
     final bool allItemsValid = _allItemsHavePositiveAmount();
     
-    return FloatingActionButton.extended(
-      onPressed: allItemsValid ? _proceedToInvoice : null, // Disable if any item has zero amount
-      icon: const Icon(Icons.receipt_long),
-      label: Row(
-        children: [
-          // Format the price to ensure 2 decimal places
-          Text(_formatPriceWithTwoDecimals(_basket!.formattedTotalPrice)),
-          const SizedBox(width: 8),
-          const Text('Generate Invoice'),
-        ],
+    // Add animations for smooth appearance/disappearance
+    return AnimatedOpacity(
+      opacity: _isFabVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        transform: Matrix4.translationValues(
+          0, 
+          _isFabVisible ? 0 : 100, // Move down when hidden
+          0
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: _isFabVisible && allItemsValid ? _proceedToInvoice : null, // Disable if hidden or invalid items
+          icon: const Icon(Icons.receipt_long),
+          label: Row(
+            children: [
+              // Format the price to ensure 2 decimal places
+              Text(_formatPriceWithTwoDecimals(_basket!.formattedTotalPrice)),
+              const SizedBox(width: 8),
+              const Text('Generate Invoice'),
+            ],
+          ),
+          backgroundColor: allItemsValid ? AppColors.primary : Colors.grey, // Gray out if any item has zero amount
+          elevation: allItemsValid ? 4 : 2, // Reduce elevation for disabled state
+        ),
       ),
-      backgroundColor: allItemsValid ? AppColors.primary : Colors.grey, // Gray out if any item has zero amount
-      elevation: allItemsValid ? 4 : 2, // Reduce elevation for disabled state
     );
   }
 
@@ -478,7 +551,8 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
 
   Widget _buildProductsGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(16.0),
+      controller: _productsScrollController, // Use the products scroll controller
+      padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, _getBottomPadding()), // Dynamic bottom padding (non-const)
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.6,
@@ -499,6 +573,11 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         );
       },
     );
+  }
+  
+  /// Helper method to get bottom padding based on FAB visibility
+  double _getBottomPadding() {
+    return _isFabVisible ? 80.0 : 16.0;
   }
 
   Widget _buildBasketTab() {
@@ -573,7 +652,8 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            controller: _basketScrollController, // Use the basket scroll controller
+            padding: EdgeInsets.fromLTRB(16.0, 0, 16.0, _getBottomPadding()), // Dynamic bottom padding
             itemCount: _basket!.items.length,
             itemBuilder: (context, index) {
               final item = _basket!.items[index];
