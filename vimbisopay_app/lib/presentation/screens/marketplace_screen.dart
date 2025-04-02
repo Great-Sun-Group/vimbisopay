@@ -30,7 +30,8 @@ class MarketplaceScreen extends StatefulWidget {
 }
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
-  final MarketplaceRepository _marketplaceRepository = ServiceLocator.marketplaceRepository;
+  final MarketplaceRepository _marketplaceRepository =
+      ServiceLocator.marketplaceRepository;
   final LocationService _locationService = ServiceLocator.locationService;
   late ScrollController _scrollController;
   bool _isLoading = true;
@@ -54,11 +55,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void initState() {
     super.initState();
     Logger.lifecycle('MarketplaceScreen initialized');
-    
+
     // Initialize scroll controller
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
-    
+
     // First get the user data
     _getUserData().then((_) {
       // Then check vendor status
@@ -67,7 +68,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _requestLocationPermission().then((_) {
           _loadProducts();
           _checkFirstTimeVisit();
-          
+
           if (mounted) {
             setState(() {
               _isInitializing = false;
@@ -77,12 +78,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       });
     });
   }
-  
+
   /// Gets the user data from the database.
   Future<void> _getUserData() async {
     try {
       final user = await ServiceLocator.databaseHelper.getUser();
-      
+
       if (mounted) {
         setState(() {
           _user = user;
@@ -93,17 +94,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       Logger.error('Error getting user data', e);
     }
   }
-  
+
   void _scrollListener() {
     // Show/hide FAB based on scroll direction
     if (_scrollController.hasClients) {
-      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+      if (_scrollController.position.userScrollDirection ==
+          ScrollDirection.reverse) {
         // Scrolling down - hide FAB
         if (_isFabVisible) {
           setState(() => _isFabVisible = false);
         }
-      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward ||
-                (_scrollController.hasClients && _scrollController.position.pixels == 0)) {
+      } else if (_scrollController.position.userScrollDirection ==
+              ScrollDirection.forward ||
+          (_scrollController.hasClients &&
+              _scrollController.position.pixels == 0)) {
         // Scrolling up or at the top - show FAB
         if (!_isFabVisible) {
           setState(() => _isFabVisible = true);
@@ -111,23 +115,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
     }
   }
-  
+
   /// Requests location permission from the user.
   ///
   /// This method shows a dialog explaining why we need location permission
   /// and then requests the permission if the user agrees.
   Future<void> _requestLocationPermission() async {
     if (_isRequestingLocation) return;
-    
+
     setState(() {
       _isRequestingLocation = true;
     });
-    
+
     try {
       Logger.data('[MARKETPLACE] Checking if location services are enabled');
-      
+
       // Check if location services are enabled
-      bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
+      bool servicesEnabled =
+          await _locationService.checkLocationServicesEnabled();
       if (!servicesEnabled) {
         Logger.data('[MARKETPLACE] Location services are disabled');
         setState(() {
@@ -135,7 +140,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         });
         return;
       }
-      
+
       // Check if permission is already granted
       bool hasPermission = await _locationService.checkLocationPermission();
       if (hasPermission) {
@@ -147,44 +152,47 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         });
         return;
       }
-      
+
       // Show a dialog explaining why we need location permission
       if (mounted) {
         final shouldRequest = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Location Permission'),
-            content: const Text(
-              'To help you find nearby products and services, we need your location. '
-              'Would you like to grant location permission?'
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Not Now'),
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('Location Permission'),
+                content: const Text(
+                    'To help you find nearby products and services, we need your location. '
+                    'Would you like to grant location permission?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Not Now'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Grant Permission'),
+                  ),
+                ],
               ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Grant Permission'),
-              ),
-            ],
-          ),
-        ) ?? false;
-        
+            ) ??
+            false;
+
         if (!shouldRequest) {
-          Logger.data('[MARKETPLACE] User declined to request location permission');
+          Logger.data(
+              '[MARKETPLACE] User declined to request location permission');
           setState(() {
             _isRequestingLocation = false;
           });
           return;
         }
       }
-      
+
       // Request permission
-      final permissionGranted = await _locationService.requestLocationPermission();
-      Logger.data('[MARKETPLACE] Location permission request result: $permissionGranted');
-      
+      final permissionGranted =
+          await _locationService.requestLocationPermission();
+      Logger.data(
+          '[MARKETPLACE] Location permission request result: $permissionGranted');
+
       if (permissionGranted) {
         // Get current location
         await _getCurrentLocation();
@@ -199,19 +207,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
     }
   }
-  
+
   /// Gets the current location if available.
   Future<void> _getCurrentLocation() async {
     try {
       Logger.data('[MARKETPLACE] Getting current location');
-      
+
       final position = await _locationService.getCurrentPosition();
       if (position != null && mounted) {
         setState(() {
           _latitude = position.latitude;
           _longitude = position.longitude;
         });
-        Logger.data('[MARKETPLACE] Got location: (${position.latitude}, ${position.longitude})');
+        Logger.data(
+            '[MARKETPLACE] Got location: (${position.latitude}, ${position.longitude})');
       } else {
         Logger.error('[MARKETPLACE] Failed to get location');
       }
@@ -219,16 +228,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       Logger.error('[MARKETPLACE] Error getting current location', e);
     }
   }
-  
+
   Future<void> _checkFirstTimeVisit() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final isFirstVisit = !prefs.containsKey('has_visited_marketplace');
-      
+
       if (isFirstVisit) {
         // Mark as visited
         await prefs.setBool('has_visited_marketplace', true);
-        
+
         // Show first-time prompt after the screen is built
         if (mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,15 +249,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       Logger.error('Error checking first-time visit', e);
     }
   }
-  
+
   void _showFirstTimeMarketplaceDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Welcome to Vimbiso Marketplace!'),
         content: const Text(
-          'Would you like to sell your products and services in the marketplace?'
-        ),
+            'Would you like to sell your products and services in the marketplace?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -282,7 +290,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
       // Get current user from database instead of Provider
       final user = await ServiceLocator.databaseHelper.getUser();
-      
+
       if (user == null) {
         Logger.state('No user found in database');
         setState(() {
@@ -291,26 +299,28 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         });
         return;
       }
-      
+
       _memberId = user.memberId;
-      
+
       // Find the user's personal account ID
       if (user.dashboard != null && user.dashboard!.accounts.isNotEmpty) {
         // Try to find an account with accountType PERSONAL
         for (final account in user.dashboard!.accounts) {
           if (account.accountType == 'PERSONAL') {
             _personalAccountId = account.accountID;
-            Logger.data('[MARKETPLACE] Found PERSONAL account: $_personalAccountId (${account.accountName})');
+            Logger.data(
+                '[MARKETPLACE] Found PERSONAL account: $_personalAccountId (${account.accountName})');
             break;
           }
         }
-        
+
         // If no account with accountType PERSONAL found, try to find by name
         if (_personalAccountId == null) {
           for (final account in user.dashboard!.accounts) {
             if (account.accountName.toUpperCase().contains('PERSONAL')) {
               _personalAccountId = account.accountID;
-              Logger.data('[MARKETPLACE] Found account with PERSONAL in name: $_personalAccountId (${account.accountName})');
+              Logger.data(
+                  '[MARKETPLACE] Found account with PERSONAL in name: $_personalAccountId (${account.accountName})');
               break;
             }
           }
@@ -319,7 +329,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
       if (_memberId != null) {
         // Check if user is a vendor
-        final isVendor = await _marketplaceRepository.isMemberVendor(_memberId!);
+        final isVendor =
+            await _marketplaceRepository.isMemberVendor(_memberId!);
 
         if (isVendor && mounted) {
           // If user is a vendor, set the vendor ID to the member ID
@@ -364,7 +375,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         );
         return;
       }
-      
+
       // Navigate to vendor registration with user data
       Navigator.pushNamed(
         context,
@@ -376,11 +387,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ).then((_) async {
         // Refresh vendor status when returning from registration
         _checkVendorStatus();
-        
+
         // Force rebuild of the UI to reflect the updated vendor status
         if (mounted) {
           setState(() {
-            Logger.data('[MARKETPLACE] Forcing UI rebuild after vendor registration');
+            Logger.data(
+                '[MARKETPLACE] Forcing UI rebuild after vendor registration');
           });
         }
       });
@@ -391,7 +403,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _canBecomeVendor_internal(User? user) {
     // If there's no user, don't allow becoming a vendor as guest
     if (user == null) return false;
-    
+
     // Check the activateMarket property directly on the User object
     // This property is set from either the User.activateMarket field or
     // from the Dashboard.activateMarket field for backward compatibility
@@ -402,7 +414,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _navigateToVendorProfile({bool replace = false}) {
     if (_vendorId == null) return;
-    
+
     if (replace) {
       // Replace current route to prevent back navigation to marketplace
       Navigator.pushReplacement(
@@ -426,14 +438,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       );
     }
   }
-  
+
   void _navigateToStoreInformation() {
     if (_vendorId == null) return;
-    
+
     // Use personal account ID if available, otherwise use vendor ID
     final storeId = _personalAccountId ?? _vendorId!;
-    Logger.data('[MARKETPLACE] Navigating to store information with ID: $storeId');
-    
+    Logger.data(
+        '[MARKETPLACE] Navigating to store information with ID: $storeId');
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -447,7 +460,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _navigateToInventoryManagement() {
     if (_vendorId == null) return;
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -492,11 +505,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           // If user is a vendor in browse mode, filter out their own products
           List<Product> filteredProducts = products;
           if (_isVendor && _showBrowseMode && _vendorId != null) {
-            Logger.data('[MARKETPLACE] Filtering out vendor\'s own products. Vendor ID: $_vendorId');
-            filteredProducts = products.where((product) => product.vendorId != _vendorId).toList();
-            Logger.data('[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
+            Logger.data(
+                '[MARKETPLACE] Filtering out vendor\'s own products. Vendor ID: $_vendorId');
+            filteredProducts = products
+                .where((product) => product.vendorId != _vendorId)
+                .toList();
+            Logger.data(
+                '[MARKETPLACE] Filtered ${products.length - filteredProducts.length} products');
           }
-          
+
           setState(() {
             _isLoading = false;
             _products = filteredProducts;
@@ -522,7 +539,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       },
     );
   }
-  
+
   Future<void> _scanInvoiceQR() async {
     try {
       // Navigate to the QR scanner screen
@@ -534,23 +551,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           fullscreenDialog: true,
         ),
       );
-      
+
       if (result != null && mounted) {
         String? invoiceId;
-        
+
         // Check if the QR code is a valid invoice QR code in the old format
         if (result.startsWith('vimbisopay://invoice/')) {
           // Extract the invoice ID from the QR code
           invoiceId = result.substring('vimbisopay://invoice/'.length);
-          Logger.data('QR code scanned in old format: $result, extracted invoice ID: $invoiceId');
-        } 
+          Logger.data(
+              'QR code scanned in old format: $result, extracted invoice ID: $invoiceId');
+        }
         // Check if the QR code is in the new URL format
         else if (result.startsWith('https://mycredex.app/getInvoice/')) {
           // Extract the invoice ID from the URL
-          invoiceId = result.substring('https://mycredex.app/getInvoice/'.length);
-          Logger.data('QR code scanned in new format: $result, extracted invoice ID: $invoiceId');
+          invoiceId =
+              result.substring('https://mycredex.app/getInvoice/'.length);
+          Logger.data(
+              'QR code scanned in new format: $result, extracted invoice ID: $invoiceId');
         }
-        
+
         if (invoiceId != null && invoiceId.isNotEmpty) {
           // Show loading indicator
           ScaffoldMessenger.of(context).showSnackBar(
@@ -559,9 +579,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               duration: Duration(seconds: 2),
             ),
           );
-          
+
           // Navigate to the buyer invoice detail screen with the non-nullable invoiceId
-          final String nonNullableInvoiceId = invoiceId; // Create a non-nullable copy
+          final String nonNullableInvoiceId =
+              invoiceId; // Create a non-nullable copy
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -592,7 +613,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
     }
   }
-  
+
   void _showVendorActionSheet() {
     showModalBottomSheet(
       context: context,
@@ -627,99 +648,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ),
     );
   }
-  
+
   // Helper method to check if extra padding is needed for FAB
   double _getBottomPadding() {
     return _isVendor && _isFabVisible ? 80.0 : 16.0;
-  }
-  
-  void _showDebugInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Debug Information'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'User Status:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text('Member ID: ${_memberId ?? 'null'}'),
-              const SizedBox(height: 8),
-              
-              const Text(
-                'Vendor Status:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text('Is Vendor: $_isVendor'),
-              Text('Vendor ID: ${_vendorId ?? 'null'}'),
-              const SizedBox(height: 8),
-              
-              const Text(
-                'Feature Flags:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text('Marketplace Enabled: ${ServiceLocator.featureFlagService.isMarketplaceEnabled()}'),
-              const SizedBox(height: 8),
-              
-              const Text(
-                'Debug Actions:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Close'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Set test values for debugging
-              setState(() {
-                _memberId = 'test_member_id';
-                _isVendor = true;  // Force vendor status to true
-                _vendorId = 'v_test';  // Set a test vendor ID
-              });
-              Logger.data('DEBUG MODE: Set test vendor values - memberId: $_memberId, isVendor: $_isVendor, vendorId: $_vendorId');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Test vendor values set'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            },
-            child: const Text('Set Test Vendor'),
-          ),
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Reset debug values
-              setState(() {
-                _memberId = null;
-                _isVendor = false;
-                _vendorId = null;
-              });
-              Logger.data('DEBUG MODE: Reset debug values');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Debug values reset'),
-                  backgroundColor: AppColors.yellowPrimary,
-                ),
-              );
-            },
-            child: const Text('Reset Debug Values'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -728,7 +660,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     if (_isInitializing) {
       return MarketplaceStates.buildInitializingState();
     }
-    
+
     // Only build the full UI once initialization is complete
     return Scaffold(
       appBar: AppBar(
@@ -748,37 +680,31 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               tooltip: 'Vendor Actions',
               onPressed: _showVendorActionSheet,
             ),
-          // Debug button - only visible in debug mode
-          if (const bool.fromEnvironment('dart.vm.product') == false)
-            IconButton(
-              icon: const Icon(Icons.bug_report),
-              tooltip: 'Debug Info',
-              onPressed: _showDebugInfo,
-            ),
         ],
       ),
       // Extremely simple FAB implementation
-      floatingActionButton: _isVendor && _isFabVisible ? 
-        GestureDetector(
-          onTap: _showVendorActionSheet,
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '+',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+      floatingActionButton: _isVendor && _isFabVisible
+          ? GestureDetector(
+              onTap: _showVendorActionSheet,
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '+',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ) : null,
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -799,7 +725,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 user: _user,
                 canBecomeVendor: _canBecomeVendor,
               ),
-            
+
             // Search bar
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -816,7 +742,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 onSubmitted: _searchProducts,
               ),
             ),
-            
+
             // Loading indicator or error message
             if (_isLoading)
               Expanded(
@@ -834,7 +760,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               Expanded(
                 child: GridView.builder(
                   controller: _scrollController,
-                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, _getBottomPadding()), // Add bottom padding when FAB is present
+                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0,
+                      _getBottomPadding()), // Add bottom padding when FAB is present
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 0.65,

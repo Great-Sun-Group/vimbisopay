@@ -438,7 +438,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_vendor == null) return const SizedBox.shrink();
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       child: Column(
         children: [
           // Store information section
@@ -926,7 +926,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 // Product info
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -937,7 +937,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Text(
                         _product!.description,
                         style: const TextStyle(
