@@ -42,7 +42,8 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    // Initialize with index 0 (Products tab) to default to browse mode
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     // Add listener to track tab changes
     _tabController.addListener(_handleTabChange);
     _loadVendorData();

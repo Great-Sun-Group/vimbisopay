@@ -43,7 +43,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
-  bool _showBrowseMode = false; // Always default to store mode for vendors
+  bool _showBrowseMode = true; // Always default to browse mode for vendors
 
   @override
   void initState() {
