@@ -14,6 +14,8 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_prof
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
+import 'package:vimbisopay_app/presentation/helpers/store_information_helper.dart';
+import 'package:flutter/rendering.dart'; // For ScrollDirection
 
 /// Store Information Screen for the VimbisoPay app.
 ///
@@ -46,6 +48,9 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   final DatabaseHelper _databaseHelper = ServiceLocator.databaseHelper;
   final StoreStatusService _storeStatusService = ServiceLocator.storeStatusService;
   
+  // Scroll controller for FAB visibility
+  late ScrollController _scrollController;
+  
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isUpdatingStoreStatus = false;
@@ -57,11 +62,16 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   String? _profileThumbnailUrl;
   bool _storeOpen = false;
   String? _operationsAccountId;
+  bool _isFabVisible = true; // Track FAB visibility
 
   @override
   void initState() {
     super.initState();
     Logger.lifecycle('StoreInformationScreen initialized');
+    
+    // Initialize scroll controller
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
     
     // Initially set loading to false until we determine if we need to show the loading indicator
     setState(() {
@@ -107,11 +117,36 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       }
     });
   }
+  
+  void _scrollListener() {
+    // Show/hide FAB based on scroll direction
+    if (_scrollController.hasClients) {
+      if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        // Scrolling down - hide FAB
+        if (_isFabVisible) {
+          setState(() => _isFabVisible = false);
+        }
+      } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward ||
+                (_scrollController.hasClients && _scrollController.position.pixels == 0)) {
+        // Scrolling up or at the top - show FAB
+        if (!_isFabVisible) {
+          setState(() => _isFabVisible = true);
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     Logger.lifecycle('StoreInformationScreen disposed');
     super.dispose();
+  }
+  
+  /// Helper method to get bottom padding based on FAB visibility
+  double _getBottomPadding() {
+    return widget.isOwner && _isFabVisible ? 80.0 : 16.0;
   }
 
   /// Loads cached store data from the database
@@ -454,21 +489,35 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               : _vendor != null
                   ? _buildStoreProfile()
                   : const Center(child: CircularProgressIndicator()), // Fallback if vendor is null
-      // Add FloatingActionButton here, only visible if user is the owner AND products list is not empty
+      // Add FloatingActionButton here with animation
       floatingActionButton: (widget.isOwner && _products.isNotEmpty)
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/vendor-sales-tab',
-                  arguments: {
-                    'vendorId': widget.storeId,
-                  },
-                );
-              },
-              icon: const Icon(Icons.point_of_sale),
-              label: const Text('New Sale'),
-              backgroundColor: AppColors.primary,
+          ? AnimatedOpacity(
+              opacity: _isFabVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                transform: Matrix4.translationValues(
+                  0, 
+                  _isFabVisible ? 0 : 100, // Move down when hidden
+                  0
+                ),
+                child: FloatingActionButton.extended(
+                  onPressed: _isFabVisible 
+                    ? () {
+                        Navigator.pushNamed(
+                          context,
+                          '/vendor-sales-tab',
+                          arguments: {
+                            'vendorId': widget.storeId,
+                          },
+                        );
+                      }
+                    : null, // Disable button when hidden
+                  icon: const Icon(Icons.point_of_sale),
+                  label: const Text('New Sale'),
+                  backgroundColor: AppColors.primary,
+                ),
+              ),
             )
           : null,
     );
@@ -535,6 +584,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         await _loadFreshData();
       },
       child: CustomScrollView(
+        controller: _scrollController, // Use the scroll controller
         slivers: [
           _buildAppBar(vendor),
           SliverToBoxAdapter(
@@ -1179,6 +1229,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _products.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
+      padding: EdgeInsets.fromLTRB(0, 0, 0, _getBottomPadding()), // Add bottom padding based on FAB visibility
       itemBuilder: (context, index) {
         final product = _products[index];
         return _buildProductListItem(product);

@@ -45,7 +45,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   double? _latitude;
   double? _longitude;
   bool _isRequestingLocation = false;
-  bool _showBrowseMode = true; // Default to browse mode for vendors
+  bool _showBrowseMode = false; // Default to My Store mode for vendors
   bool _isFabVisible = true; // Track FAB visibility
 
   @override
