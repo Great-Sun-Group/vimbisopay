@@ -151,3 +151,6 @@ Example entry format:
 -e 
 ## [1.0.0+48] - 2025-04-03
 - Cleaned up market place workflows
+-e 
+## [1.0.0+49] - 2025-04-03
+- Added offline handling and ui clean ups
