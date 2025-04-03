@@ -15,6 +15,7 @@ import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/connectivity_service.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class ServiceLocator {
@@ -34,6 +35,7 @@ class ServiceLocator {
   static RemoteConfigService? _remoteConfigService;
   static AppUpdateService? _appUpdateService;
   static ConfigManager? _configManager;
+  static ConnectivityService? _connectivityService;
   
   static final PasswordService _passwordService = PasswordService(
     securityService: _securityService,
@@ -73,6 +75,14 @@ class ServiceLocator {
   static LocationService get locationService => _locationService;
   static StoreStatusService get storeStatusService => _storeStatusService;
   static FirebaseAnalytics get analytics => _analytics;
+  
+  // Getter for ConnectivityService with lazy initialization
+  static ConnectivityService get connectivityService {
+    if (_connectivityService == null) {
+      throw Exception('ConnectivityService not initialized. Call initializeConnectivityService() first.');
+    }
+    return _connectivityService!;
+  }
   
   // Getter for FeatureFlagService with lazy initialization
   static FeatureFlagService get featureFlagService {
@@ -145,6 +155,17 @@ class ServiceLocator {
     await _configManager!.initialize();
     
     return _configManager!;
+  }
+  
+  // Initialize ConnectivityService
+  static Future<ConnectivityService> initializeConnectivityService() async {
+    if (_connectivityService != null) {
+      return _connectivityService!;
+    }
+    
+    _connectivityService = ConnectivityService();
+    await _connectivityService!.initialize();
+    return _connectivityService!;
   }
   
   // API configuration

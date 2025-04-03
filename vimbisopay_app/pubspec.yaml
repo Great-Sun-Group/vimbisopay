@@ -44,6 +44,7 @@ dependencies:
   package_info_plus: ^4.2.0  # For app version information
   device_info_plus: ^9.1.1   # For device information
   geolocator: ^13.0.3
+  connectivity_plus: ^5.0.2  # For monitoring network connectivity
 dev_dependencies:
   flutter_test:
     sdk: flutter

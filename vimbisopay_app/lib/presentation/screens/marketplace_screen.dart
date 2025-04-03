@@ -487,6 +487,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     });
 
     try {
+      // Check connectivity first
+      final connectivityService = ServiceLocator.connectivityService;
+      final isConnected = await connectivityService.checkConnectivity();
+      
+      if (!isConnected) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No internet connection. Please check your network settings and try again.';
+        });
+        return;
+      }
+      
       // Always use "a" as the default search query to ensure products are loaded
       final result = await _marketplaceRepository.searchProducts(
         'a', // Default search with "a" to get products
@@ -521,9 +533,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         },
       );
     } catch (e) {
+      // Check if this is a network error
+      final connectivityService = ServiceLocator.connectivityService;
+      final isNetworkError = connectivityService.isNetworkError(e);
+      
       setState(() {
         _isLoading = false;
-        _errorMessage = 'An unexpected error occurred: $e';
+        if (isNetworkError) {
+          _errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection.';
+        } else {
+          _errorMessage = 'An unexpected error occurred: $e';
+        }
       });
     }
   }
@@ -745,6 +765,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 child: MarketplaceStates.buildErrorState(
                   errorMessage: _errorMessage,
                   onRetry: _loadProducts,
+                  isNetworkError: _errorMessage.toLowerCase().contains('network') || 
+                                  _errorMessage.toLowerCase().contains('internet') ||
+                                  _errorMessage.toLowerCase().contains('connection') ||
+                                  _errorMessage.toLowerCase().contains('socket') ||
+                                  _errorMessage.toLowerCase().contains('host lookup') ||
+                                  _errorMessage.toLowerCase().contains('timeout'),
                 ),
               )
             // Product grid

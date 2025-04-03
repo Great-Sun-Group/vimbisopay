@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/widgets/network_error_widget.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A collection of widgets for displaying different states in the marketplace.
@@ -12,10 +14,28 @@ class MarketplaceStates {
   }
 
   /// Displays an error state with an error message and a retry button.
+  /// If isNetworkError is true, it will display an offline widget instead.
   static Widget buildErrorState({
     required String errorMessage,
     required VoidCallback onRetry,
+    bool isNetworkError = false,
   }) {
+    // Check if this is a network error
+    if (isNetworkError || 
+        errorMessage.toLowerCase().contains('network') ||
+        errorMessage.toLowerCase().contains('internet') ||
+        errorMessage.toLowerCase().contains('connection') ||
+        errorMessage.toLowerCase().contains('socket') ||
+        errorMessage.toLowerCase().contains('host lookup') ||
+        errorMessage.toLowerCase().contains('timeout')) {
+      // Use the OfflineWidget for network errors
+      return OfflineWidget(
+        onRetry: onRetry,
+        message: 'You are currently offline. Please check your internet connection and try again.',
+      );
+    }
+    
+    // Use the regular error widget for other errors
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

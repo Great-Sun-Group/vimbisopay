@@ -21,6 +21,7 @@ import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 
 class AccountRepositoryImpl implements AccountRepository {
@@ -229,7 +230,9 @@ class AccountRepositoryImpl implements AccountRepository {
         return Left(InfrastructureFailure(errorMessage));
       }
     } catch (e) {
-      return Left(InfrastructureFailure(e.toString()));
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
+      Logger.error('Error in loginV2', e);
+      return Left(InfrastructureFailure(userFriendlyMessage));
     }
   }
 
@@ -408,7 +411,9 @@ class AccountRepositoryImpl implements AccountRepository {
         Right.new,
       );
     } catch (e) {
-      return Left(InfrastructureFailure(e.toString()));
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
+      Logger.error('Error in _executeAuthenticatedRequest', e);
+      return Left(InfrastructureFailure(userFriendlyMessage));
     }
   }
 
@@ -581,7 +586,9 @@ class AccountRepositoryImpl implements AccountRepository {
       final user = await _databaseHelper.getUser();
       return Right(user);
     } catch (e) {
-      return Left(InfrastructureFailure(e.toString()));
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
+      Logger.error('Error in login', e);
+      return Left(InfrastructureFailure(userFriendlyMessage));
     }
   }
 

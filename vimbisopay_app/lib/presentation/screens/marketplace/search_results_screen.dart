@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/product.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/widgets/network_error_widget.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 class SearchResultsScreen extends StatefulWidget {
@@ -83,6 +84,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     });
 
     try {
+      // Check connectivity first
+      final connectivityService = ServiceLocator.connectivityService;
+      final isConnected = await connectivityService.checkConnectivity();
+      
+      if (!isConnected) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No internet connection. Please check your network settings and try again.';
+        });
+        return;
+      }
+      
       // Use searchProducts with the search query
       final result = await _marketplaceRepository.searchProducts(
         _searchController.text,
@@ -113,10 +126,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         },
       );
     } catch (e) {
+      // Check if this is a network error
+      final connectivityService = ServiceLocator.connectivityService;
+      final isNetworkError = connectivityService.isNetworkError(e);
+      
       Logger.error('[SEARCH_RESULTS] Error loading products', e);
       setState(() {
         _isLoading = false;
-        _errorMessage = 'An unexpected error occurred';
+        if (isNetworkError) {
+          _errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection.';
+        } else {
+          _errorMessage = 'An unexpected error occurred: $e';
+        }
       });
     }
   }
