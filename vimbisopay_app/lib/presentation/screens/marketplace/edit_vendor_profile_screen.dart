@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/vendor.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -426,7 +427,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: InlineLoadingAnimation(size: 80))
             : _errorMessage != null && _vendor == null
                 ? _buildErrorView()
                 : _buildForm(),
@@ -525,7 +526,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
                                 ? CachedNetworkImageProvider(_profileImageUrl!) as ImageProvider
                                 : null),
                         child: _isUploadingImage
-                            ? const CircularProgressIndicator()
+                            ? const InlineLoadingAnimation(size: 24)
                             : (_profileImageUrl == null && _selectedImageFile == null
                                 ? const Icon(
                                     Icons.person,

@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A screen for managing inventory for a vendor.
 ///
@@ -232,7 +233,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
         title: const Text('Inventory Management'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _errorMessage != null
               ? _buildErrorView()
               : _buildSkuList(),

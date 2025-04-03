@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/product.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String? initialQuery;
@@ -263,7 +264,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             if (_isLoading)
               const Expanded(
                 child: Center(
-                  child: CircularProgressIndicator(),
+                  child: InlineLoadingAnimation(size: 80),
                 ),
               )
             else if (_errorMessage.isNotEmpty)

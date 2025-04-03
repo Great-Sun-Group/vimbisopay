@@ -10,6 +10,7 @@ import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A screen that allows buyers to pay for invoices.
 ///
@@ -432,7 +433,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         title: const Text('Complete Payment'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _buildPaymentForm(),
       bottomNavigationBar: _buildBottomBar(),
     );

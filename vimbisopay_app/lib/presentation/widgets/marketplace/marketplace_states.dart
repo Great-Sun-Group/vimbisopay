@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A collection of widgets for displaying different states in the marketplace.
 class MarketplaceStates {
-  /// Displays a loading state with a circular progress indicator.
+  /// Displays a loading state with a Lottie animation.
   static Widget buildLoadingState() {
     return const Center(
-      child: CircularProgressIndicator(),
+      child: InlineLoadingAnimation(size: 80),
     );
   }
 
@@ -87,7 +88,7 @@ class MarketplaceStates {
       ),
       body: const SafeArea(
         child: Center(
-          child: CircularProgressIndicator(),
+          child: InlineLoadingAnimation(size: 80),
         ),
       ),
     );
