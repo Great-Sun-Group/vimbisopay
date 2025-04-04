@@ -6,6 +6,12 @@
   "settings": {
     "terminal.integrated.shell.linux": "/bin/bash"
   },
+  "runArgs": [
+    "--device=/dev/net/tun"
+  ],
+  "features": {
+    "ghcr.io/tailscale/codespace/tailscale": {}
+  },
   "extensions": [
     "Dart-Code.flutter",
     "redhat.java",
