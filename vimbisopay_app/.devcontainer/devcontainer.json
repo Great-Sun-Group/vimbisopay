@@ -10,7 +10,9 @@
     "--device=/dev/net/tun"
   ],
   "features": {
-    "ghcr.io/tailscale/codespace/tailscale": {}
+    "ghcr.io/tailscale/codespace/tailscale": {
+      "version": "latest"
+    }
   },
   "extensions": [
     "Dart-Code.flutter",
