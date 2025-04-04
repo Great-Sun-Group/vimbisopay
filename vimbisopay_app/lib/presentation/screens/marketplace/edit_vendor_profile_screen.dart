@@ -252,26 +252,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
           Logger.data('[EDIT_VENDOR] Found DIGITAL_ASSET account: ${digitalAssetAccount.accountName} (${digitalAssetAccount.accountID})');
         } catch (e) {
           Logger.error('[EDIT_VENDOR] Error finding DIGITAL_ASSET account', e);
-          
-          // Fallback: try to find by name
-          try {
-            final profilePicturesAccount = user.dashboard!.accountsInternal.firstWhere(
-              (account) => account.accountName == 'Profile Pictures',
-              orElse: () => throw Exception('No account named Profile Pictures'),
-            );
-            digitalAssetAccountId = profilePicturesAccount.accountID;
-            Logger.data('[EDIT_VENDOR] Found account by name: ${profilePicturesAccount.accountName} (${profilePicturesAccount.accountID})');
-          } catch (e) {
-            Logger.error('[EDIT_VENDOR] Error finding account by name', e);
-            
-            // Last resort: use the first account in the list
-            if (user.dashboard!.accountsInternal.isNotEmpty) {
-              digitalAssetAccountId = user.dashboard!.accountsInternal.first.accountID;
-              Logger.data('[EDIT_VENDOR] Using first available account: ${user.dashboard!.accountsInternal.first.accountName} (${user.dashboard!.accountsInternal.first.accountID})');
-            } else {
-              throw Exception('No internal accounts available');
-            }
-          }
+          throw Exception('No internal accounts available');
         }
       }
       

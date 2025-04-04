@@ -1,0 +1,17 @@
+{
+  "name": "Flutter Development Environment",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  "extensions": [
+    "Dart-Code.flutter",
+    "redhat.java",
+    "vscjava.vscode-java-pack",
+    "esbenp.prettier-vscode"
+  ],
+  "postCreateCommand": "flutter doctor && gradle -v && sdkmanager --list",
+  "remoteUser": "codespace"
+}

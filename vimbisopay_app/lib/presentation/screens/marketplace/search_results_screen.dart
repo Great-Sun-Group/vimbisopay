@@ -145,6 +145,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void _onSearch(String query) {
     _loadProducts();
   }
+  
+  /// Checks if the current error message is related to network connectivity.
+  bool _isNetworkError() {
+    final errorLower = _errorMessage.toLowerCase();
+    return errorLower.contains('network') || 
+           errorLower.contains('internet') ||
+           errorLower.contains('connection') ||
+           errorLower.contains('socket') ||
+           errorLower.contains('host lookup') ||
+           errorLower.contains('timeout');
+  }
 
   Widget _buildProductCard(Product product) {
     return Card(
@@ -291,31 +302,36 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             else if (_errorMessage.isNotEmpty)
               Expanded(
                 child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: AppColors.error,
+                  child: _isNetworkError() 
+                    ? OfflineWidget(
+                        onRetry: _loadProducts,
+                        message: 'You are currently offline. Please check your internet connection and try again.',
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: AppColors.error,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.error,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: _loadProducts,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Try Again'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.error,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: _loadProducts,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
                 ),
               )
             // Product grid

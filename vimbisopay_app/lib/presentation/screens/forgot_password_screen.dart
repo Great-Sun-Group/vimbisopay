@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'dart:async' show unawaited;
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -55,19 +56,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final phone = _phoneController.text;
 
     Logger.data('[ForgotPassword] Validating form fields');
-    
+
     setState(() {
       _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
 
       // Check if all required fields have valid values
-      final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
+      final hasValidPhone =
+          phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
 
       // Update form validity
       _isFormValid = hasValidPhone;
-          
-      Logger.data('[ForgotPassword] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
+
+      Logger.data(
+          '[ForgotPassword] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
       if (!_isFormValid) {
-        Logger.data('[ForgotPassword] Invalid fields: ${_fieldErrors.entries.where((e) => e.value != null).map((e) => e.key).join(', ')}');
+        Logger.data(
+            '[ForgotPassword] Invalid fields: ${_fieldErrors.entries.where((e) => e.value != null).map((e) => e.key).join(', ')}');
       }
     });
   }
@@ -122,18 +126,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  void _showOtpVerification(String phone, String memberId, String token) {
+  void _showOtpVerification(String phone, String memberId) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => PasswordResetOTPFlow(
         phone: phone,
-        token: token,
         memberId: memberId,
         onVerificationComplete: (OtpVerificationResponse response) {
           // Close OTP dialog
           Navigator.pop(context);
-          
           // Show reset password bottom sheet
           showModalBottomSheet(
             context: context,
@@ -153,7 +155,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  void _showError(String message) {
+  void _showError(String message, {String title = 'Error'}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -162,9 +164,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            'Error',
-            style: TextStyle(color: AppColors.error),
+          title: Text(
+            title,
+            style: const TextStyle(color: AppColors.error),
           ),
           content: Text(
             message,
@@ -173,7 +175,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+              child:
+                  const Text('OK', style: TextStyle(color: AppColors.primary)),
             ),
           ],
         );
@@ -185,23 +188,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Future<void> _handleSubmit() async {
     Logger.interaction('[ForgotPassword] Submit button pressed');
-    
+
     // Validate form first
     setState(() {
       _touchedFields.add('phone');
     });
-    
+
     _validateForm();
     _formKey.currentState!.validate();
-    
+
     if (!_isFormValid) {
-      Logger.data('[ForgotPassword] Form validation failed, aborting submission');
+      Logger.data(
+          '[ForgotPassword] Form validation failed, aborting submission');
       return;
     }
 
     // Dismiss keyboard before showing dialog
     FocusScope.of(context).unfocus();
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -223,7 +227,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     try {
       final phoneNumber = '+${_phoneController.text}';
-      final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+      final sanitizedPhone =
+          PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
       final result = await _repository.requestOtp(
         phone: sanitizedPhone,
         purpose: 'PASSWORD_RESET',
@@ -244,19 +249,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       result.fold(
         (failure) {
           cleanup();
-          _showError(failure.message ?? 'Failed to send reset instructions. Please try again.');
+          // Use the failure message if available, otherwise translate the error
+          final errorMessage =
+              failure.message ?? ErrorTranslator.translateError(failure);
+          _showError(errorMessage);
         },
         (response) {
           cleanup();
           final memberId = response['data']?['action']?['details']?['memberID'];
-          final token = response['data']?['action']?['details']?['token'];
-          if (memberId == null || token == null) {
+          if (memberId == null) {
             _showError('Failed to get required information from response');
             return;
           }
-          Logger.data('[ForgotPassword] Got memberId and token from response');
+          Logger.data('[ForgotPassword] Got memberIdfrom response');
           // Show OTP verification dialog with memberId and token
-          _showOtpVerification(sanitizedPhone, memberId, token);
+          _showOtpVerification(sanitizedPhone, memberId);
         },
       );
     } catch (e) {
@@ -266,7 +273,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         setState(() {
           _isLoading = false;
         });
-        _showError('Failed to send reset instructions. Please try again.');
+        _showError(ErrorTranslator.translateError(e));
       }
     }
   }
@@ -309,7 +316,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone),
-                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                            helperText:
+                                'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
                             helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.phone,
@@ -336,12 +344,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       const SizedBox(height: 24),
                       FilledButton(
-                        onPressed: _isFormValid && !_isLoading ? _handleSubmit : null,
+                        onPressed:
+                            _isFormValid && !_isLoading ? _handleSubmit : null,
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50),
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.textPrimary,
-                          disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                          disabledBackgroundColor:
+                              AppColors.primary.withOpacity(0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -352,7 +362,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.textPrimary),
                                 ),
                               )
                             : const Text(
