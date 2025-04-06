@@ -9,7 +9,6 @@ help:
 	@echo "  diff <from_branch> <to_branch>  - Generate diff between two branches"
 	@echo "    Example: make diff project dev"
 	@echo "  update-swagger                  - Fetch and format latest Swagger API docs"
-	@echo "  webapp                          - Run the Flutter web app"
 
 # Diff target that takes two branch parameters
 diff:
@@ -28,15 +27,8 @@ update-swagger:
 	@curl -s https://docs.mycredex.app/develop/swagger.json/ | jq '.' >> api-docs/swagger.json
 	@echo "Swagger docs updated in api-docs/swagger.json"
 
-# Run the Flutter web app
-webapp:
-	@echo "Enabling Flutter web support..."
-	@flutter config --enable-web
-	@echo "Starting Flutter web app on server..."
-	@cd vimbisopay_app && flutter run -d web-server --web-hostname=0.0.0.0 --web-port=8080
-
 # Catch-all target to handle the branch parameters
 %:
 	@:
 
-.PHONY: help diff update-swagger webapp
+.PHONY: help diff update-swagger
