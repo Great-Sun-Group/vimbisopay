@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
@@ -184,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showErrorDialog(String message) {
+  void _showErrorDialog(String message, {String title = 'Login Failed'}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -204,9 +205,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.error,
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Login Failed',
-                  style: TextStyle(
+                Text(
+                  title,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -382,7 +383,7 @@ class _LoginScreenState extends State<LoginScreen> {
           
           v1Result.fold(
             (v1Failure) {
-              _showErrorDialog('Failed to initialize verification. Please try again.');
+              _showErrorDialog(ErrorTranslator.translateError(v1Failure));
             },
             (v1User) async {
               // Request OTP with loading dialog
@@ -405,7 +406,7 @@ class _LoginScreenState extends State<LoginScreen> {
     
               otpResult.fold(
                 (otpFailure) {
-                  _showErrorDialog('Failed to send verification code.');
+                  _showErrorDialog(ErrorTranslator.translateError(otpFailure));
                 },
                 (_) {
                   // Show success dialog
@@ -437,9 +438,9 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           );
         } else {
-          _showErrorDialog(
-            'We couldn\'t log you in. Please check your phone number and password, then try again.',
-          );
+          // Use the failure message if available, otherwise translate the error
+          final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
+          _showErrorDialog(errorMessage);
         }
       },
       (user) async {
@@ -470,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           otpResult.fold(
             (otpFailure) {
-              _showErrorDialog('Failed to send verification code.');
+              _showErrorDialog(ErrorTranslator.translateError(otpFailure));
             },
             (_) {
               // Show OTP verification flow

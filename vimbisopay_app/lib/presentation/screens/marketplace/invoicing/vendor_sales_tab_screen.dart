@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/presentation/models/sales_basket.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/invoice_generation_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/marketplace/basket_item_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/marketplace/product_selection_card.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A screen that allows vendors to create a new sales transaction.
 ///
@@ -331,7 +332,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _errorMessage.isNotEmpty
               ? _buildErrorView()
               : _buildTabView(),

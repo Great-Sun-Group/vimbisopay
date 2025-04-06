@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 class OTPVerificationFlow extends StatefulWidget {
   final String token;
@@ -96,7 +97,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
               _error = reason;
               Logger.data('[VERIFY_OTP] Rate limited: $reason');
             } else {
-              _error = failure.message ?? 'Failed to verify OTP';
+              _error = failure.message ?? ErrorTranslator.translateError(failure);
             }
             _isLoading = false;
           });
@@ -165,7 +166,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
                   Logger.error('Failed to set initial password', failure);
                   Navigator.of(dialogContext).pop();
                   setState(() {
-                    _error = failure.message ?? 'Failed to set password';
+                    _error = failure.message ?? ErrorTranslator.translateError(failure);
                     _isLoading = false;
                   });
                 },
@@ -185,7 +186,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
             if (!mounted) return;
             Navigator.of(dialogContext).pop();
             setState(() {
-              _error = 'Failed to complete verification';
+              _error = ErrorTranslator.translateError(e);
               _isLoading = false;
             });
           }
@@ -196,7 +197,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
       if (!mounted) return;
       Navigator.of(dialogContext).pop();
       setState(() {
-        _error = 'An error occurred while verifying OTP';
+        _error = ErrorTranslator.translateError(e);
         _isLoading = false;
       });
     }
@@ -241,7 +242,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
               _error = reason;
               Logger.data('[RESEND_OTP] Rate limited: $reason');
             } else {
-              _error = failure.message ?? 'Failed to resend OTP';
+              _error = failure.message ?? ErrorTranslator.translateError(failure);
             }
           });
         },
@@ -257,7 +258,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'An error occurred while resending OTP';
+        _error = ErrorTranslator.translateError(e);
       });
     } finally {
       if (mounted) {

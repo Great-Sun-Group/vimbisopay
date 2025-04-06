@@ -31,6 +31,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/presentation/widgets/connectivity_banner.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -152,6 +153,11 @@ void main() async {
     print('Initializing NotificationService...');
     final notificationService = ServiceLocator.notificationService;
     
+    // Initialize ConnectivityService
+    print('Initializing ConnectivityService...');
+    await ServiceLocator.initializeConnectivityService();
+    print('ConnectivityService initialized successfully');
+    
     // Schedule full notification service initialization for after UI is rendered
     Future.delayed(const Duration(seconds: 1), () async {
       print('Completing NotificationService initialization in background...');
@@ -213,6 +219,19 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'VimbisoPay',
+        builder: (context, child) {
+          return Stack(
+            children: [
+              child!,
+              Positioned(
+                top: MediaQuery.of(context).padding.top, // Position below status bar
+                left: 0,
+                right: 0,
+                child: const ConnectivityBanner(),
+              ),
+            ],
+          );
+        },
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: const ColorScheme.dark(

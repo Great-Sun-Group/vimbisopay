@@ -13,6 +13,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_prof
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// Vendor Profile Screen for the VimbisoPay app.
 ///
@@ -287,7 +288,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _errorMessage.isNotEmpty
               ? _buildErrorView()
               : _buildVendorProfile(),
@@ -834,9 +835,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: InlineLoadingAnimation(size: 24),
                           )
                         : Switch(
                             value: _storeOpen,
@@ -1133,7 +1132,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         placeholder: (context, url) => Container(
           color: AppColors.grey200,
           child: const Center(
-            child: CircularProgressIndicator(),
+            child: InlineLoadingAnimation(size: 40),
           ),
         ),
         errorWidget: (context, url, error) => Container(
@@ -1223,7 +1222,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
         fit: BoxFit.cover,
         placeholder: (context, url) => placeholder ?? Container(
           color: AppColors.grey200,
-          child: const Center(child: CircularProgressIndicator()),
+          child: const Center(child: InlineLoadingAnimation(size: 40)),
         ),
         errorWidget: (context, url, error) {
           Logger.error('[VENDOR_PROFILE] Error loading remote image: $url', error);

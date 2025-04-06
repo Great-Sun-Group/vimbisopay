@@ -15,6 +15,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_ed
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 import 'package:vimbisopay_app/presentation/helpers/store_information_helper.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:flutter/rendering.dart'; // For ScrollDirection
 
 /// Store Information Screen for the VimbisoPay app.
@@ -529,14 +530,14 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _errorMessage.isNotEmpty && _vendor == null
               ? _buildErrorView()
               : _vendor != null
                   ? _buildStoreProfile()
                   : const Center(
                       child:
-                          CircularProgressIndicator()), // Fallback if vendor is null
+                          InlineLoadingAnimation(size: 80)), // Fallback if vendor is null
       // Add FloatingActionButton here with animation
       floatingActionButton: (widget.isOwner && _products.isNotEmpty)
           ? AnimatedOpacity(
@@ -617,7 +618,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
+            InlineLoadingAnimation(size: 80),
             SizedBox(height: 16),
             Text('Loading store information...'),
           ],
@@ -648,8 +649,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                         child: SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                          child: InlineLoadingAnimation(
+                            size: 24,
                           ),
                         ),
                       ),
@@ -1118,8 +1119,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                            child: InlineLoadingAnimation(
+                              size: 24,
                             ),
                           )
                         : Switch(
@@ -1326,7 +1327,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         placeholder: (context, url) => Container(
           color: AppColors.grey200,
           child: const Center(
-            child: CircularProgressIndicator(),
+            child: InlineLoadingAnimation(size: 40),
           ),
         ),
         errorWidget: (context, url, error) => Container(
@@ -1420,7 +1421,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
             placeholder ??
             Container(
               color: AppColors.grey200,
-              child: const Center(child: CircularProgressIndicator()),
+              child: const Center(child: InlineLoadingAnimation(size: 40)),
             ),
         errorWidget: (context, url, error) {
           Logger.error('[STORE_INFO] Error loading remote image: $url', error);

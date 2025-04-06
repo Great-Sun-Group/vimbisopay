@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logger/logger.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/error/exceptions.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
@@ -99,9 +100,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         },
       );
     } catch (e) {
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
       emit(state.copyWith(
         status: HomeStatus.error,
-        error: 'Failed to initialize dashboard: ${e.toString()}',
+        error: 'Failed to initialize dashboard: $userFriendlyMessage',
       ));
     }
   }
@@ -198,18 +200,20 @@ Dashboard refresh stats:
               processingCredexIds: state.processingCredexIds, // Preserve processing state
             ));
           } catch (e) {
+            final userFriendlyMessage = ErrorTranslator.translateError(e);
             _logger.e('Error saving user or updating state: $e');
             emit(state.copyWith(
               status: HomeStatus.error,
-              error: 'Failed to update dashboard data',
+              error: 'Failed to update dashboard data: $userFriendlyMessage',
             ));
           }
         },
       );
     } catch (e) {
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
       emit(state.copyWith(
         status: HomeStatus.error,
-        error: 'Failed to refresh dashboard: ${e.toString()}',
+        error: 'Failed to refresh dashboard: $userFriendlyMessage',
       ));
     }
   }
@@ -298,7 +302,9 @@ Dashboard refresh stats:
                 success = true;
               }
             } else {
+              final userFriendlyMessage = ErrorTranslator.translateError(e);
               _logger.e('Error fetching more entries: $e');
+              add(HomeErrorOccurred('Error loading more entries: $userFriendlyMessage'));
               success = true;
             }
           }
@@ -310,8 +316,9 @@ Dashboard refresh stats:
         }
       }
     } catch (e, stackTrace) {
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
       _logger.e('Error in _onHomeLoadMoreStarted: $e\n$stackTrace');
-      add(const HomeErrorOccurred('Failed to load more entries'));
+      add(HomeErrorOccurred('Failed to load more entries: $userFriendlyMessage'));
     }
   }
 
@@ -362,7 +369,8 @@ Dashboard refresh stats:
     result.fold(
       (failure) {
         // On failure, remove from processing state
-        add(const HomeErrorOccurred('Failed to accept Credex'));
+        final userFriendlyMessage = ErrorTranslator.translateError(failure);
+        add(HomeErrorOccurred('Failed to accept Credex: $userFriendlyMessage'));
         emit(state.copyWith(
           processingCredexIds: state.processingCredexIds.where((id) => id != event.credexId).toList(),
         ));
@@ -393,7 +401,8 @@ Dashboard refresh stats:
     result.fold(
       (failure) {
         // On failure, remove all from processing state
-        add(const HomeErrorOccurred('Failed to accept Credex transactions'));
+        final userFriendlyMessage = ErrorTranslator.translateError(failure);
+        add(HomeErrorOccurred('Failed to accept Credex transactions: $userFriendlyMessage'));
         emit(state.copyWith(
           processingCredexIds: state.processingCredexIds.where((id) => !event.credexIds.contains(id)).toList(),
         ));
@@ -418,7 +427,10 @@ Dashboard refresh stats:
     ));
     final result = await accountRepository.cancelCredex(event.credexId);
     result.fold(
-      (failure) => add(const HomeErrorOccurred('Failed to cancel Credex')),
+      (failure) {
+        final userFriendlyMessage = ErrorTranslator.translateError(failure);
+        add(HomeErrorOccurred('Failed to cancel Credex: $userFriendlyMessage'));
+      },
       (_) {
         emit(state.copyWith(
           status: HomeStatus.success,
@@ -586,8 +598,9 @@ Dashboard refresh stats:
 
             await result.fold(
               (failure) async {
+                final userFriendlyMessage = ErrorTranslator.translateError(failure);
                 _logger.e('Failed to fetch new entries for account ${account.accountID}: ${failure.toString()}');
-                errors.add('Failed to load new entries for ${account.accountName}');
+                errors.add('Failed to load new entries for ${account.accountName}: $userFriendlyMessage');
                 success = true; // Don't retry on non-rate-limit failures
               },
               (entries) async {
@@ -630,8 +643,9 @@ Dashboard refresh stats:
                 success = true;
               }
             } else {
+              final userFriendlyMessage = ErrorTranslator.translateError(e);
               _logger.e('Error fetching entries: $e');
-              errors.add('Error loading entries for ${account.accountName}: ${e.toString()}');
+              errors.add('Error loading entries for ${account.accountName}: $userFriendlyMessage');
               success = true;
             }
           }
@@ -650,8 +664,9 @@ Dashboard refresh stats:
         ));
       }
     } catch (e, stackTrace) {
+      final userFriendlyMessage = ErrorTranslator.translateError(e);
       _logger.e('Error in _loadLedgerData: $e\n$stackTrace');
-      add(const HomeErrorOccurred('Failed to load ledger data'));
+      add(HomeErrorOccurred('Failed to load ledger data: $userFriendlyMessage'));
     }
   }
 

@@ -153,6 +153,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         // Prepare request data
         final requestBody = jsonEncode({
           'vendor': true,
+          'storeAccountName': 'Mimies pies',
+          'storeAccountHandle': 'myStore-88',
+
         });
         Logger.data('[MARKETPLACE] Request body: $requestBody');
 
@@ -322,115 +325,63 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         '[MARKETPLACE] Profile image URL: ${profileImageUrl ?? 'null'}');
     Logger.data('[MARKETPLACE] Banner image URL: ${bannerImageUrl ?? 'null'}');
 
-    return _executeAuthenticatedRequest<Vendor>(
-      request: (token) async {
-        // Prepare request data
-        final Map<String, dynamic> requestBody = {
-          'memberId': memberId,
-          'businessName': businessName,
-          'description': description,
-          'email': email,
-          'phone': phone,
-        };
-
-        if (profileImageUrl != null)
-          requestBody['profileImageUrl'] = profileImageUrl;
-        if (bannerImageUrl != null)
-          requestBody['bannerImageUrl'] = bannerImageUrl;
-
-        final requestBodyJson = jsonEncode(requestBody);
-        Logger.data('[MARKETPLACE] Request body: $requestBodyJson');
-
-        // Call the API endpoint to create vendor
-        Logger.data(
-            '[MARKETPLACE] Sending POST request to $_baseUrl/createVendor');
-        final response = await _loggedRequest(
-          () => _httpClient.post(
-            Uri.parse('$_baseUrl/createVendor'),
-            headers: _authHeaders(token),
-            body: requestBodyJson,
-          ),
-          '$_baseUrl/createVendor',
-          'POST',
-          headers: _authHeaders(token),
-          body: requestBodyJson,
-        );
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          // Parse the response body
-          final responseData = jsonDecode(response.body);
-          Logger.data('[MARKETPLACE] Response data received successfully');
-
-          // Extract vendor details from the response
-          try {
-            if (responseData.containsKey('data') &&
-                responseData['data'] is Map<String, dynamic> &&
-                responseData['data'].containsKey('vendor')) {
-              final vendorData =
-                  responseData['data']['vendor'] as Map<String, dynamic>;
-
-              final vendor = Vendor(
-                id: vendorData['id'] ?? memberId,
-                memberId: vendorData['memberId'] ?? memberId,
-                businessName: vendorData['businessName'] ?? businessName,
-                description: vendorData['description'] ?? description,
-                email: vendorData['email'] ?? email,
-                phone: vendorData['phone'] ?? phone,
-                profileImageUrl:
-                    vendorData['profileImageUrl'] ?? profileImageUrl,
-                bannerImageUrl: vendorData['bannerImageUrl'] ?? bannerImageUrl,
-                rating: (vendorData['rating'] as num?)?.toDouble() ?? 0.0,
-                ratingCount: vendorData['ratingCount'] as int? ?? 0,
-                isActive: vendorData['isActive'] as bool? ?? true,
-                createdAt: vendorData['createdAt'] != null
-                    ? DateTime.parse(vendorData['createdAt'])
-                    : DateTime.now(),
-                updatedAt: vendorData['updatedAt'] != null
-                    ? DateTime.parse(vendorData['updatedAt'])
-                    : DateTime.now(),
-              );
-
-              stopwatch.stop();
-              Logger.performance(
-                  '[MARKETPLACE] createVendor completed successfully in ${stopwatch.elapsedMilliseconds}ms');
-              return Right(vendor);
-            } else {
-              // If vendor data not found in response, create a temporary vendor object
-              final now = DateTime.now();
-              final vendor = Vendor(
-                id: memberId,
-                memberId: memberId,
-                businessName: businessName,
-                description: description,
-                email: email,
-                phone: phone,
-                profileImageUrl: profileImageUrl,
-                bannerImageUrl: bannerImageUrl,
-                rating: 0.0,
-                ratingCount: 0,
-                isActive: true,
-                createdAt: now,
-                updatedAt: now,
-              );
-
-              stopwatch.stop();
-              Logger.performance(
-                  '[MARKETPLACE] createVendor completed with temporary vendor in ${stopwatch.elapsedMilliseconds}ms');
-              return Right(vendor);
-            }
-          } catch (e) {
-            Logger.error(
-                '[MARKETPLACE] Error parsing vendor data from response', e);
-            return Left(ServerFailure('Failed to parse vendor data: $e'));
-          }
-        } else {
-          Logger.error(
-              '[MARKETPLACE] Server error with status code ${response.statusCode}');
-          return Left(
-              ServerFailure('Failed to create vendor: ${response.body}'));
-        }
-      },
+    // Step 1: Enable vendor functionality using sellInMarket
+    Logger.data('[MARKETPLACE] Step 1: Enabling vendor functionality using sellInMarket');
+    final enableResult = await enableVendorFunctionality();
+    
+    if (enableResult.isLeft()) {
+      final failure = enableResult.fold(
+        (failure) => failure,
+        (_) => ServerFailure('Failed to enable vendor functionality'),
+      );
+      Logger.error('[MARKETPLACE] Failed to enable vendor functionality: ${failure.message}');
+      return Left(failure);
+    }
+    
+    Logger.data('[MARKETPLACE] Vendor functionality enabled successfully');
+    
+    // Step 2: Update member with vendor details using editMember
+    Logger.data('[MARKETPLACE] Step 2: Updating member with vendor details using editMember');
+    final updateResult = await updateMemberWithVendorDetails(
+      firstname: null, // Not updating these fields
+      lastname: null,  // Not updating these fields
+      memberHandle: null, // Not updating these fields
+      vendorBio: description, // Use the description as vendor bio
     );
+    
+    if (updateResult.isLeft()) {
+      final failure = updateResult.fold(
+        (failure) => failure,
+        (_) => ServerFailure('Failed to update member with vendor details'),
+      );
+      Logger.error('[MARKETPLACE] Failed to update member with vendor details: ${failure.message}');
+      return Left(failure);
+    }
+    
+    Logger.data('[MARKETPLACE] Member updated with vendor details successfully');
+    
+    // If both operations were successful, create a Vendor object
+    final now = DateTime.now();
+    final vendor = Vendor(
+      id: memberId,
+      memberId: memberId,
+      businessName: businessName,
+      description: description,
+      email: email,
+      phone: phone,
+      profileImageUrl: profileImageUrl,
+      bannerImageUrl: bannerImageUrl,
+      rating: 0.0,
+      ratingCount: 0,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    stopwatch.stop();
+    Logger.performance(
+        '[MARKETPLACE] createVendor completed successfully in ${stopwatch.elapsedMilliseconds}ms');
+    return Right(vendor);
   }
 
   @override

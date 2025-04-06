@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
@@ -109,7 +110,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     });
   }
 
-  void _showError(String message) {
+  void _showError(String message, {String title = 'Error'}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -118,9 +119,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            'Error',
-            style: TextStyle(color: AppColors.error),
+          title: Text(
+            title,
+            style: const TextStyle(color: AppColors.error),
           ),
           content: Text(
             message,
@@ -262,13 +263,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       result.fold(
         (failure) {
           cleanup();
-          _showError(failure.message ?? 'Failed to create account');
+          // Use the failure message if available, otherwise translate the error
+          final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
+          _showError(errorMessage);
         },
         (success) async {
           if (!success) {
             Logger.error('[CreateAccount] Account creation failed with success=false');
             cleanup();
-            _showError('Failed to create account. Please try again.');
+            _showError(ErrorTranslator.getGenericErrorMessage());
             return;
           }
 
@@ -331,7 +334,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   (failure) {
                     Logger.error('[CreateAccount] OTP request failed', failure);
                     cleanup();
-                    _showError('Failed to send verification code. Please try again.');
+                    _showError(ErrorTranslator.translateError(failure));
                   },
                   (_) {
                     Logger.interaction('[CreateAccount] OTP sent successfully');
@@ -385,7 +388,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       Logger.error('[CreateAccount] Unexpected error during account creation', e);
       if (mounted) {
         cleanup();
-        _showError('An unexpected error occurred. Please try again.');
+        _showError(ErrorTranslator.translateError(e));
       }
     }
   }
