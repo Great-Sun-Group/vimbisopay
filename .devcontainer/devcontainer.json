@@ -48,7 +48,7 @@
   "forwardPorts": [
     3000
   ],
-  "postCreateCommand": "flutter doctor && flutter pub add dio flutter_secure_storage jwt_decoder && mkdir -p lib/{api,models,services}",
+  "postCreateCommand": "flutter doctor && flutter pub add dio flutter_secure_storage jwt_decoder && mkdir -p lib/{api,models,services} && chmod +x /workspaces/vimbisopay/vimbisopay_app/scripts/setup-firebase-config.sh && /workspaces/vimbisopay/vimbisopay_app/scripts/setup-firebase-config.sh",
   "remoteUser": "vscode",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
