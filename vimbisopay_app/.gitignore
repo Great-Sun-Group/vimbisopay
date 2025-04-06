@@ -52,6 +52,19 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android native build files
+**/android/app/.cxx/
+**/android/app/.cxx/**/*.so
+**/android/app/.cxx/**/*.a
+**/android/app/.cxx/**/*.o
+**/android/app/.cxx/**/*.d
+**/android/app/.cxx/**/*.ninja
+**/android/app/.cxx/**/*.cmake
+**/android/app/.cxx/**/*.bin
+**/android/app/.cxx/**/*.json
+**/android/app/.cxx/**/*.txt
+**/android/app/.cxx/**/CMakeFiles/
+
 # Test coverage
 /coverage/
 
