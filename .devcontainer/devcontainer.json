@@ -18,7 +18,8 @@
         "Dart-Code.dart-code",
         "Dart-Code.flutter",
         "usernamehw.errorlens",
-        "saoudrizwan.claude-dev"
+        "saoudrizwan.claude-dev",
+        "bierner.markdown-mermaid"
       ],
       "settings": {
         "editor.formatOnSave": true,
