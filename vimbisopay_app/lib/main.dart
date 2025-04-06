@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:lottie/lottie.dart';
-import 'package:vimbisopay_app/firebase_options.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -41,9 +40,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     // Initialize Firebase for background handler
     print('Initializing Firebase in background handler...');
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp();
     print('Firebase initialized in background handler');
 
     print('''
@@ -119,9 +116,7 @@ void main() async {
 
     // Initialize Firebase first
     print('Initializing Firebase...');
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp();
     print('Firebase initialized successfully');
 
     // Initialize Firebase Analytics
