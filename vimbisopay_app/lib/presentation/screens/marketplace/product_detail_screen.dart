@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/vendor.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/store_information_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'dart:convert';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -861,7 +862,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_isLoading) {
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: InlineLoadingAnimation(size: 80),
         ),
       );
     }

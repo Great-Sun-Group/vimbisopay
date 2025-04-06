@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repos
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// Vendor Registration Screen for the VimbisoPay app.
 ///
@@ -177,7 +178,7 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: InlineLoadingAnimation(size: 80))
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Form(

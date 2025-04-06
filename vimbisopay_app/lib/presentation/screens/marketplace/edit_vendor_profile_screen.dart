@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/vendor.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -251,26 +252,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
           Logger.data('[EDIT_VENDOR] Found DIGITAL_ASSET account: ${digitalAssetAccount.accountName} (${digitalAssetAccount.accountID})');
         } catch (e) {
           Logger.error('[EDIT_VENDOR] Error finding DIGITAL_ASSET account', e);
-          
-          // Fallback: try to find by name
-          try {
-            final profilePicturesAccount = user.dashboard!.accountsInternal.firstWhere(
-              (account) => account.accountName == 'Profile Pictures',
-              orElse: () => throw Exception('No account named Profile Pictures'),
-            );
-            digitalAssetAccountId = profilePicturesAccount.accountID;
-            Logger.data('[EDIT_VENDOR] Found account by name: ${profilePicturesAccount.accountName} (${profilePicturesAccount.accountID})');
-          } catch (e) {
-            Logger.error('[EDIT_VENDOR] Error finding account by name', e);
-            
-            // Last resort: use the first account in the list
-            if (user.dashboard!.accountsInternal.isNotEmpty) {
-              digitalAssetAccountId = user.dashboard!.accountsInternal.first.accountID;
-              Logger.data('[EDIT_VENDOR] Using first available account: ${user.dashboard!.accountsInternal.first.accountName} (${user.dashboard!.accountsInternal.first.accountID})');
-            } else {
-              throw Exception('No internal accounts available');
-            }
-          }
+          throw Exception('No internal accounts available');
         }
       }
       
@@ -426,7 +408,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: InlineLoadingAnimation(size: 80))
             : _errorMessage != null && _vendor == null
                 ? _buildErrorView()
                 : _buildForm(),
@@ -525,7 +507,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
                                 ? CachedNetworkImageProvider(_profileImageUrl!) as ImageProvider
                                 : null),
                         child: _isUploadingImage
-                            ? const CircularProgressIndicator()
+                            ? const InlineLoadingAnimation(size: 24)
                             : (_profileImageUrl == null && _selectedImageFile == null
                                 ? const Icon(
                                     Icons.person,

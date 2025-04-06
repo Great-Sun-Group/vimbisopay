@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/models/sales_basket.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 /// A screen for generating invoices from a sales basket.
@@ -240,9 +241,8 @@ class _InvoiceGenerationScreenState extends State<InvoiceGenerationScreen> {
               ? const SizedBox(
                   height: 20,
                   width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                  child: InlineLoadingAnimation(
+                    size: 20,
                   ),
                 )
               : const Text('Generate Invoice'),

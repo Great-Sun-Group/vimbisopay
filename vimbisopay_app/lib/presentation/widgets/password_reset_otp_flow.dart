@@ -6,17 +6,16 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 class PasswordResetOTPFlow extends StatefulWidget {
   final String phone;
-  final String token;
   final String memberId;
   final Function(OtpVerificationResponse) onVerificationComplete;
 
   const PasswordResetOTPFlow({
     super.key,
     required this.phone,
-    required this.token,
     required this.memberId,
     required this.onVerificationComplete,
   });
@@ -57,8 +56,9 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
       ),
     );
 
+    // For PASSWORD_RESET purpose, we don't use the token
     final result = await _repository.verifyOtp(
-      token: widget.token,
+      token: '', // Empty token for PASSWORD_RESET
       otp: otp,
       purpose: 'PASSWORD_RESET',
       memberId: widget.memberId,
@@ -78,7 +78,7 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
             _error = reason;
             Logger.data('[VERIFY_OTP] Rate limited: $reason');
           } else {
-            _error = failure.message ?? 'Failed to verify code';
+            _error = failure.message ?? ErrorTranslator.translateError(failure);
           }
         });
       },
@@ -124,7 +124,7 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
             _error = reason;
             Logger.data('[RESEND_OTP] Rate limited: $reason');
           } else {
-            _error = failure.message ?? 'Failed to send code';
+            _error = failure.message ?? ErrorTranslator.translateError(failure);
           }
         });
       },

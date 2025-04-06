@@ -18,7 +18,6 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/presentation/constants/home_constants.dart';
 import 'package:vimbisopay_app/presentation/widgets/account_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
-import 'package:vimbisopay_app/presentation/widgets/loading_animation.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
@@ -753,7 +752,7 @@ Error reinitializing notification listeners:
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
-          child: LoadingAnimation(size: 100),
+          child: InlineLoadingAnimation(size: 80),
         ),
       );
     }
@@ -869,7 +868,7 @@ Error reinitializing notification listeners:
             return const Scaffold(
               backgroundColor: AppColors.background,
               body: Center(
-                child: LoadingAnimation(size: 100),
+                child: InlineLoadingAnimation(size: 80),
               ),
             );
           }

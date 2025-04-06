@@ -3,6 +3,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 class SetupPasswordDialog extends StatefulWidget {
   final String token;
@@ -111,7 +112,7 @@ class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
       result.fold(
         (failure) {
           setState(() {
-            _error = failure.message ?? 'Failed to set up password';
+            _error = failure.message ?? ErrorTranslator.translateError(failure);
             _isLoading = false;
           });
         },
@@ -133,7 +134,7 @@ class _SetupPasswordDialogState extends State<SetupPasswordDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'An error occurred: ${e.toString()}';
+        _error = ErrorTranslator.translateError(e);
         _isLoading = false;
       });
     }

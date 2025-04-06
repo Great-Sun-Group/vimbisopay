@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
 /// A screen for adding or editing a Product Account in the marketplace.
 ///
@@ -547,7 +548,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
         title: Text(_isEditing ? 'Edit Product Account' : 'Add Product Account'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: InlineLoadingAnimation(size: 80))
           : _buildForm(),
     );
   }
@@ -603,7 +604,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             const SizedBox(height: 16.0),
             Center(
               child: _isImageLoading || _isUploadingImage
-                  ? const CircularProgressIndicator()
+                  ? const InlineLoadingAnimation(size: 50)
                   : _buildImagePreview(),
             ),
             const SizedBox(height: 16.0),
@@ -691,7 +692,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
               width: 200,
               height: 200,
               color: Colors.grey[300],
-              child: const Center(child: CircularProgressIndicator()),
+              child: const Center(child: InlineLoadingAnimation(size: 40)),
             ),
             errorWidget: (context, url, error) => Container(
               width: 200,

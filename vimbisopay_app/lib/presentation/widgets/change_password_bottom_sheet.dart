@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
+import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 class ChangePasswordBottomSheet extends StatefulWidget {
   final String? resetToken;
@@ -112,7 +113,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
         success = result.fold(
           (failure) {
             setState(() {
-              _error = failure.message ?? 'Failed to change password';
+              _error = failure.message ?? ErrorTranslator.translateError(failure);
               _isLoading = false;
             });
             return false;
@@ -145,7 +146,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
         );
       } else {
         setState(() {
-          _error = 'Failed to change password';
+          _error = ErrorTranslator.getGenericErrorMessage();
           _isLoading = false;
         });
       }
@@ -153,7 +154,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
       Logger.error('Error changing password', e);
       if (mounted) {
         setState(() {
-          _error = 'Failed to change password. Please try again.';
+          _error = ErrorTranslator.translateError(e);
           _isLoading = false;
         });
       }
