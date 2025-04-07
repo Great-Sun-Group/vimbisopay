@@ -11,7 +11,13 @@ abstract class MarketplaceRepository {
   ///
   /// When enabled, creates required internal accounts if they don't exist.
   /// Returns true if successful, or a [Failure] if an error occurs.
-  Future<Either<Failure, bool>> enableVendorFunctionality();
+  /// 
+  /// [storeAccountName] The name of the store account to create
+  /// [storeAccountHandle] The handle for the store account (must be unique)
+  Future<Either<Failure, bool>> enableVendorFunctionality({
+    required String storeAccountName,
+    required String storeAccountHandle,
+  });
 
   /// Updates a member's profile with vendor details.
   ///

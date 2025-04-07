@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -56,6 +58,29 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
       }
     }
   }
+  
+  /// Generates a store handle from a business name
+  String _generateStoreHandle(String businessName) {
+    // Convert to lowercase
+    String handle = businessName.toLowerCase();
+    
+    // Replace spaces with hyphens
+    handle = handle.replaceAll(' ', '-');
+    
+    // Remove any special characters
+    handle = handle.replaceAll(RegExp(r'[^\w\-]'), '');
+    
+    // Add a random suffix to ensure uniqueness
+    final random = Random();
+    final suffix = random.nextInt(1000).toString().padLeft(3, '0');
+    
+    // Limit length and add suffix
+    if (handle.length > 20) {
+      handle = handle.substring(0, 20);
+    }
+    
+    return '$handle-$suffix';
+  }
 
   @override
   void dispose() {
@@ -76,7 +101,14 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
 
     try {
       // Step 1: Enable vendor functionality
-      final enableResult = await _marketplaceRepository.enableVendorFunctionality();
+      // Generate a store handle from the business name
+      final businessName = _businessNameController.text;
+      final storeHandle = _generateStoreHandle(businessName);
+      
+      final enableResult = await _marketplaceRepository.enableVendorFunctionality(
+        storeAccountName: businessName,
+        storeAccountHandle: storeHandle,
+      );
       
       final enableSuccess = await enableResult.fold(
         (failure) {

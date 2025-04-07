@@ -630,7 +630,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             ),
             const SizedBox(height: 8.0),
             const Text(
-              'Add an image of your product to make it more appealing to customers. The image will be uploaded to the product\'s account. For best results, use small images under 80KB.',
+              'Share an image of your product',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontStyle: FontStyle.italic,
@@ -782,7 +782,7 @@ class _AddEditSkuScreenState extends State<AddEditSkuScreen> {
             ),
             const SizedBox(height: 8.0),
             const Text(
-              'Note: Creating a product will automatically create an internal account for tracking inventory using the accounting-based system.',
+              'Note: Creating a product will automatically create an internal account for tracking sales and inventory.',
               style: TextStyle(
                 fontSize: 12.0,
                 fontStyle: FontStyle.italic,
