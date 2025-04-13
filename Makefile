@@ -9,6 +9,7 @@ help:
 	@echo "  diff <from_branch> <to_branch>  - Generate diff between two branches"
 	@echo "    Example: make diff project dev"
 	@echo "  update-swagger                  - Fetch and format latest Swagger API docs"
+	@echo "  coreclearforce                  - Clear client database state to start from scratch"
 
 # Diff target that takes two branch parameters
 diff:
@@ -27,8 +28,14 @@ update-swagger:
 	@curl -s https://docs.mycredex.app/develop/swagger.json/ | jq '.' >> api-docs/swagger.json
 	@echo "Swagger docs updated in api-docs/swagger.json"
 
+# Clear client database state
+coreclearforce:
+	@echo "Clearing client database state..."
+	@cd vimbisopay_app && dart run lib/scripts/clear_db.dart
+	@echo "Client database state cleared successfully."
+
 # Catch-all target to handle the branch parameters
 %:
 	@:
 
-.PHONY: help diff update-swagger
+.PHONY: help diff update-swagger coreclearforce
