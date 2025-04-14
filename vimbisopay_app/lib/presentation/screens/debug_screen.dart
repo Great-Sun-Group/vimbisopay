@@ -759,6 +759,11 @@ Received at: ${DateTime.now()}
         if (updateInfo != null) {
           _updateInfo = updateInfo;
           _updateStatus = 'Update available: ${updateInfo['latest_version']}';
+          
+          // Log additional information
+          Logger.data('Update priority: ${updateInfo['update_priority']}');
+          Logger.data('Update type: ${updateInfo['update_type']}');
+          Logger.data('Update required: ${updateInfo['update_required']}');
         } else {
           _updateStatus = 'No updates available';
         }
@@ -768,6 +773,7 @@ Received at: ${DateTime.now()}
         _checkingForUpdates = false;
         _updateStatus = 'Error checking for updates: $e';
       });
+      Logger.error('Error checking for updates', e);
     }
   }
   
