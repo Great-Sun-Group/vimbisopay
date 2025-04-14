@@ -154,3 +154,6 @@ Example entry format:
 -e 
 ## [1.0.0+49] - 2025-04-03
 - Added offline handling and ui clean ups
+-e 
+## [2.1.0+01] - 2025-04-14
+- testing app update
