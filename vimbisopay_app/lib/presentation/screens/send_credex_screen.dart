@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
@@ -55,10 +57,11 @@ class _SendCredexScreenState extends State<SendCredexScreen>
   bool _isAmountFirstEdit = true;
   String? _recipientAccountId;
   String? _statusMessage;
-  bool _isValidatingRecipient = false;
   StreamSubscription? _refreshSubscription;
   late final AnimationController _lottieController;
   late final AudioPlayer _audioPlayer;
+  Map<String, dynamic>? _verifiedAccountDetails;
+  bool _isVerifyingRecipient = false;
 
   int get _decimalPlaces => _selectedDenomination == Denomination.CXX ? 3 : 2;
 
@@ -178,11 +181,19 @@ class _SendCredexScreenState extends State<SendCredexScreen>
 
   void _setupRecipientListener() {
     _recipientController.addListener(() {
-      if (_recipientAccountId != null) {
+      if (_recipientAccountId != null || _verifiedAccountDetails != null) {
         setState(() {
           _recipientAccountId = null;
+          _verifiedAccountDetails = null;
         });
       }
+    });
+  }
+  
+  void _handleChangeRecipient() {
+    setState(() {
+      _recipientAccountId = null;
+      _verifiedAccountDetails = null;
     });
   }
 
@@ -357,39 +368,81 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     }
   }
 
-  Future<bool> _validateRecipient() async {
-    if (_recipientAccountId != null) return true;
+  Future<void> _verifyRecipient() async {
+    if (_recipientController.text.isEmpty) return;
 
     setState(() {
-      _isValidatingRecipient = true;
+      _isVerifyingRecipient = true;
       _errorMessage = null;
+      _verifiedAccountDetails = null;
     });
 
     try {
-      _updateStatus('Validating recipient account...');
+      _updateStatus('Verifying recipient account...');
 
-      final accountResult = await widget.accountRepository
-          .getAccountByHandle(_recipientController.text);
-
-      return accountResult.fold(
-        (failure) {
-          _showError(failure.message ?? 'Failed to validate recipient account');
-          return false;
-        },
-        (account) {
-          setState(() {
-            _recipientAccountId = account.id;
-          });
-          return true;
-        },
+      // Make a direct HTTP request to the API
+      final url = '${ApiConfig.baseUrl}/getAccountByHandle';
+      final user = await widget.databaseHelper.getUser();
+      
+      if (user == null) {
+        _showError('Not authenticated');
+        return;
+      }
+      
+      final headers = {
+        'Content-Type': 'application/json',
+        'x-client-api-key': ApiConfig.apiKey,
+        'Authorization': 'Bearer ${user.token}',
+      };
+      
+      final body = {'accountHandle': _recipientController.text};
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: json.encode(body),
       );
+      
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        
+        if (!jsonResponse.containsKey('data') ||
+            !jsonResponse['data'].containsKey('action') ||
+            !jsonResponse['data']['action'].containsKey('details')) {
+          _showError('Invalid response format');
+          return;
+        }
+        
+        final details = jsonResponse['data']['action']['details'];
+        
+        // Extract the fields we need directly from the response
+        final accountID = details['accountID'] as String?;
+        final accountName = details['accountName'] as String?;
+        final accountHandle = details['accountHandle'] as String?;
+        
+        if (accountID == null || accountName == null || accountHandle == null) {
+          _showError('Missing required account information');
+          return;
+        }
+        
+        setState(() {
+          _recipientAccountId = accountID;
+          _verifiedAccountDetails = {
+            'accountName': accountName,
+            'accountHandle': accountHandle,
+          };
+        });
+      } else {
+        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify recipient account';
+        _showError(errorMessage);
+      }
     } catch (e) {
       _showError(e.toString());
-      return false;
     } finally {
       if (mounted) {
         setState(() {
-          _isValidatingRecipient = false;
+          _isVerifyingRecipient = false;
+          _statusMessage = null;
         });
       }
     }
@@ -497,31 +550,26 @@ class _SendCredexScreenState extends State<SendCredexScreen>
     final balance = _availableBalance;
     final denom = _selectedDenomination.toString().split('.').last;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.account_balance_wallet,
-            size: 16,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Secured Balances:',
+          style: TextStyle(
             color: AppColors.textSecondary,
+            fontSize: 15,
           ),
-          const SizedBox(width: 8),
-          Text(
-            'Available: $balance $denom',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$balance $denom',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -559,117 +607,6 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                 children: [
                   _buildStatusMessage(),
                   _buildErrorMessage(),
-                  Card(
-                    color: AppColors.surface,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'From Account',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.senderAccount.accountName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            '@${widget.senderAccount.accountHandle}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          '@',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _recipientController,
-                          style: const TextStyle(color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                            labelText: 'Recipient Handle',
-                            labelStyle:
-                                const TextStyle(color: AppColors.textSecondary),
-                            hintText: 'Enter recipient handle',
-                            hintStyle: TextStyle(
-                                color: AppColors.textSecondary.withOpacity(0.5)),
-                            filled: true,
-                            fillColor: AppColors.surface,
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            suffixIcon: _isValidatingRecipient
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Padding(
-                                      padding: EdgeInsets.all(12.0),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            AppColors.primary),
-                                      ),
-                                    ),
-                                  )
-                                : _recipientAccountId != null
-                                    ? const Icon(Icons.check_circle,
-                                        color: AppColors.success)
-                                    : null,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter recipient handle';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _scanQRCode,
-                        icon: const Icon(Icons.qr_code_scanner,
-                            color: AppColors.primary),
-                        tooltip: 'Scan QR Code',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildBalanceIndicator(),
                   Row(
                     children: [
                       Expanded(
@@ -681,13 +618,21 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                               decimal: true),
                           style: const TextStyle(color: AppColors.textPrimary),
                           decoration: InputDecoration(
-                            labelText: 'Amount (${_selectedDenomination.toString().split('.').last})',
+                            labelText: 'Amount',
                             labelStyle:
                                 const TextStyle(color: AppColors.textSecondary),
                             filled: true,
                             fillColor: AppColors.surface,
                             border: OutlineInputBorder(
-                              borderSide: BorderSide.none,
+                              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -723,13 +668,21 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                           dropdownColor: AppColors.surface,
                           style: const TextStyle(color: AppColors.textPrimary),
                           decoration: InputDecoration(
-                            labelText: 'Currency',
+                            labelText: 'Denom',
                             labelStyle:
                                 const TextStyle(color: AppColors.textSecondary),
                             filled: true,
                             fillColor: AppColors.surface,
                             border: OutlineInputBorder(
-                              borderSide: BorderSide.none,
+                              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -743,14 +696,196 @@ class _SendCredexScreenState extends State<SendCredexScreen>
                               ),
                             );
                           }).toList(),
-                          onChanged: _handleDenominationChange,
+                          onChanged: null, // Making denom selector read-only
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  if (_verifiedAccountDetails == null) ...[
+                    // Show search/scan section only when no recipient is verified
+                    Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _recipientController,
+                            style: const TextStyle(color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              labelText: 'Recipient 💳 Handle',
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              hintText: 'Enter recipient handle',
+                              hintStyle: TextStyle(
+                                  color: AppColors.textSecondary.withOpacity(0.5)),
+                              filled: true,
+                              fillColor: AppColors.surface,
+                              border: OutlineInputBorder(
+                                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              suffixIcon: _isVerifyingRecipient
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: Padding(
+                                        padding: EdgeInsets.all(12.0),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                              AppColors.primary),
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter recipient handle';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _recipientController,
+                          builder: (context, value, child) {
+                            return ElevatedButton(
+                              onPressed: value.text.isEmpty || _isVerifyingRecipient
+                                  ? null
+                                  : _verifyRecipient,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.textPrimary,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              child: const Text('Verify'),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: _scanQRCode,
+                          icon: const Icon(Icons.qr_code_scanner,
+                              color: AppColors.primary),
+                          tooltip: 'Scan QR Code',
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    // Show verified recipient info with Change button
+                    Card(
+                      color: AppColors.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'To',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _handleChangeRecipient,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.primary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Change',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '💳 ${_verifiedAccountDetails!['accountName']}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '💳 ${_verifiedAccountDetails!['accountHandle']}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Card(
+                    color: AppColors.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'From',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '💳 ${widget.senderAccount.accountName}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '💳 ${widget.senderAccount.accountHandle}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _buildBalanceIndicator(),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : _handleSubmit,
+                    onPressed: (_isLoading || _verifiedAccountDetails == null) ? null : _handleSubmit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.textPrimary,
@@ -789,17 +924,18 @@ class _SendCredexScreenState extends State<SendCredexScreen>
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Ensure recipient has been verified
+    if (_verifiedAccountDetails == null || _recipientAccountId == null) {
+      _showError('Please verify the recipient account first');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      if (!await _validateRecipient()) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
       _updateStatus('Offering Secured Credex ...');
 
       final credexRequest = CredexRequest(
