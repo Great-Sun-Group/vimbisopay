@@ -10,6 +10,7 @@ help:
 	@echo "    Example: make diff project dev"
 	@echo "  update-swagger                  - Fetch and format latest Swagger API docs"
 	@echo "  coreclearforce                  - Clear client database state to start from scratch"
+	@echo "  app1                            - Run Flutter app on device at 127.0.0.1:6555"
 
 # Diff target that takes two branch parameters
 diff: _check_args
@@ -42,4 +43,8 @@ coreclearforce:
 %:
 	@:
 
-.PHONY: help diff update-swagger coreclearforce
+# Run Flutter app on device at 127.0.0.1:6555
+app1:
+	@cd vimbisopay_app && flutter run -d 127.0.0.1:6555
+
+.PHONY: help diff update-swagger coreclearforce app1
