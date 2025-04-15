@@ -144,18 +144,22 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> enableVendorFunctionality() async {
+  Future<Either<Failure, bool>> enableVendorFunctionality({
+    required String storeAccountName,
+    required String storeAccountHandle,
+  }) async {
     final stopwatch = Stopwatch()..start();
     Logger.data('[MARKETPLACE] Starting enableVendorFunctionality operation');
+    Logger.data('[MARKETPLACE] Store account name: $storeAccountName');
+    Logger.data('[MARKETPLACE] Store account handle: $storeAccountHandle');
 
     return _executeAuthenticatedRequest<bool>(
       request: (token) async {
         // Prepare request data
         final requestBody = jsonEncode({
           'vendor': true,
-          'storeAccountName': 'Mimies pies',
-          'storeAccountHandle': 'myStore-88',
-
+          'storeAccountName': storeAccountName,
+          'storeAccountHandle': storeAccountHandle,
         });
         Logger.data('[MARKETPLACE] Request body: $requestBody');
 
@@ -325,40 +329,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         '[MARKETPLACE] Profile image URL: ${profileImageUrl ?? 'null'}');
     Logger.data('[MARKETPLACE] Banner image URL: ${bannerImageUrl ?? 'null'}');
 
-    // Step 1: Enable vendor functionality using sellInMarket
-    Logger.data('[MARKETPLACE] Step 1: Enabling vendor functionality using sellInMarket');
-    final enableResult = await enableVendorFunctionality();
-    
-    if (enableResult.isLeft()) {
-      final failure = enableResult.fold(
-        (failure) => failure,
-        (_) => ServerFailure('Failed to enable vendor functionality'),
-      );
-      Logger.error('[MARKETPLACE] Failed to enable vendor functionality: ${failure.message}');
-      return Left(failure);
-    }
-    
-    Logger.data('[MARKETPLACE] Vendor functionality enabled successfully');
-    
-    // Step 2: Update member with vendor details using editMember
-    Logger.data('[MARKETPLACE] Step 2: Updating member with vendor details using editMember');
-    final updateResult = await updateMemberWithVendorDetails(
-      firstname: null, // Not updating these fields
-      lastname: null,  // Not updating these fields
-      memberHandle: null, // Not updating these fields
-      vendorBio: description, // Use the description as vendor bio
-    );
-    
-    if (updateResult.isLeft()) {
-      final failure = updateResult.fold(
-        (failure) => failure,
-        (_) => ServerFailure('Failed to update member with vendor details'),
-      );
-      Logger.error('[MARKETPLACE] Failed to update member with vendor details: ${failure.message}');
-      return Left(failure);
-    }
-    
-    Logger.data('[MARKETPLACE] Member updated with vendor details successfully');
+    // Note: The vendor functionality should already be enabled and member details updated
+    // by the time this method is called from VendorRegistrationScreen
+    Logger.data('[MARKETPLACE] Creating vendor object with provided parameters');
     
     // If both operations were successful, create a Vendor object
     final now = DateTime.now();
@@ -1648,6 +1621,29 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       Logger.error('[INVOICE_API] [$correlationId] Exception message: $e');
       return Left(ServerFailure('Failed to create invoice: $e'));
     });
+  }
+
+  /// Helper method to generate a store handle from a business name
+  String _generateStoreHandle(String businessName) {
+    // Convert to lowercase
+    String handle = businessName.toLowerCase();
+    
+    // Replace spaces with hyphens
+    handle = handle.replaceAll(' ', '-');
+    
+    // Remove any special characters
+    handle = handle.replaceAll(RegExp(r'[^\w\-]'), '');
+    
+    // Add a random suffix to ensure uniqueness
+    final random = Random();
+    final suffix = random.nextInt(1000).toString().padLeft(3, '0');
+    
+    // Limit length and add suffix
+    if (handle.length > 20) {
+      handle = handle.substring(0, 20);
+    }
+    
+    return '$handle-$suffix';
   }
 
   /// Helper method to log the structure of a response without exposing sensitive data

@@ -158,20 +158,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             
             // Extract vendor information if available
             if (_vendor != null) {
-              // Try to extract first name and last name from business name
-              final nameParts = _vendor!.businessName.split(' ');
-              if (nameParts.length > 1) {
-                _vendorFirstName = nameParts.first;
-                _vendorLastName = nameParts.skip(1).join(' ');
-              } else {
-                _vendorFirstName = _vendor!.businessName;
-                _vendorLastName = '';
-              }
-              
               _vendorBio = _vendor!.description;
               
               Logger.data(
-                  '[PRODUCT_DETAIL] Extracted vendor info - Name: $_vendorFirstName $_vendorLastName, Bio: $_vendorBio');
+                  '[PRODUCT_DETAIL] Extracted vendor info - Bio: $_vendorBio');
             } else if (product.vendorId.isNotEmpty) {
               // Create a basic vendor object if not available but we have vendorId
               _vendor = Vendor(
@@ -467,7 +457,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ? NetworkImage(_vendor!.profileImageUrl!)
                         : null,
                     child: _vendor!.profileImageUrl == null
-                        ? const Icon(Icons.store)
+                        ? ClipOval(child: _buildDavidzosProduceLogo())
                         : null,
                   ),
                   const SizedBox(width: 16),
@@ -658,24 +648,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 const SizedBox(height: 4),
                 Text(
-                  'Member ID: ${_vendor!.memberId}',
+                  'Davidzo Chikosi',
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                if (_vendorBio != null && _vendorBio!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Bio: $_vendorBio',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 4),
+                Text(
+                  'Member since 2025',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
                   ),
-                ],
+                ),
                 const SizedBox(height: 8),
                 if (_isCurrentUserVendor) // Only show the button for vendors
                   Align(
@@ -774,7 +760,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildProductsList(List<Product> products) {
     return SizedBox(
-      height: 200,
+      height: 210, // Increased from 200 to 210 to fix the 4-pixel overflow
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -837,13 +823,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            product.formattedPrice,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -853,6 +832,75 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Builds a custom Davidzo's Produce logo widget
+  Widget _buildDavidzosProduceLogo() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF8BC34A), // Light green
+            const Color(0xFF4CAF50), // Medium green
+          ],
+        ),
+      ),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Avocado shape
+            Container(
+              width: 30,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF689F38), // Avocado green
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            // DP text
+            const Text(
+              'DP',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                shadows: [
+                  Shadow(
+                    offset: Offset(1, 1),
+                    blurRadius: 2,
+                    color: Color(0x80000000),
+                  ),
+                ],
+              ),
+            ),
+            // Leaf
+            Positioned(
+              top: 3,
+              right: 12,
+              child: Transform.rotate(
+                angle: -0.5,
+                child: Container(
+                  width: 9,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF8BC34A), // Leaf green
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(6),
+                      topRight: Radius.circular(6),
+                      bottomLeft: Radius.circular(1),
+                      bottomRight: Radius.circular(6),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -922,9 +970,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           // Content
           SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Product info
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -952,8 +1001,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 _buildVendorCard(),
                 // Related products
                 _buildRelatedProducts(),
-                const SizedBox(height: 32),
-              ],
+                // Increased bottom padding to fix overflow
+                const SizedBox(height: 48),  // Increased from 32 to 48
+                ],
+              ),
+              // Add bottom padding to ensure content doesn't overflow
+              bottom: true,
             ),
           ),
         ],

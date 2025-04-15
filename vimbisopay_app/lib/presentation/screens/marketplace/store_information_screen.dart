@@ -1043,6 +1043,12 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   }
 
   Widget _buildBusinessInfo(Vendor vendor) {
+    // If not the owner, return an empty container (no About section)
+    if (!widget.isOwner) {
+      return Container();
+    }
+    
+    // For owners, show the About section with all controls
     return SettingsContainer(
       title: 'About',
       children: [
@@ -1058,7 +1064,6 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                   height: 1.5,
                 ),
               ),
-              if (widget.isOwner) ...[
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -1152,7 +1157,6 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                   ],
                 ),
               ],
-            ],
           ),
         ),
       ],
@@ -1167,7 +1171,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Products',
+              'Current Products',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -1351,16 +1355,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           '[STORE_INFO] Using profile thumbnail URL: $_profileThumbnailUrl');
       return _buildImageFromUrl(
         _profileThumbnailUrl,
-        placeholder: Container(
-          color: AppColors.primary,
-          child: const Center(
-            child: Icon(
-              Icons.person,
-              size: 38,
-              color: AppColors.white,
-            ),
-          ),
-        ),
+        placeholder: _buildDavidzosProduceLogo(),
       );
     }
 
@@ -1368,27 +1363,78 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
     return vendor.profileImageUrl != null
         ? _buildImageFromUrl(
             vendor.profileImageUrl,
-            placeholder: Container(
-              color: AppColors.primary,
-              child: const Center(
-                child: Icon(
-                  Icons.storefront,
-                  size: 38,
-                  color: AppColors.white,
+            placeholder: _buildDavidzosProduceLogo(),
+          )
+        : _buildDavidzosProduceLogo();
+  }
+  
+  /// Builds a custom Davidzo's Produce logo widget
+  Widget _buildDavidzosProduceLogo() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF8BC34A), // Light green
+            const Color(0xFF4CAF50), // Medium green
+          ],
+        ),
+      ),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Avocado shape
+            Container(
+              width: 50,
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFF689F38), // Avocado green
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            // DP text
+            const Text(
+              'DP',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                shadows: [
+                  Shadow(
+                    offset: Offset(1, 1),
+                    blurRadius: 2,
+                    color: Color(0x80000000),
+                  ),
+                ],
+              ),
+            ),
+            // Leaf
+            Positioned(
+              top: 5,
+              right: 20,
+              child: Transform.rotate(
+                angle: -0.5,
+                child: Container(
+                  width: 15,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF8BC34A), // Leaf green
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                      bottomLeft: Radius.circular(2),
+                      bottomRight: Radius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ),
-          )
-        : Container(
-            color: AppColors.primary,
-            child: const Center(
-              child: Icon(
-                Icons.storefront,
-                size: 38,
-                color: AppColors.white,
-              ),
-            ),
-          );
+          ],
+        ),
+      ),
+    );
   }
 
   /// Builds an image widget from a URL, handling both local and remote URLs.
@@ -1469,35 +1515,52 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            _formatAccountBalance(accountBalance),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: AppColors.primary,
-            ),
+      trailing: widget.isOwner 
+        ? Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatAccountBalance(accountBalance),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.primary,
+                ),
+              ),
+              Text(
+                'Balance',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          )
+        : const Icon(
+            Icons.chevron_right,
+            color: AppColors.textGray,
+            size: 24,
           ),
-          Text(
-            'Balance',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
       onTap: () {
-        // TODO: Navigate to product detail screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Selected: ${product.name}'),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        if (widget.isOwner) {
+          // For owners, just show a snackbar (or you could navigate to edit product)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Selected: ${product.name}'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        } else {
+          // For non-owners, navigate to the product detail screen
+          Navigator.pushNamed(
+            context,
+            '/product-detail',
+            arguments: {
+              'productId': product.id,
+            },
+          );
+        }
       },
     );
   }
