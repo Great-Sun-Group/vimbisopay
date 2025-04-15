@@ -80,3 +80,21 @@ class UpdateStatusEvent extends SendCredexEvent {
   @override
   List<Object> get props => [message];
 }
+
+class UpdateCredexTypeEvent extends SendCredexEvent {
+  final bool isSecured;
+  
+  const UpdateCredexTypeEvent(this.isSecured);
+  
+  @override
+  List<Object> get props => [isSecured];
+}
+
+class UpdateDueDateEvent extends SendCredexEvent {
+  final DateTime? dueDate;
+  
+  const UpdateDueDateEvent(this.dueDate);
+  
+  @override
+  List<Object?> get props => [dueDate];
+}

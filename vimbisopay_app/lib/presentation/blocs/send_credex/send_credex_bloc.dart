@@ -32,6 +32,22 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     on<SendCredexSubmitEvent>(_onSubmit);
     on<ClearErrorEvent>(_onClearError);
     on<UpdateStatusEvent>(_onUpdateStatus);
+    on<UpdateCredexTypeEvent>(_onUpdateCredexType);
+    on<UpdateDueDateEvent>(_onUpdateDueDate);
+  }
+  
+  void _onUpdateCredexType(UpdateCredexTypeEvent event, Emitter<SendCredexState> emit) {
+    emit(state.copyWith(
+      isSecuredCredex: event.isSecured,
+      // If switching to secured, clear the due date
+      dueDate: event.isSecured ? null : state.dueDate,
+    ));
+  }
+  
+  void _onUpdateDueDate(UpdateDueDateEvent event, Emitter<SendCredexState> emit) {
+    emit(state.copyWith(
+      dueDate: event.dueDate,
+    ));
   }
   
   void _onInitialize(InitializeSendCredexEvent event, Emitter<SendCredexState> emit) {
@@ -263,7 +279,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       status: SendCredexStatus.submitting,
       isLoading: true,
       errorMessage: null,
-      statusMessage: 'Offering Secured Credex...',
+      statusMessage: state.isSecuredCredex ? 'Offering Secured Credex...' : 'Offering Unsecured Credex...',
     ));
     
     try {
@@ -274,7 +290,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         initialAmount: double.parse(state.amount),
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
-        securedCredex: true,
+        securedCredex: state.isSecuredCredex,
+        dueDate: state.isSecuredCredex ? null : state.dueDate?.toIso8601String(),
       );
       
       final result = await accountRepository.createCredex(credexRequest);

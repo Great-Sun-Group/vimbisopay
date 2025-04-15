@@ -225,7 +225,7 @@ class RecipientInputSection extends StatelessWidget {
             decoration: InputDecoration(
               labelText: '💳 Handle',
               labelStyle: const TextStyle(color: AppColors.textSecondary),
-              hintText: 'Recipient account',
+              hintText: 'Send to what account?',
               hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
               filled: true,
               fillColor: AppColors.surface,
@@ -386,7 +386,7 @@ class SenderAccountCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'From',
+              'From Account:',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -480,6 +480,230 @@ class SubmitButton extends StatelessWidget {
               ),
             ),
     );
+  }
+}
+
+/// Widget to display member profile information
+class ProfileInfoWidget extends StatelessWidget {
+  final String? profileImageUrl;
+  final String firstName;
+  final String lastName;
+  
+  const ProfileInfoWidget({
+    super.key,
+    this.profileImageUrl,
+    required this.firstName,
+    required this.lastName,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Profile image
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.surface,
+            border: Border.all(
+              color: AppColors.primary,
+              width: 2,
+            ),
+            image: profileImageUrl != null
+                ? DecorationImage(
+                    image: NetworkImage(profileImageUrl!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
+          child: profileImageUrl == null
+              ? const Icon(
+                  Icons.person,
+                  size: 40,
+                  color: AppColors.primary,
+                )
+              : null,
+        ),
+        const SizedBox(height: 8),
+        // Name
+        Text(
+          '$firstName $lastName',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+/// Widget for Credex type selection
+class CredexTypeSelector extends StatelessWidget {
+  final bool isSecuredCredex;
+  final Function(bool) onCredexTypeChanged;
+  
+  const CredexTypeSelector({
+    super.key,
+    required this.isSecuredCredex,
+    required this.onCredexTypeChanged,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        children: [
+          _buildTypeButton(
+            context,
+            title: 'Secured Credex',
+            isSelected: isSecuredCredex,
+            onTap: () => onCredexTypeChanged(true),
+          ),
+          const SizedBox(height: 8),
+          _buildTypeButton(
+            context,
+            title: 'Unsecured Credex',
+            isSelected: !isSecuredCredex,
+            onTap: () => onCredexTypeChanged(false),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTypeButton(
+    BuildContext context, {
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            width: 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget for due date selection
+class DueDateSelector extends StatelessWidget {
+  final DateTime? selectedDate;
+  final Function(DateTime?) onDateChanged;
+  
+  const DueDateSelector({
+    super.key,
+    this.selectedDate,
+    required this.onDateChanged,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Due Date (Optional)',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => _selectDate(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: AppColors.textSecondary,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    selectedDate != null
+                        ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                        : 'Select a due date',
+                    style: TextStyle(
+                      color: selectedDate != null
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary.withOpacity(0.5),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.calendar_today,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (selectedDate != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => onDateChanged(null),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Clear'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _selectDate(BuildContext context) async {
+    // Get tomorrow's date (to prevent selecting today or past dates)
+    final DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
+    // Get 4 weeks from today as the default initial date
+    final DateTime fourWeeksFromNow = DateTime.now().add(const Duration(days: 28));
+    
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate ?? fourWeeksFromNow,
+      firstDate: tomorrow,
+      lastDate: DateTime(2100),
+    );
+    
+    if (picked != null && picked != selectedDate) {
+      onDateChanged(picked);
+    }
   }
 }
 

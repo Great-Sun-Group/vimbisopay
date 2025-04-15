@@ -27,6 +27,8 @@ class SendCredexState extends Equatable {
   final bool isLoading;
   final bool isAmountFirstEdit;
   final CredexResponse? credexResponse;
+  final bool isSecuredCredex;
+  final DateTime? dueDate;
   
   const SendCredexState({
     this.status = SendCredexStatus.initial,
@@ -42,6 +44,8 @@ class SendCredexState extends Equatable {
     this.isLoading = false,
     this.isAmountFirstEdit = true,
     this.credexResponse,
+    this.isSecuredCredex = true,
+    this.dueDate,
   });
   
   int get decimalPlaces => selectedDenomination == Denomination.CXX ? 3 : 2;
@@ -118,6 +122,8 @@ class SendCredexState extends Equatable {
     bool? isLoading,
     bool? isAmountFirstEdit,
     CredexResponse? credexResponse,
+    bool? isSecuredCredex,
+    DateTime? dueDate,
   }) {
     return SendCredexState(
       status: status ?? this.status,
@@ -133,6 +139,8 @@ class SendCredexState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       isAmountFirstEdit: isAmountFirstEdit ?? this.isAmountFirstEdit,
       credexResponse: credexResponse ?? this.credexResponse,
+      isSecuredCredex: isSecuredCredex ?? this.isSecuredCredex,
+      dueDate: dueDate,
     );
   }
   
@@ -171,5 +179,7 @@ class SendCredexState extends Equatable {
     isLoading,
     isAmountFirstEdit,
     credexResponse,
+    isSecuredCredex,
+    dueDate,
   ];
 }

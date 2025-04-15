@@ -21,14 +21,10 @@ class CredexRequest {
     required this.credexType,
     required this.offersOrRequests,
     required this.securedCredex,
-    String? dueDate,
+    this.dueDate,
     this.invoiceID,
-  }) : dueDate = _getDefaultDueDate();
+  });
 
-  /// Generates a default due date 30 days from now in the format YYYY-MM-DD.
-  static String? _getDefaultDueDate() {
-    return null;
-  }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {

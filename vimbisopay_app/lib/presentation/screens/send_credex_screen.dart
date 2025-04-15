@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
+import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
@@ -288,6 +289,82 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         ],
                         
                         const SizedBox(height: 16),
+                        
+                        // Credex Type Selector
+                        CredexTypeSelector(
+                          isSecuredCredex: state.isSecuredCredex,
+                          onCredexTypeChanged: (isSecured) => 
+                              _bloc.add(UpdateCredexTypeEvent(isSecured)),
+                        ),
+                        
+                        // Only show info, profile and due date when Unsecured is selected
+                        if (!state.isSecuredCredex) ...[                          
+                          // Info paragraph
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: AppColors.primary.withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Text(
+                              'Your unsecured credex is your publicly recorded promise to provide value in the future. Build your credscore by keeping your promises.',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Profile and Due Date Row
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left side - Profile Info
+                              Expanded(
+                                child: FutureBuilder<User?>(
+                                  future: widget.databaseHelper.getUser(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && 
+                                        snapshot.data != null && 
+                                        snapshot.data!.dashboard != null) {
+                                      final dashboard = snapshot.data!.dashboard!;
+                                      return ProfileInfoWidget(
+                                        profileImageUrl: dashboard.member.profilePictureThumbnail,
+                                        firstName: dashboard.member.firstname,
+                                        lastName: dashboard.member.lastname,
+                                      );
+                                    } else {
+                                      // Fallback to using the account name if dashboard is not available
+                                      final nameParts = widget.senderAccount.accountName.split(' ');
+                                      final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+                                      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+                                      
+                                      return ProfileInfoWidget(
+                                        firstName: firstName,
+                                        lastName: lastName,
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              
+                              // Right side - Due Date Selector
+                              Expanded(
+                                child: DueDateSelector(
+                                  selectedDate: state.dueDate,
+                                  onDateChanged: (date) => 
+                                      _bloc.add(UpdateDueDateEvent(date)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         
                         // Sender account card
                         if (state.senderAccount != null)
