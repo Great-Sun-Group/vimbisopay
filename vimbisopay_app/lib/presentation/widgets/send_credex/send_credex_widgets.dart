@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
+import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/profile_bar_graph_widget.dart';
 
 /// Widget to display status messages
 class StatusMessageWidget extends StatelessWidget {
@@ -200,6 +202,7 @@ class AmountInputSection extends StatelessWidget {
 /// Widget for recipient input and verification
 class RecipientInputSection extends StatelessWidget {
   final TextEditingController recipientController;
+  final FocusNode? focusNode; // Add focus node parameter
   final bool isVerifying;
   final VoidCallback onVerify;
   final VoidCallback onScanQR;
@@ -208,6 +211,7 @@ class RecipientInputSection extends StatelessWidget {
   const RecipientInputSection({
     super.key,
     required this.recipientController,
+    this.focusNode, // Make it optional
     required this.isVerifying,
     required this.onVerify,
     required this.onScanQR,
@@ -216,73 +220,174 @@ class RecipientInputSection extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: TextFormField(
-            controller: recipientController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              labelText: '💳 Handle',
-              labelStyle: const TextStyle(color: AppColors.textSecondary),
-              hintText: 'Send to what account?',
-              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              suffixIcon: isVerifying
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        // Handle input field - full width
+        TextFormField(
+          controller: recipientController,
+          focusNode: focusNode, // Use the focus node
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            labelText: '💳 Handle',
+            labelStyle: const TextStyle(color: AppColors.textSecondary),
+            hintText: 'Send to what account?',
+            hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+            filled: true,
+            fillColor: AppColors.surface,
+            border: OutlineInputBorder(
+              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            suffixIcon: isVerifying
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          validator: validator,
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // When verifying, don't show any buttons or helper text
+        if (isVerifying) ...[
+          // Empty space to maintain layout
+          const SizedBox(height: 24),
+        ] else ...[
+          // Helper text - only visible when not verifying
+          const Text(
+            'Enter handle or scan QR code',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Action buttons row
+          Row(
+            children: [
+              // Verify button
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: recipientController,
+                  builder: (context, value, child) {
+                    return ElevatedButton(
+                      onPressed: value.text.isEmpty ? null : onVerify,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                    )
-                  : null,
-            ),
-            validator: validator,
-          ),
-        ),
-        const SizedBox(width: 8),
-        ValueListenableBuilder<TextEditingValue>(
-          valueListenable: recipientController,
-          builder: (context, value, child) {
-            return ElevatedButton(
-              onPressed: value.text.isEmpty || isVerifying ? null : onVerify,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+                      child: const Text('Verify Handle'),
+                    );
+                  },
                 ),
               ),
-              child: const Text('Verify'),
-            );
-          },
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: onScanQR,
-          icon: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-          tooltip: 'Scan QR Code',
-        ),
+              
+              const SizedBox(width: 12),
+              
+              // QR Scan button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onScanQR,
+                  icon: const Icon(Icons.qr_code_scanner, size: 18),
+                  label: const Text('Scan QR'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Widget to wrap RecipientInputSection in a card with border
+class RecipientInputCard extends StatelessWidget {
+  final TextEditingController recipientController;
+  final FocusNode? focusNode;
+  final bool isVerifying;
+  final VoidCallback onVerify;
+  final VoidCallback onScanQR;
+  final String? Function(String?)? validator;
+  
+  const RecipientInputCard({
+    super.key,
+    required this.recipientController,
+    this.focusNode,
+    required this.isVerifying,
+    required this.onVerify,
+    required this.onScanQR,
+    this.validator,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: const BorderSide(
+          color: AppColors.primary,
+          width: 1.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'To Account:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            RecipientInputSection(
+              recipientController: recipientController,
+              focusNode: focusNode,
+              isVerifying: isVerifying,
+              onVerify: onVerify,
+              onScanQR: onScanQR,
+              validator: validator,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -291,35 +396,96 @@ class RecipientInputSection extends StatelessWidget {
 class VerifiedRecipientCard extends StatelessWidget {
   final Map<String, dynamic> accountDetails;
   final VoidCallback onChangeRecipient;
+  final CredexType? credexType;
+  final String? profileImageUrl;
+  final String? memberName; // Added for member name
+  final bool isVerifying; // Add isVerifying parameter
   
   const VerifiedRecipientCard({
     super.key,
     required this.accountDetails,
     required this.onChangeRecipient,
+    this.credexType,
+    this.profileImageUrl,
+    this.memberName,
+    this.isVerifying = false, // Default to false
   });
+  
+  // Helper property for backward compatibility
+  bool get isSecuredCredex => credexType == CredexType.SECURED;
   
   @override
   Widget build(BuildContext context) {
     return Card(
       color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: const BorderSide(
+          color: AppColors.primary,
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text(
+              'To Account:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'To',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                // Left side - Account name and handle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '💳 ${accountDetails['accountName']}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '💳 ${accountDetails['accountHandle']}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                TextButton(
+                
+                // Right side - Empty for Secured/Neutral, Profile Pic for Unsecured
+                Expanded(
+                  child: credexType == null || credexType == CredexType.NEUTRAL || credexType == CredexType.SECURED
+                    ? const SizedBox() // Empty for neutral or secured state
+                    : Container(
+                        alignment: Alignment.centerRight,
+                        child: ProfileWithBarGraph.davidzo(
+                          profileImageUrl: profileImageUrl,
+                        ),
+                      ),
+                ),
+              ],
+            ),
+            // Only show Change button if not verifying
+            if (!isVerifying) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
                   onPressed: onChangeRecipient,
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
@@ -335,24 +501,8 @@ class VerifiedRecipientCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '💳 ${accountDetails['accountName']}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
               ),
-            ),
-            Text(
-              '💳 ${accountDetails['accountHandle']}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -365,13 +515,22 @@ class SenderAccountCard extends StatelessWidget {
   final dashboard.DashboardAccount account;
   final Denomination selectedDenomination;
   final double availableBalance;
+  final CredexType? credexType;
+  final String? profileImageUrl;
+  final String? memberName;
   
   const SenderAccountCard({
     super.key,
     required this.account,
     required this.selectedDenomination,
     required this.availableBalance,
+    this.credexType,
+    this.profileImageUrl,
+    this.memberName,
   });
+  
+  // Helper property for backward compatibility
+  bool get isSecuredCredex => credexType == CredexType.SECURED;
   
   @override
   Widget build(BuildContext context) {
@@ -379,6 +538,13 @@ class SenderAccountCard extends StatelessWidget {
     
     return Card(
       color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: const BorderSide(
+          color: AppColors.primary,
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -394,40 +560,78 @@ class SenderAccountCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '💳 ${account.accountName}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            Text(
-              '💳 ${account.accountHandle}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Column(
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Secured Balances:',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 15,
+                // Left side - Account name and handle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '💳 ${account.accountName}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '💳 ${account.accountHandle}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$availableBalance $denom',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                
+                // Right side - Secured Balances, Profile Pic, or Empty (neutral)
+                Expanded(
+                  child: credexType == null || credexType == CredexType.NEUTRAL
+                    ? const SizedBox() // Empty for neutral state
+                    : credexType == CredexType.SECURED
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'Secured Balances:',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$availableBalance $denom',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Container(
+                          alignment: Alignment.centerRight,
+                          child: memberName != null
+                              ? ProfileWithBarGraph.currentUser(
+                                  profileImageUrl: profileImageUrl,
+                                  firstName: memberName?.split(' ').first ?? '',
+                                  lastName: (memberName?.split(' ').length ?? 0) > 1 
+                                      ? memberName?.split(' ').last ?? '' 
+                                      : '',
+                                )
+                              : Text(
+                                  account.accountName,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                        ),
                 ),
               ],
             ),
@@ -509,32 +713,34 @@ class ProfileInfoWidget extends StatelessWidget {
             shape: BoxShape.circle,
             color: AppColors.surface,
             border: Border.all(
-              color: AppColors.primary,
+              color: AppColors.secondary,
               width: 2,
             ),
-            image: profileImageUrl != null
-                ? DecorationImage(
-                    image: NetworkImage(profileImageUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
+            image: null,
           ),
-          child: profileImageUrl == null
-              ? const Icon(
-                  Icons.person,
-                  size: 40,
-                  color: AppColors.primary,
-                )
-              : null,
+          child: const Icon(
+            Icons.person,
+            size: 40,
+            color: AppColors.secondary,
+          ),
         ),
         const SizedBox(height: 8),
-        // Name
+        // First name
         Text(
-          '$firstName $lastName',
+          firstName,
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        // Last name
+        Text(
+          lastName,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -545,12 +751,12 @@ class ProfileInfoWidget extends StatelessWidget {
 
 /// Widget for Credex type selection
 class CredexTypeSelector extends StatelessWidget {
-  final bool isSecuredCredex;
-  final Function(bool) onCredexTypeChanged;
+  final CredexType credexType;
+  final Function(CredexType) onCredexTypeChanged;
   
   const CredexTypeSelector({
     super.key,
-    required this.isSecuredCredex,
+    required this.credexType,
     required this.onCredexTypeChanged,
   });
   
@@ -558,20 +764,24 @@ class CredexTypeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      child: Column(
+      child: Row(
         children: [
-          _buildTypeButton(
-            context,
-            title: 'Secured Credex',
-            isSelected: isSecuredCredex,
-            onTap: () => onCredexTypeChanged(true),
+          Expanded(
+            child: _buildTypeButton(
+              context,
+              title: 'Secured',
+              isSelected: credexType == CredexType.SECURED,
+              onTap: () => onCredexTypeChanged(CredexType.SECURED),
+            ),
           ),
-          const SizedBox(height: 8),
-          _buildTypeButton(
-            context,
-            title: 'Unsecured Credex',
-            isSelected: !isSecuredCredex,
-            onTap: () => onCredexTypeChanged(false),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildTypeButton(
+              context,
+              title: 'Unsecured',
+              isSelected: credexType == CredexType.UNSECURED,
+              onTap: () => onCredexTypeChanged(CredexType.UNSECURED),
+            ),
           ),
         ],
       ),
@@ -589,10 +799,10 @@ class CredexTypeSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
+          color: isSelected ? AppColors.secondary : AppColors.surface,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            color: isSelected ? AppColors.secondary : AppColors.textSecondary,
             width: 1,
           ),
         ),
@@ -662,7 +872,7 @@ class DueDateSelector extends StatelessWidget {
                   ),
                   const Icon(
                     Icons.calendar_today,
-                    color: AppColors.primary,
+                    color: AppColors.secondary,
                     size: 20,
                   ),
                 ],
@@ -675,7 +885,7 @@ class DueDateSelector extends StatelessWidget {
               child: TextButton(
                 onPressed: () => onDateChanged(null),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                  foregroundColor: AppColors.secondary,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,

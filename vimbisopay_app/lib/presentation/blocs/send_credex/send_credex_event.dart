@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
+import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
 
 abstract class SendCredexEvent extends Equatable {
   const SendCredexEvent();
@@ -82,12 +83,12 @@ class UpdateStatusEvent extends SendCredexEvent {
 }
 
 class UpdateCredexTypeEvent extends SendCredexEvent {
-  final bool isSecured;
+  final CredexType credexType;
   
-  const UpdateCredexTypeEvent(this.isSecured);
+  const UpdateCredexTypeEvent(this.credexType);
   
   @override
-  List<Object> get props => [isSecured];
+  List<Object> get props => [credexType];
 }
 
 class UpdateDueDateEvent extends SendCredexEvent {

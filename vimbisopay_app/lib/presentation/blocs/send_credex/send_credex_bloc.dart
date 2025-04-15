@@ -38,9 +38,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   
   void _onUpdateCredexType(UpdateCredexTypeEvent event, Emitter<SendCredexState> emit) {
     emit(state.copyWith(
-      isSecuredCredex: event.isSecured,
+      credexType: event.credexType,
       // If switching to secured, clear the due date
-      dueDate: event.isSecured ? null : state.dueDate,
+      dueDate: event.credexType == CredexType.SECURED ? null : state.dueDate,
     ));
   }
   
@@ -67,16 +67,46 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       selectedDenomination: defaultDenomination,
       availableDenominations: availableDenominations,
       amount: '0.${'0' * (defaultDenomination == Denomination.CXX ? 3 : 2)}',
+      showFullUI: false, // Start with only showing initial input fields
+      credexType: CredexType.NEUTRAL, // Explicitly set to neutral state on initialization
     );
     
     // If recipient info is provided, pre-fill and verify
     if (event.recipientHandle != null && event.recipientAccountId != null) {
+      // Check if sender's account handle equals recipient's handle
+      if (event.senderAccount.accountHandle.toLowerCase() == event.recipientHandle!.toLowerCase()) {
+        emit(initialState.copyWith(
+          status: SendCredexStatus.error,
+          isLoading: false,
+          errorMessage: 'Offer account must be different than recipient account.',
+          statusMessage: null,
+        ));
+        
+        // Clear error message after delay
+        Future.delayed(const Duration(seconds: 5), () {
+          if (state.errorMessage != null) {
+            add(const ClearErrorEvent());
+          }
+        });
+        
+        return;
+      }
+      
+      // If we have both handle and ID, we can consider this pre-verified
+      // but we'll still verify it with the API to get the account name
       emit(initialState.copyWith(
         recipientHandle: event.recipientHandle,
         recipientAccountId: event.recipientAccountId,
+        // Set temporary verified account details until API verification completes
+        verifiedAccountDetails: {
+          'accountHandle': event.recipientHandle,
+          'accountName': 'Verifying...',
+        },
+        status: SendCredexStatus.recipientVerified,
+        showFullUI: true, // Show the full UI immediately for pre-filled recipients
       ));
       
-      // Verify the recipient
+      // Still verify the recipient to get the account name and confirm the account exists
       add(VerifyRecipientEvent(event.recipientHandle!));
     } else {
       emit(initialState);
@@ -109,6 +139,26 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   Future<void> _onVerifyRecipient(VerifyRecipientEvent event, Emitter<SendCredexState> emit) async {
     if (event.handle.isEmpty) return;
     
+    // Check if sender's account handle equals recipient's handle
+    if (state.senderAccount != null && 
+        state.senderAccount!.accountHandle.toLowerCase() == event.handle.toLowerCase()) {
+      emit(state.copyWith(
+        status: SendCredexStatus.error,
+        isLoading: false,
+        errorMessage: 'Offer account must be different than recipient account.',
+        statusMessage: null,
+      ));
+      
+      // Clear error message after delay
+      Future.delayed(const Duration(seconds: 5), () {
+        if (state.errorMessage != null) {
+          add(const ClearErrorEvent());
+        }
+      });
+      
+      return;
+    }
+    
     emit(state.copyWith(
       status: SendCredexStatus.verifyingRecipient,
       isLoading: true,
@@ -119,9 +169,12 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     try {
       // Make a direct HTTP request to the API
       final url = '${ApiConfig.baseUrl}/getAccountByHandle';
+      Logger.data('Verifying recipient: ${event.handle}, URL: $url');
+      
       final user = await databaseHelper.getUser();
       
       if (user == null) {
+        Logger.error('User is null, not authenticated');
         emit(state.copyWith(
           status: SendCredexStatus.error,
           isLoading: false,
@@ -138,19 +191,26 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       };
       
       final body = {'accountHandle': event.handle};
+      Logger.data('Request body: ${json.encode(body)}');
       
+      Logger.data('Sending API request to verify recipient');
       final response = await http.post(
         Uri.parse(url),
         headers: headers,
         body: json.encode(body),
       );
       
+      Logger.data('API response status code: ${response.statusCode}');
+      Logger.data('API response body: ${response.body}');
+      
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
+        Logger.data('Parsed JSON response: $jsonResponse');
         
         if (!jsonResponse.containsKey('data') ||
             !jsonResponse['data'].containsKey('action') ||
             !jsonResponse['data']['action'].containsKey('details')) {
+          Logger.error('Invalid response format: $jsonResponse');
           emit(state.copyWith(
             status: SendCredexStatus.error,
             isLoading: false,
@@ -161,6 +221,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         }
         
         final details = jsonResponse['data']['action']['details'];
+        Logger.data('Response details: $details');
         
         // Extract the fields we need directly from the response
         final accountID = details['accountID'] as String?;
@@ -168,6 +229,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         final accountHandle = details['accountHandle'] as String?;
         
         if (accountID == null || accountName == null || accountHandle == null) {
+          Logger.error('Missing required account information: accountID=$accountID, accountName=$accountName, accountHandle=$accountHandle');
           emit(state.copyWith(
             status: SendCredexStatus.error,
             isLoading: false,
@@ -177,6 +239,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           return;
         }
         
+        Logger.data('Recipient verified successfully: $accountHandle ($accountID)');
         emit(state.copyWith(
           status: SendCredexStatus.recipientVerified,
           isLoading: false,
@@ -187,9 +250,171 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             'accountHandle': accountHandle,
           },
           statusMessage: null,
+          showFullUI: true, // Show the full UI after successful verification
+          credexType: CredexType.NEUTRAL, // Explicitly set to neutral state after verification
         ));
+      } else if (response.statusCode == 401 || 
+                (response.statusCode == 400 && response.body.toLowerCase().contains('token expired'))) {
+        // Token expired, try to refresh it
+        Logger.data('Token expired, attempting to refresh');
+        
+        try {
+          // Get the current user to get phone and passwordHash
+          final user = await databaseHelper.getUser();
+          
+          if (user == null || user.passwordHash == null) {
+            Logger.error('No user or password hash found for token refresh');
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: 'Authentication error. Please log in again.',
+              statusMessage: null,
+            ));
+            return;
+          }
+          
+          // Use the account repository to refresh the token with loginV2
+          final refreshResult = await accountRepository.loginV2(
+            phone: user.phone,
+            passwordHash: user.passwordHash,
+          );
+          
+          // Handle the refresh result
+          if (refreshResult.isLeft()) {
+            // Failed to refresh token
+            final failure = refreshResult.fold((l) => l, (r) => null);
+            Logger.error('Failed to refresh token: ${failure?.message}');
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: 'Authentication error. Please log in again.',
+              statusMessage: null,
+            ));
+            return;
+          }
+          
+          // Token refresh succeeded
+          final refreshedUser = refreshResult.fold((l) => null, (r) => r);
+          if (refreshedUser == null) {
+            // No user found
+            Logger.error('No user found after token refresh');
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: 'Authentication error. Please log in again.',
+              statusMessage: null,
+            ));
+            return;
+          }
+          
+          // Save the refreshed user
+          await accountRepository.saveUser(refreshedUser);
+        } catch (e) {
+          Logger.error('Exception during token refresh: $e');
+          emit(state.copyWith(
+            status: SendCredexStatus.error,
+            isLoading: false,
+            errorMessage: 'Authentication error. Please log in again.',
+            statusMessage: null,
+          ));
+          return;
+        }
+        
+        // Get the updated user with the new token
+        final updatedUserResult = await accountRepository.getCurrentUser();
+        final updatedUser = updatedUserResult.fold((l) => null, (r) => r);
+        
+        if (updatedUser == null) {
+          Logger.error('No updated user found after token refresh');
+          emit(state.copyWith(
+            status: SendCredexStatus.error,
+            isLoading: false,
+            errorMessage: 'Authentication error. Please log in again.',
+            statusMessage: null,
+          ));
+          return;
+        }
+        
+        // Try the request again with the refreshed token
+        Logger.data('Token refreshed, retrying request');
+        
+        final newHeaders = {
+          'Content-Type': 'application/json',
+          'x-client-api-key': ApiConfig.apiKey,
+          'Authorization': 'Bearer ${updatedUser.token}',
+        };
+        
+        final retryResponse = await http.post(
+          Uri.parse(url),
+          headers: newHeaders,
+          body: json.encode(body),
+        );
+        
+        Logger.data('Retry response status code: ${retryResponse.statusCode}');
+        Logger.data('Retry response body: ${retryResponse.body}');
+        
+        if (retryResponse.statusCode == 200) {
+          final jsonResponse = json.decode(retryResponse.body);
+          
+          if (!jsonResponse.containsKey('data') ||
+              !jsonResponse['data'].containsKey('action') ||
+              !jsonResponse['data']['action'].containsKey('details')) {
+            Logger.error('Invalid response format after token refresh: $jsonResponse');
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: 'Invalid response format',
+              statusMessage: null,
+            ));
+            return;
+          }
+          
+          final details = jsonResponse['data']['action']['details'];
+          
+          // Extract the fields we need directly from the response
+          final accountID = details['accountID'] as String?;
+          final accountName = details['accountName'] as String?;
+          final accountHandle = details['accountHandle'] as String?;
+          
+          if (accountID == null || accountName == null || accountHandle == null) {
+            Logger.error('Missing required account information after token refresh');
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: 'Missing required account information',
+              statusMessage: null,
+            ));
+            return;
+          }
+          
+          Logger.data('Recipient verified successfully after token refresh: $accountHandle ($accountID)');
+          emit(state.copyWith(
+            status: SendCredexStatus.recipientVerified,
+            isLoading: false,
+            recipientHandle: accountHandle,
+            recipientAccountId: accountID,
+            verifiedAccountDetails: {
+              'accountName': accountName,
+              'accountHandle': accountHandle,
+            },
+            statusMessage: null,
+            showFullUI: true, // Show the full UI after successful verification
+            credexType: CredexType.NEUTRAL, // Explicitly set to neutral state after verification
+          ));
+        } else {
+          // Still failed after token refresh
+          final errorMessage = json.decode(retryResponse.body)['message'] ?? 'Failed to verify recipient account';
+          Logger.error('Error verifying recipient after token refresh: $errorMessage');
+          emit(state.copyWith(
+            status: SendCredexStatus.error,
+            isLoading: false,
+            errorMessage: _getFormattedErrorMessage(errorMessage),
+            statusMessage: null,
+          ));
+        }
       } else {
         final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify recipient account';
+        Logger.error('Error verifying recipient: $errorMessage');
         emit(state.copyWith(
           status: SendCredexStatus.error,
           isLoading: false,
@@ -198,6 +423,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         ));
       }
     } catch (e) {
+      Logger.error('Exception during recipient verification: $e');
       emit(state.copyWith(
         status: SendCredexStatus.error,
         isLoading: false,
@@ -241,12 +467,25 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   }
   
   void _onChangeRecipient(ChangeRecipientEvent event, Emitter<SendCredexState> emit) {
-    // Clear recipient information and reset to initial state for recipient entry
-    emit(state.clearRecipient().copyWith(
+    // Create a new state with cleared recipient information and reset to neutral credex type
+    final newState = SendCredexState(
       status: SendCredexStatus.initial,
-      statusMessage: null,
-      errorMessage: null
-    ));
+      senderAccount: state.senderAccount,
+      selectedDenomination: state.selectedDenomination,
+      availableDenominations: state.availableDenominations,
+      amount: state.amount,
+      isAmountFirstEdit: state.isAmountFirstEdit,
+      credexType: CredexType.NEUTRAL, // Reset to neutral state
+      dueDate: state.dueDate,
+      showFullUI: true, // Keep showing the full UI
+      // Explicitly clear recipient information
+      recipientHandle: '',
+      recipientAccountId: null,
+      verifiedAccountDetails: null,
+    );
+    
+    // Emit the new state
+    emit(newState);
   }
   
   void _onScanQRCode(ScanQRCodeEvent event, Emitter<SendCredexState> emit) {
@@ -256,14 +495,44 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     final parts = event.result!.split('#');
     if (parts.length == 2) {
       final handle = parts[0].startsWith('@') ? parts[0].substring(1) : parts[0];
+      final accountId = parts[1];
       
+      // Check if sender's account handle equals recipient's handle
+      if (state.senderAccount != null && 
+          state.senderAccount!.accountHandle.toLowerCase() == handle.toLowerCase()) {
+        emit(state.copyWith(
+          status: SendCredexStatus.error,
+          isLoading: false,
+          errorMessage: 'Offer account must be different than recipient account.',
+          statusMessage: null,
+        ));
+        
+        // Clear error message after delay
+        Future.delayed(const Duration(seconds: 5), () {
+          if (state.errorMessage != null) {
+            add(const ClearErrorEvent());
+          }
+        });
+        
+        return;
+      }
+      
+      // If we have both handle and ID from QR code, we can consider this pre-verified
+      // but we'll still verify it with the API to get the account name
       emit(state.copyWith(
         recipientHandle: handle,
-        recipientAccountId: parts[1],
+        recipientAccountId: accountId,
+        // Set temporary verified account details until API verification completes
+        verifiedAccountDetails: {
+          'accountHandle': handle,
+          'accountName': 'Verifying...',
+        },
+        status: SendCredexStatus.recipientVerified,
+        showFullUI: true, // Show the full UI immediately for QR code scanned recipients
         errorMessage: null,
       ));
       
-      // Verify the recipient
+      // Still verify the recipient to get the account name and confirm the account exists
       add(VerifyRecipientEvent(handle));
     } else {
       emit(state.copyWith(
@@ -279,7 +548,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       status: SendCredexStatus.submitting,
       isLoading: true,
       errorMessage: null,
-      statusMessage: state.isSecuredCredex ? 'Offering Secured Credex...' : 'Offering Unsecured Credex...',
+      statusMessage: state.credexType == CredexType.SECURED ? 'Offering Secured Credex...' : 'Offering Unsecured Credex...',
     ));
     
     try {
@@ -290,63 +559,199 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         initialAmount: double.parse(state.amount),
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
-        securedCredex: state.isSecuredCredex,
-        dueDate: state.isSecuredCredex ? null : state.dueDate?.toIso8601String(),
+        securedCredex: state.credexType == CredexType.SECURED,
+        dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate?.toIso8601String(),
       );
       
       final result = await accountRepository.createCredex(credexRequest);
       
-      await result.fold(
-        (failure) async {
+      // Handle failure case
+      if (result.isLeft()) {
+        final failure = result.fold((l) => l, (r) => null);
+        
+        // Check if the error is due to token expiration
+        final errorMessage = failure?.message ?? '';
+        if (errorMessage.toLowerCase().contains('token expired') || 
+            errorMessage.toLowerCase().contains('unauthorized')) {
+          Logger.data('Token expired during submit, attempting to refresh');
+          
           try {
-            // Try to parse the error response as JSON
-            final Map<String, dynamic> errorResponse = jsonDecode(failure.message ?? failure.toString());
-            final action = errorResponse['data']?['action'];
+            // Get the current user to get phone and passwordHash
+            final user = await databaseHelper.getUser();
             
-            if (action != null && 
-                action['details']?['code'] == 'TIER_LIMIT_EXCEEDED') {
-              final userMessage = errorResponse['message'] ?? 
-                                action['details']?['reason'] ??
-                                'You have reached your daily transaction limit.';
+            if (user == null || user.passwordHash == null) {
+              Logger.error('No user or password hash found for token refresh');
+              emit(state.copyWith(
+                status: SendCredexStatus.error,
+                isLoading: false,
+                errorMessage: 'Authentication error. Please log in again.',
+                statusMessage: null,
+              ));
+              return;
+            }
+            
+            // Use the account repository to refresh the token with loginV2
+            final refreshResult = await accountRepository.loginV2(
+              phone: user.phone,
+              passwordHash: user.passwordHash,
+            );
+            
+            // Handle the refresh result
+            if (refreshResult.isLeft()) {
+              // Failed to refresh token
+              final refreshFailure = refreshResult.fold((l) => l, (r) => null);
+              Logger.error('Failed to refresh token: ${refreshFailure?.message}');
+              emit(state.copyWith(
+                status: SendCredexStatus.error,
+                isLoading: false,
+                errorMessage: 'Authentication error. Please log in again.',
+                statusMessage: null,
+              ));
+              return;
+            }
+            
+            // Token refresh succeeded
+            final refreshedUser = refreshResult.fold((l) => null, (r) => r);
+            if (refreshedUser == null) {
+              // No user found
+              Logger.error('No user found after token refresh');
+              emit(state.copyWith(
+                status: SendCredexStatus.error,
+                isLoading: false,
+                errorMessage: 'Authentication error. Please log in again.',
+                statusMessage: null,
+              ));
+              return;
+            }
+            
+            // Save the refreshed user
+            await accountRepository.saveUser(refreshedUser);
+            
+            // Try the request again with the refreshed token
+            Logger.data('Token refreshed, retrying createCredex request');
+            final retryResult = await accountRepository.createCredex(credexRequest);
+            
+            if (retryResult.isLeft()) {
+              // Still failed after token refresh
+              final retryFailure = retryResult.fold((l) => l, (r) => null);
+              try {
+                // Try to parse the error response as JSON
+                final Map<String, dynamic> errorResponse = jsonDecode(retryFailure?.message ?? retryFailure.toString());
+                final action = errorResponse['data']?['action'];
+                
+                if (action != null && 
+                    action['details']?['code'] == 'TIER_LIMIT_EXCEEDED') {
+                  final userMessage = errorResponse['message'] ?? 
+                                    action['details']?['reason'] ??
+                                    'You have reached your daily transaction limit.';
+                  
+                  emit(state.copyWith(
+                    status: SendCredexStatus.error,
+                    isLoading: false,
+                    errorMessage: userMessage,
+                    statusMessage: null,
+                  ));
+                } else {
+                  emit(state.copyWith(
+                    status: SendCredexStatus.error,
+                    isLoading: false,
+                    errorMessage: _getFormattedErrorMessage(retryFailure?.message ?? retryFailure.toString()),
+                    statusMessage: null,
+                  ));
+                }
+              } catch (e) {
+                emit(state.copyWith(
+                  status: SendCredexStatus.error,
+                  isLoading: false,
+                  errorMessage: _getFormattedErrorMessage(retryFailure?.message ?? retryFailure.toString()),
+                  statusMessage: null,
+                ));
+              }
+              return;
+            }
+            
+            // Handle success case after token refresh
+            final response = retryResult.fold((l) => null, (r) => r);
+            if (response != null) {
+              // Update transactions in database with original response
+              await databaseHelper.updatePendingTransactions(response);
               
               emit(state.copyWith(
-                status: SendCredexStatus.error,
+                status: SendCredexStatus.success,
                 isLoading: false,
-                errorMessage: userMessage,
                 statusMessage: null,
+                credexResponse: response,
               ));
-            } else {
-              emit(state.copyWith(
-                status: SendCredexStatus.error,
-                isLoading: false,
-                errorMessage: _getFormattedErrorMessage(failure.message ?? failure.toString()),
-                statusMessage: null,
-              ));
+              
+              // Trigger refresh to update dashboard and transactions
+              homeBloc.add(const HomeFetchPendingTransactions());
             }
+            return;
           } catch (e) {
+            Logger.error('Exception during token refresh in submit: $e');
             emit(state.copyWith(
               status: SendCredexStatus.error,
               isLoading: false,
-              errorMessage: _getFormattedErrorMessage(failure.message ?? failure.toString()),
+              errorMessage: 'Authentication error. Please log in again.',
+              statusMessage: null,
+            ));
+            return;
+          }
+        }
+        
+        // Handle other errors (not token related)
+        try {
+          // Try to parse the error response as JSON
+          final Map<String, dynamic> errorResponse = jsonDecode(failure?.message ?? failure.toString());
+          final action = errorResponse['data']?['action'];
+          
+          if (action != null && 
+              action['details']?['code'] == 'TIER_LIMIT_EXCEEDED') {
+            final userMessage = errorResponse['message'] ?? 
+                              action['details']?['reason'] ??
+                              'You have reached your daily transaction limit.';
+            
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: userMessage,
+              statusMessage: null,
+            ));
+          } else {
+            emit(state.copyWith(
+              status: SendCredexStatus.error,
+              isLoading: false,
+              errorMessage: _getFormattedErrorMessage(failure?.message ?? failure.toString()),
               statusMessage: null,
             ));
           }
-        },
-        (response) async {
-          // Update transactions in database with original response
-          await databaseHelper.updatePendingTransactions(response);
-          
+        } catch (e) {
           emit(state.copyWith(
-            status: SendCredexStatus.success,
+            status: SendCredexStatus.error,
             isLoading: false,
+            errorMessage: _getFormattedErrorMessage(failure?.message ?? failure.toString()),
             statusMessage: null,
-            credexResponse: response,
           ));
-          
-          // Trigger refresh to update dashboard and transactions
-          homeBloc.add(const HomeFetchPendingTransactions());
-        },
-      );
+        }
+        return;
+      }
+      
+      // Handle success case
+      final response = result.fold((l) => null, (r) => r);
+      if (response != null) {
+        // Update transactions in database with original response
+        await databaseHelper.updatePendingTransactions(response);
+        
+        emit(state.copyWith(
+          status: SendCredexStatus.success,
+          isLoading: false,
+          statusMessage: null,
+          credexResponse: response,
+        ));
+        
+        // Trigger refresh to update dashboard and transactions
+        homeBloc.add(const HomeFetchPendingTransactions());
+      }
     } catch (e) {
       emit(state.copyWith(
         status: SendCredexStatus.error,
