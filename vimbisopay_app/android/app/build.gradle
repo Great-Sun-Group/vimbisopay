@@ -70,6 +70,53 @@ flutter {
     source '../..'
 }
 
+// Custom task to handle APK copying with retry logic
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleDebug') {
+        task.doLast {
+            def sourceApk = new File("${project.buildDir}/outputs/apk/debug/app-debug.apk")
+            def destApk = new File("${project.buildDir}/outputs/flutter-apk/app-debug.apk")
+            
+            if (sourceApk.exists()) {
+                println "Copying APK with custom task: ${sourceApk.path} -> ${destApk.path}"
+                
+                // Create parent directories if they don't exist
+                destApk.parentFile.mkdirs()
+                
+                // Implement retry logic for file copy
+                def maxRetries = 3
+                def retryCount = 0
+                def success = false
+                
+                while (!success && retryCount < maxRetries) {
+                    try {
+                        // Use Java NIO for more reliable file copy
+                        java.nio.file.Files.copy(
+                            sourceApk.toPath(),
+                            destApk.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                        )
+                        success = true
+                        println "APK copied successfully on attempt ${retryCount + 1}"
+                    } catch (Exception e) {
+                        retryCount++
+                        println "Copy failed (attempt ${retryCount}): ${e.message}"
+                        if (retryCount < maxRetries) {
+                            println "Retrying in 2 seconds..."
+                            Thread.sleep(2000)
+                        } else {
+                            println "Failed to copy APK after ${maxRetries} attempts"
+                            throw e
+                        }
+                    }
+                }
+            } else {
+                println "Source APK not found at: ${sourceApk.path}"
+            }
+        }
+    }
+}
+
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "androidx.fragment:fragment-ktx:1.5.5"
