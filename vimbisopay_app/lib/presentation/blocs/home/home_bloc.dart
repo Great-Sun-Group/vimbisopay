@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex_bulk.dart';
 import 'package:vimbisopay_app/application/usecases/accept_credex.dart';
 import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
@@ -56,11 +57,23 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   }
 
   Future<void> _onHomeLoadStarted(HomeLoadStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with loading
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Home load prevented while update screen is showing');
+      return;
+    }
+    
     emit(state.copyWith(status: HomeStatus.loading));
     
     try {
       // Get current user which includes the dashboard
       final userResult = await accountRepository.getCurrentUser();
+      
+      // Check again if update screen is showing before processing the result
+      if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+        _logger.i('Home load result processing prevented while update screen is showing');
+        return;
+      }
       
       await userResult.fold(
         (failure) async {
@@ -115,6 +128,12 @@ Starting home refresh:
 - Current status: ${state.status}
 - Trigger: ${event.toString()}
 ''');
+
+    // Check if update screen is showing - if so, don't proceed with refresh
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Home refresh prevented while update screen is showing');
+      return;
+    }
 
     if (state.dashboard == null) {
       _logger.e('Cannot refresh - no dashboard available');
@@ -219,6 +238,12 @@ Dashboard refresh stats:
   }
 
   Future<void> _onHomeLoadMoreStarted(HomeLoadMoreStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with loading more data
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Load more prevented while update screen is showing');
+      return;
+    }
+    
     if (state.dashboard == null || !state.hasMoreEntries) return;
     
     // Prevent multiple concurrent load more requests
@@ -353,10 +378,22 @@ Dashboard refresh stats:
   }
 
   void _onHomePageChanged(HomePageChanged event, Emitter<HomeState> emit) {
+    // Check if update screen is showing - if so, don't proceed with page change
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Page change prevented while update screen is showing');
+      return;
+    }
+    
     emit(state.copyWith(currentPage: event.page));
   }
 
   Future<void> _onHomeAcceptCredexStarted(HomeAcceptCredexStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with accepting credex
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Accept credex prevented while update screen is showing');
+      return;
+    }
+    
     // Add the credexId to processing state
     final updatedProcessingIds = [...state.processingCredexIds, event.credexId];
     
@@ -389,6 +426,12 @@ Dashboard refresh stats:
   }
 
   Future<void> _onHomeAcceptCredexBulkStarted(HomeAcceptCredexBulkStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with accepting credex bulk
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Accept credex bulk prevented while update screen is showing');
+      return;
+    }
+    
     // Add all credexIds to processing state
     final updatedProcessingIds = [...state.processingCredexIds, ...event.credexIds];
     
@@ -421,6 +464,12 @@ Dashboard refresh stats:
   }
 
   Future<void> _onHomeCancelCredexStarted(HomeCancelCredexStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with cancelling credex
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Cancel credex prevented while update screen is showing');
+      return;
+    }
+    
     emit(state.copyWith(
       status: HomeStatus.cancellingCredex,
       processingCredexIds: [...state.processingCredexIds, event.credexId],
@@ -470,6 +519,12 @@ Dashboard refresh stats:
   }
 
   Future<void> _onHomeUpgradeTierStarted(HomeUpgradeTierStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with upgrading tier
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Upgrade tier prevented while update screen is showing');
+      return;
+    }
+    
     emit(state.copyWith(status: HomeStatus.upgradingTier));
     try {
       await upgradeMemberTier(event.sourceAccountId);
@@ -516,12 +571,24 @@ Dashboard refresh stats:
     HomeFetchPendingTransactions event,
     Emitter<HomeState> emit,
   ) async {
+    // Check if update screen is showing - if so, don't proceed with fetching pending transactions
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Fetch pending transactions prevented while update screen is showing');
+      return;
+    }
+    
     // Trigger a refresh to update the dashboard and transactions
     add(const HomeRefreshStarted());
   }
 
   void _onHomeOfferAccepted(HomeOfferAccepted event, Emitter<HomeState> emit) {
     _logger.i('Offer accepted notification received for credexId: ${event.credexId}');
+    
+    // Check if update screen is showing - if so, don't proceed with processing offer
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Offer accepted processing prevented while update screen is showing');
+      return;
+    }
     
     // Add the credexId to processingCredexIds to show "Processing..." state
     // Don't trigger a refresh here since the notification service will handle that
@@ -532,6 +599,12 @@ Dashboard refresh stats:
 
   Future<void> _loadLedgerData(Dashboard dashboard) async {
     _logger.d('Loading ledger data for accounts');
+
+    // Check if update screen is showing - if so, don't proceed with loading ledger data
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Ledger data loading prevented while update screen is showing');
+      return;
+    }
 
     final Map<String, List<LedgerEntry>> accountLedgers = {};
     final List<LedgerEntry> allEntries = [];

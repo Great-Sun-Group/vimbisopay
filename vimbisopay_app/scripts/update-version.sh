@@ -1,5 +1,19 @@
 #!/bin/bash
-
+#
+# VimbisoPay App Version Update Script
+# 
+# This script automates the process of updating the app version across all necessary files:
+# - Updates the version in pubspec.yaml
+# - Updates the version in android/local.properties for Android builds
+# - Updates the CHANGELOG.md with the new version and release notes
+# - Builds a new APK with the updated version
+# - Creates a Git tag and GitHub release with the new version
+#
+# The script ensures that both the version name (x.y.z) and version code (build number)
+# are properly synchronized between Flutter and Android.
+#
+# Usage: ./update-version.sh
+#
 # Source GitHub configuration
 source "$(dirname "$0")/github_config.sh"
 
@@ -18,8 +32,75 @@ echo "Current version: $current_version"
 echo "Enter new version (format: x.y.z+b):"
 read new_version
 
+# Validate version format
+if ! [[ $new_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(\+[0-9]+)?$ ]]; then
+  echo "Error: Invalid version format. Expected format is x.y.z or x.y.z+b where x, y, z, and b are numbers."
+  echo "Example: 1.0.0 or 1.0.0+49"
+  exit 1
+fi
+
+# Parse version components
+version_name=$(echo $new_version | cut -d'+' -f1)
+version_code=$(echo $new_version | cut -d'+' -f2)
+
+# Check if version code is missing (no + in the version string)
+if [ "$version_name" = "$version_code" ]; then
+  echo "Warning: No version code provided in the version string."
+  echo "Using current version code from local.properties..."
+  
+  # Try to get current version code from local.properties
+  if [ -f "android/local.properties" ]; then
+    current_code=$(grep "flutter.versionCode" "android/local.properties" | cut -d'=' -f2)
+    if [ -n "$current_code" ]; then
+      # Increment the current version code
+      version_code=$((current_code + 1))
+      echo "Incremented version code to: $version_code"
+      # Update the new_version to include the version code
+      new_version="${version_name}+${version_code}"
+      echo "Updated full version to: $new_version"
+    else
+      # Default to 1 if no current version code found
+      version_code=1
+      echo "No current version code found, defaulting to: $version_code"
+      # Update the new_version to include the version code
+      new_version="${version_name}+${version_code}"
+      echo "Updated full version to: $new_version"
+    fi
+  else
+    # Default to 1 if local.properties doesn't exist
+    version_code=1
+    echo "No local.properties file found, defaulting version code to: $version_code"
+    # Update the new_version to include the version code
+    new_version="${version_name}+${version_code}"
+    echo "Updated full version to: $new_version"
+  fi
+else
+  echo "Version name: $version_name"
+  echo "Version code: $version_code"
+fi
+
 # Update pubspec.yaml version
 sed -i '' "s/version: .*/version: $new_version/" pubspec.yaml
+
+# Update Android local.properties with new version
+if [ -f "android/local.properties" ]; then
+  # Check if properties already exist and update them
+  if grep -q "flutter.versionName" "android/local.properties"; then
+    sed -i '' "s/flutter.versionName=.*/flutter.versionName=$version_name/" "android/local.properties"
+  else
+    echo "flutter.versionName=$version_name" >> "android/local.properties"
+  fi
+  
+  if grep -q "flutter.versionCode" "android/local.properties"; then
+    sed -i '' "s/flutter.versionCode=.*/flutter.versionCode=$version_code/" "android/local.properties"
+  else
+    echo "flutter.versionCode=$version_code" >> "android/local.properties"
+  fi
+  
+  echo "Updated Android version in local.properties"
+else
+  echo "Warning: android/local.properties not found, Android version not updated"
+fi
 
 # Update CHANGELOG.md
 echo -e "\n## [$new_version] - $current_date" >> CHANGELOG.md
@@ -84,7 +165,7 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 # Commit changes
 echo "Committing version changes..."
-git add pubspec.yaml CHANGELOG.md
+git add pubspec.yaml CHANGELOG.md android/local.properties
 git commit -m "chore: bump version to $new_version"
 
 # Push commit
@@ -205,4 +286,5 @@ fi
 echo "Version updated to $new_version"
 echo "APK location: $version_apk"
 echo "GitHub release created: https://github.com/$GITHUB_REPO/releases/tag/v$new_version"
+echo "APK download URL: https://github.com/$GITHUB_REPO/releases/download/v$new_version/$(basename "$version_apk")"
 echo "Changes have been committed and pushed"
