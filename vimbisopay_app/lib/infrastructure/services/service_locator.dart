@@ -16,6 +16,7 @@ import 'package:vimbisopay_app/infrastructure/services/notification_service.dart
 import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/connectivity_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/app_state_manager.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 
 class ServiceLocator {
@@ -29,6 +30,7 @@ class ServiceLocator {
   static final LocationService _locationService = LocationService();
   static final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  static final AppStateManager _appStateManager = AppStateManager();
   
   // Lazy-initialized services that require async initialization
   static FeatureFlagService? _featureFlagService;
@@ -75,6 +77,7 @@ class ServiceLocator {
   static LocationService get locationService => _locationService;
   static StoreStatusService get storeStatusService => _storeStatusService;
   static FirebaseAnalytics get analytics => _analytics;
+  static AppStateManager get appStateManager => _appStateManager;
   
   // Getter for ConnectivityService with lazy initialization
   static ConnectivityService get connectivityService {

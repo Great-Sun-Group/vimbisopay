@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:lottie/lottie.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -29,9 +30,11 @@ import 'package:vimbisopay_app/infrastructure/utils/database_test.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/utils/navigation_utils.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/connectivity_banner.dart';
+import 'package:vimbisopay_app/presentation/screens/app_update_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -144,6 +147,10 @@ void main() async {
       if (updateInfo != null) {
         Logger.data('Update available: ${updateInfo['latest_version']}');
         Logger.data('Update required: ${updateInfo['update_required']}');
+        Logger.data('Update priority: ${updateInfo['update_priority']}');
+        
+        // Show update screen
+        await _showUpdateScreen(updateInfo);
       } else {
         Logger.data('No updates available');
       }
@@ -188,6 +195,51 @@ NotificationService initialized successfully:
   runApp(MyApp(sharedPreferences: prefs));
 }
 
+/// Shows the app update screen.
+///
+/// This function shows a dialog with the update information and options to
+/// download and install the update or defer it for later. It also ensures that
+/// the current version is included in the update information.
+///
+/// The function gets the current app version using PackageInfo and adds it to
+/// the updateInfo map if it's not already present.
+// Global navigator key for accessing the navigator from outside the widget tree
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _showUpdateScreen(Map<String, dynamic> updateInfo) async {
+  // Get current app version
+  final packageInfo = await PackageInfo.fromPlatform();
+  final currentVersion = packageInfo.version;
+  
+  // Add current version to updateInfo if not already present
+  if (!updateInfo.containsKey('current_version')) {
+    updateInfo['current_version'] = currentVersion;
+    Logger.data('Added current version to update info: $currentVersion');
+  }
+  
+  // Wait for the app to be fully initialized
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = navigatorKey.currentContext;
+    if (context == null) {
+      Logger.error('Cannot show update screen: no valid context');
+      return;
+    }
+    
+    // Set update screen showing state
+    ServiceLocator.appStateManager.setUpdateScreenShowing(true);
+    
+    // Show the update screen as a dialog
+    showDialog(
+      context: context,
+      barrierDismissible: updateInfo['update_required'] != true,
+      builder: (context) => AppUpdateScreen(updateInfo: updateInfo),
+    ).then((_) {
+      // Reset state when dialog is dismissed
+      ServiceLocator.appStateManager.setUpdateScreenShowing(false);
+    });
+  });
+}
+
 class MyApp extends StatelessWidget {
   final SharedPreferences sharedPreferences;
 
@@ -218,6 +270,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'VimbisoPay',
         builder: (context, child) {
           return Stack(
@@ -589,7 +642,7 @@ class _IntroWrapperState extends State<IntroWrapper>
         // If we have a valid user and security is set up, go to auth screen
         if (user != null && isSecuritySetup && mounted) {
           Logger.state('Valid user found, navigating to auth');
-          Navigator.pushReplacementNamed(
+          NavigationUtils.safeNavigateReplacementTo(
             context,
             '/auth',
             arguments: user,
@@ -696,7 +749,7 @@ class LoginSignupScreen extends StatelessWidget {
                 const SizedBox(height: 48),
                 FilledButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/login');
+                    NavigationUtils.safeNavigateTo(context, '/login');
                   },
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -711,7 +764,7 @@ class LoginSignupScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/create-account');
+                    NavigationUtils.safeNavigateTo(context, '/create-account');
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -729,9 +782,9 @@ class LoginSignupScreen extends StatelessWidget {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.remove('hasShownIntro');
                     if (context.mounted) {
-                      Navigator.pushReplacement(
+                      NavigationUtils.safeNavigateReplacementTo(
                         context,
-                        MaterialPageRoute(builder: (_) => const IntroWrapper()),
+                        '/',
                       );
                     }
                   },
