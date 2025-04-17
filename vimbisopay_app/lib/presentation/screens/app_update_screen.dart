@@ -27,6 +27,8 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
   String _downloadStatus = '';
   bool _downloadComplete = false;
   bool _downloadError = false;
+  bool _verifyingIntegrity = false;
+  bool _integrityVerified = false;
 
   @override
   Widget build(BuildContext context) {
@@ -313,6 +315,96 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                   const SizedBox(height: 16),
                 ],
                 
+                // Integrity Verification Status
+                if (_verifyingIntegrity) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Verifying file integrity...',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Ensuring the downloaded file is authentic and has not been tampered with.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ] else if (_integrityVerified) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.success),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.verified_user,
+                              color: AppColors.success,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Integrity verification successful',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'The downloaded file has been verified as authentic and secure.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
                 if (_downloadError) ...[
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -373,12 +465,63 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                 ],
                 
                 if (_downloadComplete) ...[
+                  // Restart instructions container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.success),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: AppColors.success,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Restart Required',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'The update has been downloaded and installation has started. You need to close and reopen the app to complete the update process.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '1. Wait for Android to finish installing the update\n2. Close the app completely\n3. Reopen the app to use the new version',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () {
                       Navigator.of(context).pop(true);
                     },
                     icon: const Icon(Icons.check_circle),
-                    label: const Text('Continue'),
+                    label: const Text('I Understand'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
@@ -411,6 +554,10 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
     });
 
     try {
+      // Check if integrity information is available
+      final hasIntegrityInfo = widget.updateInfo.containsKey('integrity') && 
+                              widget.updateInfo['integrity'] != null;
+      
       // Simulate download progress with detailed logging
       for (int i = 1; i <= 10; i++) {
         await Future.delayed(const Duration(milliseconds: 300));
@@ -420,25 +567,54 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
           _downloadStatus = 'Downloading... ${(i * 10)}%';
         });
       }
-
+      
+      // Show integrity verification status if integrity info is available
+      if (hasIntegrityInfo) {
+        setState(() {
+          _verifyingIntegrity = true;
+          _downloadStatus = 'Verifying file integrity...';
+        });
+        
+        // Add a small delay to show the verification status
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
       Logger.state('Calling ConfigManager.downloadAndInstallUpdate');
       final stopwatch = Stopwatch()..start();
       
       // Perform the actual download and installation
       final result = await ServiceLocator.configManager.downloadAndInstallUpdate(
         widget.updateInfo['update_url'],
+        updateInfo: widget.updateInfo,
       );
+      
+      // Log integrity information if available
+      if (hasIntegrityInfo) {
+        final integrity = widget.updateInfo['integrity'];
+        Logger.data('Integrity info: ${integrity.toString()}');
+        Logger.data('Algorithm: ${integrity['algorithm']}');
+        Logger.data('Checksum: ${integrity['checksum']}');
+        Logger.data('Checksum URL: ${integrity['checksumUrl']}');
+      }
+      
+      // Update integrity verification status
+      if (hasIntegrityInfo) {
+        setState(() {
+          _verifyingIntegrity = false;
+          _integrityVerified = result; // If result is true, integrity verification passed
+        });
+      }
       
       stopwatch.stop();
       Logger.performance('Download and install completed in ${stopwatch.elapsedMilliseconds}ms');
       Logger.data('Download and install result: $result');
 
       if (result) {
-        Logger.state('Update installation successful');
+        Logger.state('Update installation request sent successfully');
         setState(() {
           _downloading = false;
           _downloadComplete = true;
-          _downloadStatus = 'Update installed successfully!';
+          _downloadStatus = 'Update installation initiated successfully!';
         });
       } else {
         Logger.error('Update installation failed with result: $result');

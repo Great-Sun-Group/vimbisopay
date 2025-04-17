@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/core/config/feature_flags.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/main.dart';
 import 'package:vimbisopay_app/presentation/helpers/marketplace_debug_helper.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Debug screen for the VimbisoPay app.
 ///
@@ -38,6 +39,7 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
   bool _checkingForUpdates = false;
   String _updateStatus = '';
   Map<String, dynamic>? _updateInfo;
+  String _currentAppVersion = 'Loading...';
   
   // Notifications tab variables
   String _notificationStatus = 'Checking...';
@@ -53,6 +55,7 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
     _tabController = TabController(length: 3, vsync: this);
     _loadCurrentValues();
     _initializeNotificationService();
+    _loadAppVersion();
   }
 
   @override
@@ -538,6 +541,25 @@ Received at: ${DateTime.now()}
     );
   }
   
+  // Load app version
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _currentAppVersion = '${packageInfo.version} (${packageInfo.buildNumber})';
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading app version', e);
+      if (mounted) {
+        setState(() {
+          _currentAppVersion = 'Unknown';
+        });
+      }
+    }
+  }
+
   // App Updates Tab
   Widget _buildAppUpdatesTab() {
     return SafeArea(
@@ -546,6 +568,35 @@ Received at: ${DateTime.now()}
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Card(
+              color: AppColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Current App Version',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _currentAppVersion,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             const Text(
               'App Update Testing',
               style: TextStyle(
