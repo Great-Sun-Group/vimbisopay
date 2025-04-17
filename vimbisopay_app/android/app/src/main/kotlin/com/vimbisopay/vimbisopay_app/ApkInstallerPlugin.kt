@@ -31,7 +31,7 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
                 val filePath = call.argument<String>("filePath")
                 if (filePath != null) {
                     try {
-                        Log.d(TAG, "Installing APK from path: $filePath")
+                        Log.d(TAG, "Preparing to install APK from path: $filePath")
                         val success = installApk(filePath)
                         result.success(success)
                     } catch (e: Exception) {
@@ -75,8 +75,9 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
-            Log.d(TAG, "Starting installation intent")
+            Log.d(TAG, "Launching Android package installer")
             context.startActivity(intent)
+            Log.d(TAG, "APK installation request sent to Android package installer - user must approve and restart app after installation")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error in installApk", e)
