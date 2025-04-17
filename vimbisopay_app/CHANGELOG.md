@@ -177,3 +177,6 @@ Example entry format:
 -e 
 ## [2.4.0+2] - 2025-04-18
 - checking self install
+-e 
+## [2.5.0+03] - 2025-04-18
+- test url formatting
