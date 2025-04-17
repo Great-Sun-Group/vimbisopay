@@ -157,3 +157,5 @@ Example entry format:
 -e 
 ## [2.1.0+01] - 2025-04-14
 - testing app update
+-e 
+## [2.1.1+02] - 2025-04-17
