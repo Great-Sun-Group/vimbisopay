@@ -180,3 +180,6 @@ Example entry format:
 -e 
 ## [2.5.0+03] - 2025-04-18
 - test url formatting
+-e 
+## [2.6.0+4] - 2025-04-18
+- using package installer 
