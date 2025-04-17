@@ -165,3 +165,9 @@ Example entry format:
 -e 
 ## [2.1.2+11] - 2025-04-17
 - testing auto app update on device 
+-e 
+## [2.2.0+1] - 2025-04-17
+- checking version checksums
+-e 
+## [2.2.0+2] - 2025-04-17
+- version check
