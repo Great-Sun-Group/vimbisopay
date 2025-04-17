@@ -162,3 +162,6 @@ Example entry format:
 -e 
 ## [2.1.1+03] - 2025-04-17
 - testing urls 
+-e 
+## [2.1.2+11] - 2025-04-17
+- testing auto app update on device 
