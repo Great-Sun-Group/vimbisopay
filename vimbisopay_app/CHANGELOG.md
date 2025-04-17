@@ -171,3 +171,6 @@ Example entry format:
 -e 
 ## [2.2.0+2] - 2025-04-17
 - version check
+-e 
+## [2.3.0+01] - 2025-04-17
+- formatted urls
