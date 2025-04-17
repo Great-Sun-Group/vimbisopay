@@ -45,6 +45,6 @@ coreclearforce:
 
 # Run Flutter app on device at 127.0.0.1:6555
 app1:
-	@cd vimbisopay_app && flutter run -d 127.0.0.1:6555
+	@cd vimbisopay_app && flutter run --hot -d 127.0.0.1:6555
 
 .PHONY: help diff update-swagger coreclearforce app1
