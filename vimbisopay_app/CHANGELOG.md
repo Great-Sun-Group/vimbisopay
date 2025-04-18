@@ -183,3 +183,6 @@ Example entry format:
 -e 
 ## [2.6.0+4] - 2025-04-18
 - using package installer 
+-e 
+## [2.7.0+01] - 2025-04-18
+- testing package installer
