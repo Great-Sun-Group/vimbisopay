@@ -465,7 +465,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                 ],
                 
                 if (_downloadComplete) ...[
-                  // Restart instructions container
+                  // Installation instructions container
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -485,7 +485,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Text(
-                                'Restart Required',
+                                'Installation In Progress',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -497,7 +497,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'The update has been downloaded and installation has started. You need to close and reopen the app to complete the update process.',
+                          'The update has been downloaded and installation has started. You will receive a notification when the installation is complete.',
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textPrimary,
@@ -505,7 +505,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          '1. Wait for Android to finish installing the update\n2. Close the app completely\n3. Reopen the app to use the new version',
+                          '1. Approve the installation when prompted\n2. Wait for the installation to complete\n3. You\'ll receive a notification when done\n4. Tap the notification to open the updated app',
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textPrimary,
