@@ -37,7 +37,7 @@ dependencies:
   provider: ^6.1.1
   logger: ^2.0.2+1
   path: any
-  audioplayers: ^6.1.0
+  audioplayers: ^5.2.1  # Downgrading to a version compatible with audioplayers_android
   path_provider: any
   image_picker: ^1.0.4
   cached_network_image: ^3.3.0
