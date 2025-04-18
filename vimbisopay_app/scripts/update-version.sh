@@ -25,6 +25,7 @@ urlencode() {
     c=${string:$pos:1}
     case "$c" in
       [-_.~a-zA-Z0-9] ) o="${c}" ;;
+      "+" )             o="%2B" ;;
       * )               printf -v o '%%%02x' "'$c"
     esac
     encoded+="${o}"
