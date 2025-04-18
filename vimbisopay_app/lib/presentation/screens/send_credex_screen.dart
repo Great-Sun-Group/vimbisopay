@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart'; // Add Logger import
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
@@ -12,7 +11,7 @@ import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_event.
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/send_credex_widgets.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/index.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/transaction_success_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
 
@@ -44,7 +43,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   final _recipientController = TextEditingController();
   final _amountController = TextEditingController();
   final _amountFocusNode = FocusNode();
-  final _recipientFocusNode = FocusNode(); // Add focus node for recipient input
+  final _recipientFocusNode = FocusNode();
   late final SendCredexBloc _bloc;
   bool _isAmountFirstEdit = true;
 
@@ -101,7 +100,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     _recipientController.dispose();
     _amountController.dispose();
     _amountFocusNode.dispose();
-    _recipientFocusNode.dispose(); // Dispose the recipient focus node
+    _recipientFocusNode.dispose();
     super.dispose();
   }
 
@@ -152,9 +151,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     }
   }
 
-  // Add a local state variable to track if we're showing the recipient input
-  bool _showRecipientInput = false;
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
@@ -169,11 +165,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           // Update recipient controller when handle changes or is cleared
           if (state.recipientHandle != _recipientController.text) {
             _recipientController.text = state.recipientHandle ?? '';
-          }
-
-          // Reset _showRecipientInput when a recipient is verified
-          if (state.verifiedAccountDetails != null) {
-            _showRecipientInput = false;
           }
           
           // Show tier limit dialog if needed
@@ -243,33 +234,40 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         StatusMessageWidget(message: state.statusMessage),
                         ErrorMessageWidget(message: state.errorMessage),
                         
-                        // Sender account card - moved to the top and always visible
+                        // Sender account card - always visible
                         if (state.senderAccount != null) ...[
-                          FutureBuilder<User?>(
-                            future: widget.databaseHelper.getUser(),
-                            builder: (context, snapshot) {
-                              String? profileImageUrl;
-                              String? memberName;
-                              if (snapshot.hasData && 
-                                  snapshot.data != null && 
-                                  snapshot.data!.dashboard != null) {
-                                profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
-                                memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
-                              }
-                              
-                              return SenderAccountCard(
-                                account: state.senderAccount!,
-                                selectedDenomination: state.selectedDenomination,
-                                availableBalance: state.availableBalance,
-                                credexType: state.credexType,
-                                profileImageUrl: profileImageUrl, // Always pass the profileImageUrl
-                                memberName: memberName, // Pass the member name
-                              );
-                            },
+                          SizedBox(
+                            width: double.infinity,
+                            child: FutureBuilder<User?>(
+                              future: widget.databaseHelper.getUser(),
+                              builder: (context, snapshot) {
+                                String? profileImageUrl;
+                                String? memberName;
+                                if (snapshot.hasData && 
+                                    snapshot.data != null && 
+                                    snapshot.data!.dashboard != null) {
+                                  profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
+                                  memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
+                                }
+                                
+                                return SenderAccountCard(
+                                  account: state.senderAccount!,
+                                  selectedDenomination: state.selectedDenomination,
+                                  availableBalance: state.availableBalance,
+                                  credexType: state.credexType,
+                                  profileImageUrl: profileImageUrl,
+                                  memberName: memberName,
+                                );
+                              },
+                            ),
                           ),
+                          
+                          const SizedBox(height: 16),
                         ],
-                                                
-                        // Recipient section
+                        
+                        // Recipient section - always visible
+                        // No extra spacing needed here since the previous card already has margin
+                        
                         if (state.verifiedAccountDetails == null) ...[
                           // Set focus to the recipient input field when it appears
                           Builder(builder: (context) {
@@ -279,7 +277,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             
                             return RecipientInputCard(
                               recipientController: _recipientController,
-                              focusNode: _recipientFocusNode, // Pass the focus node
+                              focusNode: _recipientFocusNode,
                               isVerifying: state.status == SendCredexStatus.verifyingRecipient,
                               onVerify: () => _bloc.add(VerifyRecipientEvent(_recipientController.text)),
                               onScanQR: _scanQRCode,
@@ -302,45 +300,50 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                   snapshot.data!.dashboard != null) {
                                 profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
                                 memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
-                                // Debug log to check if profile image URL is available
-                                Logger.data('Recipient profile image URL: $profileImageUrl');
                               }
                               
                               return VerifiedRecipientCard(
                                 accountDetails: state.verifiedAccountDetails!,
-                                onChangeRecipient: () {
-                                  // Clear the recipient controller
-                                  _recipientController.text = '';
-                                  // Directly update the UI to show the recipient input section
-                                  _bloc.add(const ChangeRecipientEvent());
-                                },
+                                onChangeRecipient: () => _bloc.add(const ChangeRecipientEvent()),
                                 credexType: state.credexType,
-                                profileImageUrl: profileImageUrl, // Always pass the profileImageUrl
-                                memberName: memberName, // Always pass the memberName
-                                isVerifying: state.status == SendCredexStatus.verifyingRecipient, // Pass verification status
+                                profileImageUrl: profileImageUrl,
+                                memberName: memberName,
+                                isVerifying: state.status == SendCredexStatus.verifyingRecipient,
                               );
                             },
                           ),
                         ],
                         
-                        // Only show the rest of the UI after recipient verification and when showFullUI is true
-                        if (state.showFullUI) ...[
-                          const SizedBox(height: 16),
-                          
-                          // Amount and denomination section - moved above Credex Type Selector
-                          AmountInputSection(
+                        // Amount section - always visible but disabled until recipient is verified
+                        const SizedBox(height: 16),
+                        
+                        Container(
+                          width: double.infinity,
+                          child: AmountInputCard(
                             amountController: _amountController,
                             amountFocusNode: _amountFocusNode,
                             selectedDenomination: state.selectedDenomination,
                             availableDenominations: state.availableDenominations,
-                            decimalPlaces: state.decimalPlaces,
-                            onAmountChanged: (value) => _bloc.add(UpdateAmountEvent(value)),
                             onDenominationChanged: (denom) {
-                              if (denom != null) {
+                              if (denom != null && state.verifiedAccountDetails != null) {
                                 _bloc.add(UpdateDenominationEvent(denom));
                               }
                             },
+                            decimalPlaces: state.decimalPlaces,
+                            onAmountChanged: (value) => state.verifiedAccountDetails != null ? 
+                                _bloc.add(UpdateAmountEvent(value)) : null,
+                            onUpgradePressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => TierLimitDialog(
+                                  message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+                                  accountId: widget.senderAccount.accountID,
+                                  homeBloc: widget.homeBloc,
+                                ),
+                              );
+                            },
                             validator: (value) {
+                              if (state.verifiedAccountDetails == null) return null;
                               if (value == null || value.isEmpty) {
                                 return 'Please enter amount';
                               }
@@ -351,85 +354,93 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                               if (amount <= 0) {
                                 return 'Amount must be greater than 0';
                               }
-                              if (amount > state.availableBalance) {
+                              // Only check balance for secured Credex
+                              if (state.credexType == CredexType.SECURED && amount > state.availableBalance) {
                                 return 'Amount exceeds available balance';
                               }
                               return null;
                             },
+                            isEnabled: state.verifiedAccountDetails != null,
+                            showFullContent: state.senderAccount != null && state.verifiedAccountDetails != null,
                           ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Credex Type Selector
-                          CredexTypeSelector(
-                            credexType: state.credexType,
-                            onCredexTypeChanged: (credexType) => 
-                                _bloc.add(UpdateCredexTypeEvent(credexType)),
+                        ),
+                        
+                        // Credex Type Section - always visible but disabled until recipient is verified
+                        const SizedBox(height: 16),
+                        
+                        Container(
+                          width: double.infinity,
+                          child: FutureBuilder<User?>(
+                            future: widget.databaseHelper.getUser(),
+                            builder: (context, snapshot) {
+                              // Determine if we should show full content for the Type section
+                              // Only show full content if recipient is verified and amount is entered
+                              final hasAmount = double.tryParse(state.amount) != null && double.parse(state.amount) > 0;
+                              final showFullContent = state.verifiedAccountDetails != null && hasAmount;
+                              
+                              return CredexTypeSection(
+                                credexType: state.credexType,
+                                onCredexTypeChanged: (credexType) => 
+                                    state.verifiedAccountDetails != null ? 
+                                    _bloc.add(UpdateCredexTypeEvent(credexType)) : null,
+                                dueDate: state.dueDate,
+                                onDueDateChanged: (date) => 
+                                    state.verifiedAccountDetails != null ? 
+                                    _bloc.add(UpdateDueDateEvent(date)) : null,
+                                availableBalance: state.availableBalance,
+                                selectedDenomination: state.selectedDenomination.toString().split('.').last,
+                                accountName: state.senderAccount!.accountName,
+                                isEnabled: state.verifiedAccountDetails != null,
+                                showFullContent: showFullContent,
+                              );
+                            },
                           ),
-                          
-                          // Info paragraph for Secured Credex
-                          if (state.credexType == CredexType.SECURED) ...[
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: AppColors.secondary.withOpacity(0.5),
-                                  width: 1,
+                        ),
+                        
+                        // Contract and counterparty preview sections - always visible but may be empty
+                        const SizedBox(height: 16),
+                        
+                        Container(
+                          width: double.infinity,
+                          child: FutureBuilder<User?>(
+                            future: widget.databaseHelper.getUser(),
+                            builder: (context, snapshot) {
+                              String memberName = "You";
+                              if (snapshot.hasData && 
+                                  snapshot.data != null && 
+                                  snapshot.data!.dashboard != null) {
+                                memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
+                              }
+                              
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                // Contract section (now includes counterparty preview)
+                                ContractSection(
+                                  credexType: state.credexType,
+                                  amount: state.amount,
+                                  denomination: state.selectedDenomination.toString().split('.').last,
+                                  senderAccountName: state.senderAccount!.accountName,
+                                  recipientAccountName: state.verifiedAccountDetails?['accountName'] ?? 'recipient',
+                                  memberName: memberName,
+                                  dueDate: state.dueDate,
+                                  availableBalance: state.availableBalance,
                                 ),
-                              ),
-                              child: const Text(
-                                'Backed by your secured balance of gold or cash. This is a direct transfer of title that will be completed immediately on offer acceptance.',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ],
-                          
-                          // Info paragraph and additional fields for Unsecured Credex
-                          if (state.credexType == CredexType.UNSECURED) ...[                          
-                            // Info paragraph
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: AppColors.secondary.withOpacity(0.5),
-                                  width: 1,
-                                ),
-                              ),
-                              child: const Text(
-                                'Backed by your publicly recorded promise to provide value in the future. Build your credscore by keeping your promises.',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // Due Date Selector (now separate from profile pics)
-                            DueDateSelector(
-                              selectedDate: state.dueDate,
-                              onDateChanged: (date) => 
-                                  _bloc.add(UpdateDueDateEvent(date)),
-                            ),
-                          ],
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Submit button
-                          SubmitButton(
-                            isLoading: state.isLoading,
-                            isEnabled: state.canSubmit,
-                            onPressed: _handleSubmit,
+                                ],
+                              );
+                            },
                           ),
-                        ],
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Submit button - always visible but disabled until all conditions are met
+                        ActionButton(
+                          label: 'Sign Offer',
+                          onPressed: state.canSubmit ? _handleSubmit : null,
+                          isLoading: state.isLoading,
+                          backgroundColor: _hasInsufficientBalance(state) ? AppColors.darkRed : AppColors.primary,
+                        ),
                       ],
                     ),
                   ),
@@ -447,5 +458,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     
     // Dispatch submit event
     _bloc.add(const SendCredexSubmitEvent());
+  }
+  
+  // Helper method to check if there's insufficient balance for secured Credex
+  bool _hasInsufficientBalance(SendCredexState state) {
+    if (state.credexType != CredexType.SECURED) return false;
+    
+    final amount = double.tryParse(state.amount) ?? 0.0;
+    return amount > 0 && amount > state.availableBalance;
   }
 }

@@ -43,7 +43,7 @@ abstract class AppColors {
   static const Color grey = Color(0xFF9E9E9E);          // GREY
   static const Color grey200 = Color(0xFFEEEEEE);       // GREY 200
   static const Color grey300 = Color(0xFFE0E0E0);       // GREY 300
-  static const Color techAzure = Color(0xFF0078D7);     // Microsoft Tech Azure Blue
+  static const Color techAzure = Color(0xFF04A0B2);     // Tech Azure Blue
   
   // ======== SEMANTIC COLOR DEFINITIONS ========
   // These map the base colors to their functional uses in the app

@@ -37,10 +37,16 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   }
   
   void _onUpdateCredexType(UpdateCredexTypeEvent event, Emitter<SendCredexState> emit) {
+    DateTime? newDueDate = state.dueDate;
+    
+    // Set a default due date if switching to UNSECURED and no due date exists
+    if (event.credexType == CredexType.UNSECURED && newDueDate == null) {
+      newDueDate = DateTime.now().add(const Duration(days: 28));
+    }
+    
     emit(state.copyWith(
       credexType: event.credexType,
-      // If switching to secured, clear the due date
-      dueDate: event.credexType == CredexType.SECURED ? null : state.dueDate,
+      dueDate: newDueDate,
     ));
   }
   
@@ -60,6 +66,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       orElse: () => Denomination.USD,
     );
     
+    // Set default due date (4 weeks from now)
+    final defaultDueDate = DateTime.now().add(const Duration(days: 28));
+    
     // Initialize state with sender account and default values
     final initialState = state.copyWith(
       status: SendCredexStatus.initial,
@@ -68,7 +77,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       availableDenominations: availableDenominations,
       amount: '0.${'0' * (defaultDenomination == Denomination.CXX ? 3 : 2)}',
       showFullUI: false, // Start with only showing initial input fields
-      credexType: CredexType.NEUTRAL, // Explicitly set to neutral state on initialization
+      credexType: CredexType.SECURED, // Explicitly set to secured state on initialization
+      dueDate: defaultDueDate, // Set default due date
     );
     
     // If recipient info is provided, pre-fill and verify
@@ -104,6 +114,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         },
         status: SendCredexStatus.recipientVerified,
         showFullUI: true, // Show the full UI immediately for pre-filled recipients
+        // Preserve the current credexType and dueDate
+        credexType: state.credexType,
+        dueDate: state.dueDate,
       ));
       
       // Still verify the recipient to get the account name and confirm the account exists
@@ -251,7 +264,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           },
           statusMessage: null,
           showFullUI: true, // Show the full UI after successful verification
-          credexType: CredexType.NEUTRAL, // Explicitly set to neutral state after verification
+          // Explicitly preserve the current credexType and dueDate
+          credexType: state.credexType,
+          dueDate: state.dueDate,
         ));
       } else if (response.statusCode == 401 || 
                 (response.statusCode == 400 && response.body.toLowerCase().contains('token expired'))) {
@@ -399,7 +414,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             },
             statusMessage: null,
             showFullUI: true, // Show the full UI after successful verification
-            credexType: CredexType.NEUTRAL, // Explicitly set to neutral state after verification
+            // Explicitly preserve the current credexType and dueDate
+            credexType: state.credexType,
+            dueDate: state.dueDate,
           ));
         } else {
           // Still failed after token refresh
@@ -413,14 +430,44 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           ));
         }
       } else {
-        final errorMessage = json.decode(response.body)['message'] ?? 'Failed to verify recipient account';
-        Logger.error('Error verifying recipient: $errorMessage');
-        emit(state.copyWith(
-          status: SendCredexStatus.error,
-          isLoading: false,
-          errorMessage: _getFormattedErrorMessage(errorMessage),
-          statusMessage: null,
-        ));
+        try {
+          final jsonResponse = json.decode(response.body);
+          final message = jsonResponse['message'] ?? 'Failed to verify recipient account';
+          
+          // Check for specific account not found error
+          if (jsonResponse.containsKey('data') && 
+              jsonResponse['data'].containsKey('action') && 
+              jsonResponse['data']['action'].containsKey('details')) {
+            
+            final details = jsonResponse['data']['action']['details'];
+            if (details['code'] == 'ACCOUNT_NOT_FOUND') {
+              emit(state.copyWith(
+                status: SendCredexStatus.error,
+                isLoading: false,
+                errorMessage: 'Account not found. Please check the handle and try again.',
+                statusMessage: null,
+              ));
+              return;
+            }
+          }
+          
+          Logger.error('Error verifying recipient: $message');
+          emit(state.copyWith(
+            status: SendCredexStatus.error,
+            isLoading: false,
+            errorMessage: _getFormattedErrorMessage(message),
+            statusMessage: null,
+          ));
+        } catch (e) {
+          final errorMessage = 'Failed to verify recipient account';
+          Logger.error('Error parsing response: $e');
+          emit(state.copyWith(
+            status: SendCredexStatus.error,
+            isLoading: false,
+            errorMessage: errorMessage,
+            statusMessage: null,
+          ));
+        }
       }
     } catch (e) {
       Logger.error('Exception during recipient verification: $e');
@@ -443,6 +490,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   void _onUpdateAmount(UpdateAmountEvent event, Emitter<SendCredexState> emit) {
     emit(state.copyWith(
       amount: event.amount,
+      // Explicitly preserve the due date when updating amount
+      dueDate: state.dueDate,
     ));
   }
   
@@ -462,12 +511,14 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       emit(state.copyWith(
         selectedDenomination: event.denomination,
         amount: newAmount,
+        // Explicitly preserve the due date when updating denomination
+        dueDate: state.dueDate,
       ));
     }
   }
   
   void _onChangeRecipient(ChangeRecipientEvent event, Emitter<SendCredexState> emit) {
-    // Create a new state with cleared recipient information and reset to neutral credex type
+    // Create a new state with cleared recipient information and reset to secured credex type
     final newState = SendCredexState(
       status: SendCredexStatus.initial,
       senderAccount: state.senderAccount,
@@ -475,7 +526,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       availableDenominations: state.availableDenominations,
       amount: state.amount,
       isAmountFirstEdit: state.isAmountFirstEdit,
-      credexType: CredexType.NEUTRAL, // Reset to neutral state
+      credexType: CredexType.SECURED, // Reset to secured state
       dueDate: state.dueDate,
       showFullUI: true, // Keep showing the full UI
       // Explicitly clear recipient information
@@ -530,6 +581,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         status: SendCredexStatus.recipientVerified,
         showFullUI: true, // Show the full UI immediately for QR code scanned recipients
         errorMessage: null,
+        // Explicitly preserve the current credexType and dueDate
+        credexType: state.credexType,
+        dueDate: state.dueDate,
       ));
       
       // Still verify the recipient to get the account name and confirm the account exists
@@ -586,6 +640,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
                 isLoading: false,
                 errorMessage: 'Authentication error. Please log in again.',
                 statusMessage: null,
+                dueDate: state.dueDate, // Preserve due date
               ));
               return;
             }
@@ -606,6 +661,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
                 isLoading: false,
                 errorMessage: 'Authentication error. Please log in again.',
                 statusMessage: null,
+                dueDate: state.dueDate, // Preserve due date
               ));
               return;
             }
@@ -650,6 +706,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
                     isLoading: false,
                     errorMessage: userMessage,
                     statusMessage: null,
+                    dueDate: state.dueDate, // Preserve due date
                   ));
                 } else {
                   emit(state.copyWith(
@@ -694,6 +751,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
               isLoading: false,
               errorMessage: 'Authentication error. Please log in again.',
               statusMessage: null,
+              dueDate: state.dueDate, // Preserve due date
             ));
             return;
           }
@@ -716,6 +774,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
               isLoading: false,
               errorMessage: userMessage,
               statusMessage: null,
+              dueDate: state.dueDate, // Preserve due date
             ));
           } else {
             emit(state.copyWith(
@@ -723,6 +782,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
               isLoading: false,
               errorMessage: _getFormattedErrorMessage(failure?.message ?? failure.toString()),
               statusMessage: null,
+              dueDate: state.dueDate, // Preserve due date
             ));
           }
         } catch (e) {
@@ -731,6 +791,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             isLoading: false,
             errorMessage: _getFormattedErrorMessage(failure?.message ?? failure.toString()),
             statusMessage: null,
+            dueDate: state.dueDate, // Preserve due date
           ));
         }
         return;
@@ -758,6 +819,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         isLoading: false,
         errorMessage: _getFormattedErrorMessage(e.toString()),
         statusMessage: null,
+        dueDate: state.dueDate, // Preserve due date
       ));
     }
     
@@ -770,13 +832,19 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   }
   
   void _onClearError(ClearErrorEvent event, Emitter<SendCredexState> emit) {
-    emit(state.clearError());
+    // Use copyWith instead of clearError to ensure we preserve the due date
+    emit(state.copyWith(
+      errorMessage: null,
+      dueDate: state.dueDate,
+    ));
   }
   
   void _onUpdateStatus(UpdateStatusEvent event, Emitter<SendCredexState> emit) {
     emit(state.copyWith(
       statusMessage: event.message,
       errorMessage: null,
+      // Explicitly preserve the due date
+      dueDate: state.dueDate,
     ));
   }
   

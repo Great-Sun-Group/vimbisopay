@@ -6,7 +6,8 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/send_credex_widgets.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/common/action_button.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
 class TransactionSuccessDialog extends StatefulWidget {
   final CredexResponse response;
@@ -89,60 +90,63 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog> wit
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
               const SizedBox(height: 24),
-              Container(
+              StyledCard(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.background.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                margin: EdgeInsets.zero,
+                showTitleOverlay: false,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TransactionDetailRow(
-                      label: 'Amount',
-                      value: '${widget.amount} ${widget.denomination}',
-                    ),
+                    _buildDetailRow('Amount', '${widget.amount} ${widget.denomination}'),
                     const SizedBox(height: 12),
-                    TransactionDetailRow(
-                      label: 'To',
-                      value: widget.response.data.action.details.receiverAccountName,
-                    ),
+                    _buildDetailRow('To', widget.response.data.action.details.receiverAccountName),
                     const SizedBox(height: 12),
-                    TransactionDetailRow(
-                      label: 'New Balance',
-                      value: _getNewBalance(),
-                    ),
+                    _buildDetailRow('New Balance', _getNewBalance()),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _handleDone(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+              ActionButton(
+                label: 'Done',
+                onPressed: () => _handleDone(context),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                borderRadius: BorderRadius.circular(8),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+  
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Flexible(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
+      ],
     );
   }
   
