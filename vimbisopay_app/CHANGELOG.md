@@ -196,3 +196,7 @@ Example entry format:
 ## [3.0.0-debug+01] - 2025-04-18 (Debug Build)
 - Debug build with API environment: dev
 - testing debug flavour
+-e 
+## [3.0.1-debug+01] - 2025-04-18 (Debug Build)
+- Debug build with API environment: dev
+- test debug builds
