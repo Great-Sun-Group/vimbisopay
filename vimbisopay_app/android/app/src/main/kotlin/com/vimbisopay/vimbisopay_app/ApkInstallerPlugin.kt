@@ -1,7 +1,9 @@
 package com.vimbisopay.vimbisopay_app
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -12,6 +14,8 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 
 class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
@@ -60,25 +64,61 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
 
             Log.d(TAG, "APK file exists, size: ${file.length()} bytes")
             
-            // Create content URI using FileProvider
-            val contentUri = FileProvider.getUriForFile(
+            // Use PackageInstaller API for installation with status updates
+            val packageInstaller = context.packageManager.packageInstaller
+            
+            // Create a new session
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            val sessionId = packageInstaller.createSession(params)
+            val session = packageInstaller.openSession(sessionId)
+            
+            Log.d(TAG, "PackageInstaller session created with ID: $sessionId")
+            
+            // Copy the APK file to the session
+            FileInputStream(file).use { inputStream ->
+                session.openWrite("package", 0, file.length()).use { outputStream ->
+                    val buffer = ByteArray(65536)
+                    var c: Int
+                    while (inputStream.read(buffer).also { c = it } != -1) {
+                        outputStream.write(buffer, 0, c)
+                        outputStream.flush()
+                    }
+                }
+            }
+            
+            Log.d(TAG, "APK file copied to PackageInstaller session")
+            
+            // Create a broadcast intent for installation status
+            val intent = Intent(InstallationStatusReceiver.ACTION_INSTALLATION_STATUS)
+            // Make the intent explicit by specifying the component
+            intent.setClass(context, InstallationStatusReceiver::class.java)
+            
+            val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                "${context.packageName}.fileprovider",
-                file
+                sessionId,
+                intent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
             )
             
-            Log.d(TAG, "Content URI created: $contentUri")
-
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(contentUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            Log.d(TAG, "Launching Android package installer")
-            context.startActivity(intent)
+            // Commit the session
+            Log.d(TAG, "Committing PackageInstaller session")
+            session.commit(pendingIntent.intentSender)
+            Log.d(TAG, "PackageInstaller session committed, installation in progress")
+            
+            // The actual installation will happen asynchronously, and the status will be
+            // broadcast to our InstallationStatusReceiver
             Log.d(TAG, "APK installation request sent to Android package installer - user must approve and restart app after installation")
             return true
+        } catch (e: IOException) {
+            Log.e(TAG, "IO error in installApk", e)
+            throw e
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security error in installApk", e)
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error in installApk", e)
             throw e
