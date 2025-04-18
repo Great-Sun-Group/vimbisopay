@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'; // For ScrollDirection
+import 'package:vimbisopay_app/core/constants/url_constants.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/marketplace/product.dart';
@@ -576,17 +577,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         String? invoiceId;
 
         // Check if the QR code is a valid invoice QR code in the old format
-        if (result.startsWith('vimbisopay://invoice/')) {
+        if (result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
           // Extract the invoice ID from the QR code
-          invoiceId = result.substring('vimbisopay://invoice/'.length);
+          invoiceId = result.substring(UrlConstants.invoiceDeepLinkPattern.length);
           Logger.data(
               'QR code scanned in old format: $result, extracted invoice ID: $invoiceId');
         }
         // Check if the QR code is in the new URL format
-        else if (result.startsWith('https://mycredex.app/getInvoice/')) {
+        else if (result.startsWith(UrlConstants.invoiceUrlPattern)) {
           // Extract the invoice ID from the URL
           invoiceId =
-              result.substring('https://mycredex.app/getInvoice/'.length);
+              result.substring(UrlConstants.invoiceUrlPattern.length);
           Logger.data(
               'QR code scanned in new format: $result, extracted invoice ID: $invoiceId');
         }

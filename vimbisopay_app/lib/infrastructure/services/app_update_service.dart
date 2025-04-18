@@ -46,13 +46,24 @@ class AppUpdateService {
       final packageInfo = await PackageInfo.fromPlatform();
       final versionName = packageInfo.version;
       final buildNumber = packageInfo.buildNumber;
-      final currentVersion = "$versionName+$buildNumber";
+      
+      // For API requests, strip the "-debug" suffix if present
+      String apiVersionName = versionName;
+      bool isDebugBuild = false;
+      if (versionName.contains("-debug")) {
+        isDebugBuild = true;
+        apiVersionName = versionName.replaceAll("-debug", "");
+        Logger.data('Debug build detected, using API version: $apiVersionName');
+      }
+      
+      final currentVersion = "$apiVersionName+$buildNumber";
       final packageName = packageInfo.packageName;
       stopwatch.stop();
       
       Logger.data('Current version name: $versionName');
       Logger.data('Current build number: $buildNumber');
       Logger.data('Full app version: $currentVersion');
+      Logger.data('Is debug build: $isDebugBuild');
       Logger.data('Package name: $packageName');
       Logger.performance('PackageInfo retrieved in ${stopwatch.elapsedMilliseconds}ms');
       

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "194022974097",
+    "project_id": "vimbiso-pay-debug",
+    "storage_bucket": "vimbiso-pay-debug.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:194022974097:android:d9b2c7358c83ba4b661530",
+        "android_client_info": {
+          "package_name": "com.vimbisopay.vimbisopay_app.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWt8ns3PNAFKmnbuDzoc_jUb3JZCML6ag"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
