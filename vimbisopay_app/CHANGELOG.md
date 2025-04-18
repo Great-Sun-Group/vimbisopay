@@ -200,3 +200,7 @@ Example entry format:
 ## [3.0.1-debug+01] - 2025-04-18 (Debug Build)
 - Debug build with API environment: dev
 - test debug builds
+
+## [3.2.2-debug+2] - 2025-04-18 (Debug Build)
+- Debug build with API environment: dev
+- testing debug version
