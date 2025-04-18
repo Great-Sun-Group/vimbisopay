@@ -539,6 +539,59 @@ class AppUpdateService {
     }
   }
   
+  /// Retries the installation of the previously downloaded APK.
+  ///
+  /// This method should be called after the user has enabled the "Allow from this source" setting.
+  /// It will retry the installation of the APK that was previously downloaded.
+  ///
+  /// Returns true if the retry was successful, false otherwise.
+  Future<bool> retryInstallation() async {
+    Logger.state('Retrying APK installation');
+    
+    try {
+      if (Platform.isAndroid) {
+        // Use the method channel to retry APK installation on Android
+        Logger.state('Using Android-specific method channel to retry APK installation');
+        final stopwatch = Stopwatch()..start();
+        
+        try {
+          // Create a method channel to communicate with the native code
+          const channel = MethodChannel('com.vimbisopay.vimbisopay_app/apk_installer');
+          Logger.data('Invoking method channel for retry');
+          
+          // Call the native method to retry the APK installation
+          final result = await channel.invokeMethod<bool>('retryInstallation');
+          
+          stopwatch.stop();
+          Logger.performance('Method channel call completed in ${stopwatch.elapsedMilliseconds}ms');
+          Logger.data('Method channel result: $result');
+          
+          if (result == true) {
+            Logger.state('APK installation retry request sent successfully via method channel');
+            Logger.state('Note: User must approve installation and restart app to complete update');
+            return true;
+          } else {
+            Logger.error('Failed to send APK installation retry request via method channel');
+            return false;
+          }
+        } on PlatformException catch (e, stackTrace) {
+          stopwatch.stop();
+          Logger.error('Platform exception in method channel', e, stackTrace);
+          Logger.data('Error code: ${e.code}');
+          Logger.data('Error message: ${e.message}');
+          Logger.data('Error details: ${e.details}');
+          return false;
+        }
+      } else {
+        Logger.error('Retry installation is only supported on Android');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Error retrying APK installation', e, stackTrace);
+      return false;
+    }
+  }
+
   /// Initiates the installation of an APK file.
   ///
   /// Returns true if the installation request was successfully sent to the Android package installer,

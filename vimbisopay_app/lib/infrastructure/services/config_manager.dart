@@ -153,4 +153,14 @@ class ConfigManager {
   Future<void> clearDeferredUpdateStatus() {
     return _appUpdateService.clearDeferredStatus();
   }
+  
+  /// Retries the installation of a previously downloaded update.
+  ///
+  /// This is useful when the user has been redirected to enable "Allow from this source"
+  /// in the settings and wants to continue the installation process.
+  ///
+  /// Returns true if the retry was successful, false otherwise.
+  Future<bool> retryInstallation() {
+    return _appUpdateService.retryInstallation();
+  }
 }
