@@ -12,13 +12,17 @@ help:
 	@echo "  coreclearforce                  - Clear client database state to start from scratch"
 
 # Diff target that takes two branch parameters
-diff:
-	@if [ "$(words $(MAKECMDGOALS))" -ne "3" ]; then \
+diff: _check_args
+	@./projects/getDiff.sh $(ARG1) $(ARG2)
+
+_check_args:
+	@if [ "$(words $(MAKECMDGOALS))" -lt "3" ]; then \
 		echo "Usage: make diff <from_branch> <to_branch>"; \
 		echo "Example: make diff project dev"; \
 		exit 1; \
 	fi
-	@./projects/getDiff.sh $(word 2,$(MAKECMDGOALS)) $(word 3,$(MAKECMDGOALS))
+	$(eval ARG1 := $(word 2,$(MAKECMDGOALS)))
+	$(eval ARG2 := $(word 3,$(MAKECMDGOALS)))
 
 # Update Swagger docs
 update-swagger:

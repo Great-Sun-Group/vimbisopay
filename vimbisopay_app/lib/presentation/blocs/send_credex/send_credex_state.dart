@@ -14,7 +14,6 @@ enum SendCredexStatus {
 }
 
 enum CredexType {
-  NEUTRAL,  // Neither secured nor unsecured selected yet
   SECURED,
   UNSECURED,
 }
@@ -51,7 +50,7 @@ class SendCredexState extends Equatable {
     this.isLoading = false,
     this.isAmountFirstEdit = true,
     this.credexResponse,
-    this.credexType = CredexType.NEUTRAL,
+    this.credexType = CredexType.SECURED,
     this.dueDate,
     this.showFullUI = false, // Default to false - only show initial input fields
   });
@@ -114,8 +113,8 @@ class SendCredexState extends Equatable {
       isRecipientVerified && 
       double.tryParse(amount) != null && 
       double.parse(amount) > 0 && 
-      double.parse(amount) <= availableBalance &&
-      credexType != CredexType.NEUTRAL; // Ensure a Credex type (Secured or Unsecured) is selected
+      // Only check balance for secured Credex
+      (credexType != CredexType.SECURED || double.parse(amount) <= availableBalance);
   
   // Helper property to maintain backward compatibility
   bool get isSecuredCredex => credexType == CredexType.SECURED;
@@ -166,7 +165,7 @@ class SendCredexState extends Equatable {
       availableDenominations: availableDenominations,
       amount: amount,
       isAmountFirstEdit: isAmountFirstEdit,
-      credexType: CredexType.NEUTRAL, // Reset to neutral state
+      credexType: CredexType.SECURED, // Reset to secured state
       dueDate: dueDate,
       showFullUI: true, // Keep showing the full UI
       // Clear recipient information
