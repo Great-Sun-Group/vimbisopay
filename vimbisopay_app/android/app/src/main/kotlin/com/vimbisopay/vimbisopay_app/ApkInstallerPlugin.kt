@@ -21,6 +21,9 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private val TAG = "ApkInstallerPlugin"
+    
+    // Store the last APK file path for retry
+    private var lastApkFilePath: String? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "com.vimbisopay.vimbisopay_app/apk_installer")
@@ -36,6 +39,8 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
                 if (filePath != null) {
                     try {
                         Log.d(TAG, "Preparing to install APK from path: $filePath")
+                        // Store the file path for potential retry
+                        lastApkFilePath = filePath
                         val success = installApk(filePath)
                         result.success(success)
                     } catch (e: Exception) {
@@ -45,6 +50,22 @@ class ApkInstallerPlugin : FlutterPlugin, MethodCallHandler {
                 } else {
                     Log.e(TAG, "File path is null")
                     result.error("INVALID_ARGUMENT", "File path is required", null)
+                }
+            }
+            "retryInstallation" -> {
+                // Method to retry installation after user enables "Allow from this source"
+                if (lastApkFilePath != null) {
+                    try {
+                        Log.d(TAG, "Retrying APK installation from path: $lastApkFilePath")
+                        val success = installApk(lastApkFilePath!!)
+                        result.success(success)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error retrying APK installation", e)
+                        result.error("RETRY_ERROR", "Error retrying APK installation: ${e.message}", e.stackTraceToString())
+                    }
+                } else {
+                    Log.e(TAG, "No previous APK file path stored for retry")
+                    result.error("NO_FILE_PATH", "No previous APK file path stored for retry", null)
                 }
             }
             else -> {

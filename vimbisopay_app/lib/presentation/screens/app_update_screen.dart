@@ -497,7 +497,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'The update has been downloaded and installation has started. You will receive a notification when the installation is complete.',
+                          'The update has been downloaded and installation has started. You must approve the installation in the system prompt that appears.',
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textPrimary,
@@ -505,11 +505,66 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          '1. Approve the installation when prompted\n2. Wait for the installation to complete\n3. You\'ll receive a notification when done\n4. Tap the notification to open the updated app',
+                          '1. IMPORTANT: Tap "INSTALL" when Android asks for permission\n2. If you tap "CANCEL", the update will not be installed\n3. Wait for the installation to complete\n4. You\'ll receive a notification when done\n5. Tap the notification to open the updated app',
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.yellowPrimary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.yellowPrimary),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.help_outline,
+                                    color: AppColors.yellowPrimary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Having trouble?',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.yellowPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'If you were redirected to enable "Allow from this source" in settings, tap the button below after enabling it to continue the installation.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _retryInstallation,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry Installation'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.yellowPrimary,
+                                    side: const BorderSide(color: AppColors.yellowPrimary),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -689,6 +744,56 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
         return Icons.priority_high_rounded;
       default:
         return Icons.info_outline;
+    }
+  }
+  
+  /// Retries the installation after the user has enabled "Allow from this source".
+  Future<void> _retryInstallation() async {
+    Logger.state('Retrying installation from update screen');
+    
+    setState(() {
+      _downloadStatus = 'Retrying installation...';
+      _downloading = true;
+      _downloadError = false;
+    });
+    
+    try {
+      final result = await ServiceLocator.configManager.retryInstallation();
+      
+      Logger.data('Retry installation result: $result');
+      
+      if (result) {
+        Logger.state('Installation retry successful');
+        setState(() {
+          _downloading = false;
+          _downloadStatus = 'Installation retry successful!';
+          // We don't set _downloadComplete to true again since it's already true
+        });
+        
+        // Show a success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Installation retry initiated. Please approve the installation prompt.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } else {
+        Logger.error('Installation retry failed');
+        setState(() {
+          _downloading = false;
+          _downloadError = true;
+          _downloadStatus = 'Failed to retry installation. Please try again.';
+        });
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Error retrying installation', e, stackTrace);
+      setState(() {
+        _downloading = false;
+        _downloadError = true;
+        _downloadStatus = 'Error: $e';
+      });
     }
   }
 }
