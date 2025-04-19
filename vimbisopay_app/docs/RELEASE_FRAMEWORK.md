@@ -185,18 +185,24 @@ The release build process uses the `update-version.sh` script:
    - Update version in `android/local.properties`
    - Update `CHANGELOG.md`
 
-2. **Build Process**
-   - Build universal APK
-   - Build architecture-specific APKs
+2. **Signing Verification**
+   - Verify the existence of the release keystore file
+   - Verify the existence of the key.properties file
+   - See [RELEASE_SIGNING_KEYS.md](RELEASE_SIGNING_KEYS.md) for details on the signing process
+
+3. **Build Process**
+   - Build universal APK with release signing
+   - Build architecture-specific APKs with release signing
+   - Verify APK signatures
    - Generate checksums
 
-3. **GitHub Release**
+4. **GitHub Release**
    - Create Git tag
    - Create GitHub release
    - Upload APKs and metadata
    - Update version JSON file
 
-4. **Verification**
+5. **Verification**
    - Verify APK installation
    - Verify update mechanism
 

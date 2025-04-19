@@ -138,12 +138,39 @@ while IFS= read -r line; do
     changes="${changes}- ${line}\n"
 done
 
+# Verify the existence of the keystore file
+if [ ! -f "vimbisopay-release-key.jks" ]; then
+  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
+  echo "Please ensure the keystore file is in the project root directory."
+  exit 1
+fi
+
+# Verify the existence of key.properties
+if [ ! -f "android/key.properties" ]; then
+  echo "Error: key.properties file not found in android directory."
+  echo "Please ensure the key.properties file is properly configured."
+  exit 1
+fi
+
 echo "Building APKs..."
-echo "Building universal APK..."
+echo "Building universal APK with release signing..."
 flutter build apk --release
 
 # Add a delay to ensure the APK is fully written
 sleep 5
+
+# Verify the APK signature
+echo "Verifying universal APK signature..."
+if command -v jarsigner &> /dev/null; then
+  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-release.apk" | grep "verified"
+  if [ $? -ne 0 ]; then
+    echo "Warning: Universal APK signature verification failed. Please check the signing configuration."
+  else
+    echo "Universal APK signature verified successfully."
+  fi
+else
+  echo "Warning: jarsigner not found. Skipping APK signature verification."
+fi
 
 # Locate the universal APK file
 apk_path="build/app/outputs/flutter-apk/app-release.apk"
@@ -186,12 +213,39 @@ if [ ! -r "$version_apk" ]; then
     exit 1
 fi
 
-# Build architecture-specific APKs
-echo "Building architecture-specific APKs..."
+# Verify the existence of the keystore file
+if [ ! -f "vimbisopay-release-key.jks" ]; then
+  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
+  echo "Please ensure the keystore file is in the project root directory."
+  exit 1
+fi
+
+# Verify the existence of key.properties
+if [ ! -f "android/key.properties" ]; then
+  echo "Error: key.properties file not found in android directory."
+  echo "Please ensure the key.properties file is properly configured."
+  exit 1
+fi
+
+# Build architecture-specific APKs with release signing
+echo "Building architecture-specific APKs with release signing..."
 flutter build apk --release --split-per-abi
 
 # Add a delay to ensure the APKs are fully written
 sleep 5
+
+# Verify the APK signature
+echo "Verifying APK signature..."
+if command -v jarsigner &> /dev/null; then
+  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" | grep "verified"
+  if [ $? -ne 0 ]; then
+    echo "Warning: APK signature verification failed. Please check the signing configuration."
+  else
+    echo "APK signature verified successfully."
+  fi
+else
+  echo "Warning: jarsigner not found. Skipping APK signature verification."
+fi
 
 # Define architecture-specific APK paths
 arm64_apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"

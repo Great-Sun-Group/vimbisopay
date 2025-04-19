@@ -75,3 +75,8 @@ lib/core/config/encryption_config.dart
 scripts/github_config.sh
 android/app/google-services.json
 ios/GoogleService-Info.plist
+
+# Signing keys and properties
+*.jks
+*.keystore
+android/key.properties
