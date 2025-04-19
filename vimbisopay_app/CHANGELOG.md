@@ -217,3 +217,7 @@ Example entry format:
 ## [4.1.0-debug+01] - 2025-04-19 (Debug Build)
 - Debug build with API environment: dev
 - testing auto update
+-e 
+## [4.2.0-debug+12] - 2025-04-19 (Debug Build)
+- Debug build with API environment: dev
+- TESTING VERSION DOWNGRADE
