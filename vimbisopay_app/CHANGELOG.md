@@ -204,3 +204,9 @@ Example entry format:
 ## [3.2.2-debug+2] - 2025-04-18 (Debug Build)
 - Debug build with API environment: dev
 - testing debug version
+-e 
+## [4.0.0+01] - 2025-04-19
+- Release managenet framework
+-e 
+## [4.0.0+02] - 2025-04-19
+- Testing release signing keys
