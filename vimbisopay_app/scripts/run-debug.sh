@@ -33,12 +33,23 @@ echo "Running debug version with API environment: $API_ENV"
 if [ "$API_ENV" == "dev" ]; then
     echo "Setting API environment to development"
     # This will be handled by the ApiConfig class which defaults to development for debug builds
+    
+    # Remove any existing API environment flag file
+    if [ -f ".api_env_prod" ]; then
+        rm .api_env_prod
+        echo "Removed production environment flag file"
+    fi
 elif [ "$API_ENV" == "prod" ]; then
     echo "Setting API environment to production"
-    # You could create a temporary file or use a flag to indicate production environment
-    # For now, we'll rely on the user to manually change it in the debug screen
-    echo "Note: You'll need to change the API environment to Production in the debug screen"
+    # Create a temporary file to indicate production environment
+    # This file will be detected by the app on startup
+    touch .api_env_prod
+    echo "API environment will be automatically set to Production on app startup"
 fi
+
+# Ensure that direct flutter run commands will use development environment
+# by adding a cleanup trap
+trap 'if [ -f ".api_env_prod" ]; then rm .api_env_prod; echo "Cleaned up production environment flag file"; fi' EXIT
 
 # Run the app in debug mode
 flutter run --debug
