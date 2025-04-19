@@ -210,3 +210,6 @@ Example entry format:
 -e 
 ## [4.0.0+02] - 2025-04-19
 - Testing release signing keys
+-e 
+## [4.0.0+03] - 2025-04-19
+- Debuging release version
