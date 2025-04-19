@@ -1,5 +1,7 @@
 # VimbisoPay Release Framework
 
+> **SECURITY WARNING**: This document should NOT contain any sensitive information such as API keys, passwords, or specific endpoint URLs. Always use placeholders and refer to secure storage for actual credentials.
+
 This document outlines the comprehensive release framework for the VimbisoPay app, including both release and debug builds, API environment configuration, and version management.
 
 ## Table of Contents
@@ -75,12 +77,12 @@ Debug and release builds maintain separate version tracks:
 ### Environment Types
 
 1. **Development Environment**
-   - URL: `https://dev.mycredex.dev`
+   - URL: `<development-api-url>`
    - Used for development and testing
    - May contain experimental features
 
 2. **Production Environment**
-   - URL: `https://api.vimbisopay.com`
+   - URL: `<production-api-url>`
    - Used for production releases
    - Stable and reliable
 
@@ -91,6 +93,7 @@ The API configuration system will be enhanced to support multiple environments:
 ```dart
 // lib/core/config/api_config.dart
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum ApiEnvironment {
@@ -148,18 +151,18 @@ class ApiConfig {
   static String get apiKey {
     switch (_environment) {
       case ApiEnvironment.development:
-        return 'gfnsrtj543dGJFDGjffDhjdyKGjugDg436vBNb';
+        return dotenv.env['DEV_API_KEY'] ?? '<dev-api-key-placeholder>';
       case ApiEnvironment.production:
-        return 'prod-api-key-here';
+        return dotenv.env['PROD_API_KEY'] ?? '<prod-api-key-placeholder>';
     }
   }
   
   static String get baseUrl {
     switch (_environment) {
       case ApiEnvironment.development:
-        return 'https://dev.mycredex.dev';
+        return dotenv.env['DEV_BASE_URL'] ?? '<dev-base-url-placeholder>';
       case ApiEnvironment.production:
-        return 'https://api.vimbisopay.com';
+        return dotenv.env['PROD_BASE_URL'] ?? '<prod-base-url-placeholder>';
     }
   }
   
@@ -466,18 +469,18 @@ Alternatively, you can manually add the debug package name to the existing `goog
 "client": [
   {
     "client_info": {
-      "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+      "mobilesdk_app_id": "<mobilesdk-app-id>",
       "android_client_info": {
-        "package_name": "com.vimbisopay.vimbisopay_app"
+        "package_name": "<release-package-name>"
       }
     },
     // ... other configuration ...
   },
   {
     "client_info": {
-      "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+      "mobilesdk_app_id": "<mobilesdk-app-id>",
       "android_client_info": {
-        "package_name": "com.vimbisopay.vimbisopay_app.debug"
+        "package_name": "<debug-package-name>"
       }
     },
     // ... same configuration as above ...
