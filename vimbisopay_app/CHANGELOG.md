@@ -213,3 +213,7 @@ Example entry format:
 -e 
 ## [4.0.0+03] - 2025-04-19
 - Debuging release version
+-e 
+## [4.1.0-debug+01] - 2025-04-19 (Debug Build)
+- Debug build with API environment: dev
+- testing auto update
