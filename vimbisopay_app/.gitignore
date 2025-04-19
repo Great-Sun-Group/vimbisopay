@@ -73,7 +73,7 @@ app.*.map.json
 lib/core/config/api_config.dart
 lib/core/config/encryption_config.dart
 scripts/github_config.sh
-android/app/google-services.json
+**/google-services.json
 ios/GoogleService-Info.plist
 
 # Signing keys and properties
