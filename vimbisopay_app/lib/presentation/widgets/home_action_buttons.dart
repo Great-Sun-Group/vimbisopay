@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vimbisopay_app/core/constants/url_constants.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
@@ -145,14 +146,14 @@ class HomeActionButtons extends StatelessWidget {
     ).then((result) {
       if (result != null && context.mounted) {
         // Check if the QR code is in the invoice URL format
-        if (result.startsWith('https://mycredex.app/getInvoice/') || 
-            result.startsWith('vimbisopay://invoice/')) {
+        if (result.startsWith(UrlConstants.invoiceUrlPattern) || 
+            result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
           // This is an invoice QR code, extract the invoice ID and navigate to the invoice detail screen
           String invoiceId = "";
-          if (result.startsWith('https://mycredex.app/getInvoice/')) {
-            invoiceId = result.substring('https://mycredex.app/getInvoice/'.length);
-          } else if (result.startsWith('vimbisopay://invoice/')) {
-            invoiceId = result.substring('vimbisopay://invoice/'.length);
+          if (result.startsWith(UrlConstants.invoiceUrlPattern)) {
+            invoiceId = result.substring(UrlConstants.invoiceUrlPattern.length);
+          } else if (result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
+            invoiceId = result.substring(UrlConstants.invoiceDeepLinkPattern.length);
           }
           
           if (invoiceId.isNotEmpty) {

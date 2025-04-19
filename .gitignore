@@ -54,3 +54,6 @@ app.*.map.json
 !.thunder/thunder-environment_*.json
 !.thunder/thunder-client.json
 vimbisopay_app/scripts/github_config.sh
+vimbisopay_app/apk-builds/*
+vimbisopay_app/.api_env_prod
+vimbisopay_app/pr.md
