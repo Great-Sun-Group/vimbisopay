@@ -21,140 +21,86 @@ class AccountCard extends StatelessWidget {
       width: double.infinity,
       color: AppColors.surface,
       padding: const EdgeInsets.all(HomeConstants.defaultPadding),
-      child: LayoutBuilder(
-        builder: (context, constraints) => Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 3,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          account.accountName,
-                          style: const TextStyle(
-                            fontSize: HomeConstants.headingTextSize,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: HomeConstants.tinyPadding),
-                      _buildTierLimitBadge(),
-                    ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // Changed to min to reduce space
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Account name and net balance row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Account name
+              Expanded(
+                flex: 3,
+                child: Text(
+                  account.accountName,
+                  style: const TextStyle(
+                    fontSize: HomeConstants.headingTextSize,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
-                  _buildAccountHandle(),
-                ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            Expanded(
-              flex: 2,
-              child: _buildBalanceSection(),
-            ),
-            _buildPayablesSection(),
-          ],
-        ),
+              
+              // Net Balance
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Net Balance',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      account.balanceData.netCredexAssetsInDefaultDenom,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          // Account handle
+          _buildAccountHandle(),
+          
+          // More space between handle and payables
+          const SizedBox(height: 20),
+          
+          // Balances section
+          _buildPayablesSection(),
+        ],
       ),
     );
   }
 
   Widget _buildTierLimitBadge() {
-    // Don't show tier limit for special tier
-    if (memberTier.type == MemberTierType.special) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: HomeConstants.defaultPadding - 4,
-            vertical: HomeConstants.smallPadding - 2,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(HomeConstants.buttonBorderRadius),
-          ),
-          child: Column(
-            children: [
-              const Text(
-                'Daily Limit',
-                style: TextStyle(
-                  fontSize: HomeConstants.captionTextSize,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: HomeConstants.tinyPadding - 2),
-              Text(
-                '\$${memberTier.dailySecuredCredexLimit.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (memberTier.type == MemberTierType.open && onUpgrade != null) ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: onUpgrade,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(HomeConstants.cardBorderRadius),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.upgrade,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'Upgrade',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
+    // Return empty widget to remove daily limit and upgrade buttons
+    return const SizedBox.shrink();
   }
 
   Widget _buildAccountHandle() {
     return Row(
       children: [
         const Text(
-          '@',
+          '💳 ',
           style: TextStyle(
             fontSize: HomeConstants.subheadingTextSize,
             color: AppColors.primary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(width: HomeConstants.tinyPadding - 2),
         Flexible(
           child: Text(
             account.accountHandle,
@@ -171,9 +117,9 @@ class AccountCard extends StatelessWidget {
 
   Widget _buildBalanceSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(top: 4), // Removed bottom padding
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.start, // Changed from spaceBetween to start
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
@@ -183,13 +129,14 @@ class AccountCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(height: 2), // Controlled spacing
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               account.balanceData.netCredexAssetsInDefaultDenom,
               style: const TextStyle(
-                fontSize: 26,
+                fontSize: 20, // Further reduced from 22px to fix overflow
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
               ),
@@ -201,68 +148,210 @@ class AccountCard extends StatelessWidget {
   }
 
   Widget _buildPayablesSection() {
-    return SizedBox(
-      height: 50,
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Receivables',
-                      style: TextStyle(
-                        fontSize: HomeConstants.bodyTextSize,
-                        color: AppColors.textSecondary,
-                      ),
+    // Gold border color
+    final borderColor = AppColors.yellowMain;
+    final borderWidth = 1.5;
+    
+    // IMPORTANT: Removed ALL top padding here
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Secured section with gold border and title overlay
+        Expanded(
+          flex: 1, // Maintain 1:2 ratio
+          child: Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Main card
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: borderColor,
+                      width: borderWidth,
                     ),
-                    const Spacer(),
-                    Text(
-                      account.balanceData.unsecuredBalances.totalReceivables,
-                      style: const TextStyle(
-                        fontSize: HomeConstants.subheadingTextSize,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.techAzure,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center, // Changed to center
+                    children: [
+                      const SizedBox(height: 2),
+                      // Secured value
+                      const Center( // Added Center widget
+                        child: Text(
+                          'Available',
+                          style: TextStyle(
+                            fontSize: HomeConstants.bodyTextSize,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Center( // Added Center widget
+                        child: Text(
+                          '\$1,250.00', // Placeholder value
+                          style: const TextStyle(
+                            fontSize: HomeConstants.subheadingTextSize,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Payables',
+                
+                // Title overlay
+                Positioned(
+                  top: -10,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    color: AppColors.surface,
+                    child: Text(
+                      'Secured',
                       style: TextStyle(
-                        fontSize: HomeConstants.bodyTextSize,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      account.balanceData.unsecuredBalances.totalPayables,
-                      style: const TextStyle(
-                        fontSize: HomeConstants.subheadingTextSize,
+                        color: borderColor,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.errorRed,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        
+        // Unsecured section containing both Receivable and Payable
+        Expanded(
+          flex: 2, // Maintain 1:2 ratio
+          child: Container(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Main card
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: borderColor,
+                      width: borderWidth,
+                    ),
+                  ),
+                  // IMPORTANT: Kept Table but added vertical divider and reduced cell padding
+                  child: Table(
+                    columnWidths: const {
+                      0: FlexColumnWidth(1),
+                      1: FlexColumnWidth(1),
+                    },
+                    // Add a border that only shows vertically between columns
+                    border: TableBorder(
+                      verticalInside: BorderSide(
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.3),
+                      ),
+                    ),
+                    children: [
+                      TableRow(
+                        children: [
+                          // Receivable label - center aligned
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Center(
+                              child: Text(
+                                'Receivable',
+                                style: TextStyle(
+                                  fontSize: HomeConstants.bodyTextSize,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Payable label - center aligned
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Center(
+                              child: Text(
+                                'Payable',
+                                style: TextStyle(
+                                  fontSize: HomeConstants.bodyTextSize,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      TableRow(
+                        children: [
+                          // Receivable value - center aligned
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Center(
+                              child: Text(
+                                '\$750.00', // Placeholder value
+                                style: const TextStyle(
+                                  fontSize: HomeConstants.subheadingTextSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.techAzure,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          // Payable value - center aligned
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Center(
+                              child: Text(
+                                '\$500.00', // Placeholder value
+                                style: const TextStyle(
+                                  fontSize: HomeConstants.subheadingTextSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.errorRed,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Title overlay
+                Positioned(
+                  top: -10,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    color: AppColors.surface,
+                    child: Text(
+                      'Unsecured',
+                      style: TextStyle(
+                        color: borderColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
