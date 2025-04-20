@@ -24,6 +24,7 @@ import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/infrastructure/services/analytics_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,10 +44,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isDisposed = false;
   bool _isInitializing = true;
   final NotificationService _notificationService = NotificationService();
+  late AnalyticsService _analyticsService;
   StreamSubscription? _refreshSubscription;
   StreamSubscription? _notificationSubscription;
 
   void _showUpgradeBottomSheet(BuildContext context, String accountId) {
+    // Track button tap for upgrade
+    try {
+      _analyticsService.trackButtonTap(
+        'upgrade_tier_button',
+        screenName: 'HomeScreen',
+        parameters: {'account_id': accountId},
+      );
+    } catch (e) {
+      Logger.error('Failed to track upgrade button tap', e);
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -89,9 +102,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
           child: UpgradeTierBottomSheet(
             onConfirm: () {
+              // Track confirm button tap
+              try {
+                _analyticsService.trackButtonTap(
+                  'confirm_upgrade_button',
+                  screenName: 'UpgradeTierBottomSheet',
+                  parameters: {'account_id': accountId},
+                );
+              } catch (e) {
+                Logger.error('Failed to track confirm upgrade button tap', e);
+              }
+              
               _homeBloc.add(HomeUpgradeTierStarted(accountId));
             },
-            onCancel: () => Navigator.pop(context),
+            onCancel: () {
+              // Track cancel button tap
+              try {
+                _analyticsService.trackButtonTap(
+                  'cancel_upgrade_button',
+                  screenName: 'UpgradeTierBottomSheet',
+                );
+              } catch (e) {
+                Logger.error('Failed to track cancel upgrade button tap', e);
+              }
+              
+              Navigator.pop(context);
+            },
             isLoading: _homeBloc.state.status == HomeStatus.upgradingTier,
           ),
         ),
@@ -426,6 +462,18 @@ Error setting up notification listeners:
     _pageController = PageController(initialPage: 0);
     _setupScrollListener();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize analytics service
+    try {
+      _analyticsService = ServiceLocator.analyticsService;
+      // Track screen view
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _analyticsService.trackScreenView('HomeScreen');
+      });
+    } catch (e) {
+      Logger.error('Failed to initialize analytics service', e);
+    }
+    
     _checkUserAndInitialize();
   }
 
@@ -594,6 +642,17 @@ Error reinitializing notification listeners:
                       icon: const Icon(Icons.clear, color: AppColors.primary),
                       onPressed: () {
                         Logger.interaction('Search cleared');
+                        
+                        // Track search clear button tap
+                        try {
+                          _analyticsService.trackButtonTap(
+                            'search_clear_button',
+                            screenName: 'HomeScreen',
+                          );
+                        } catch (e) {
+                          Logger.error('Failed to track search clear button tap', e);
+                        }
+                        
                         _homeBloc.add(const HomeSearchStarted(''));
                       },
                     )
@@ -602,6 +661,19 @@ Error reinitializing notification listeners:
             style: const TextStyle(color: AppColors.textPrimary),
             onChanged: (query) {
               Logger.interaction('Search query changed: $query');
+              
+              // Track search query change
+              if (query.isNotEmpty) {
+                try {
+                  _analyticsService.trackCustomEvent(
+                    'search_query_changed',
+                    parameters: {'query': query},
+                  );
+                } catch (e) {
+                  Logger.error('Failed to track search query change', e);
+                }
+              }
+              
               _homeBloc.add(HomeSearchStarted(query));
             },
           ),
@@ -613,6 +685,17 @@ Error reinitializing notification listeners:
               icon: const Icon(Icons.settings),
               onPressed: () {
                 Logger.interaction('Settings button tapped');
+                
+                // Track settings button tap
+                try {
+                  _analyticsService.trackButtonTap(
+                    'settings_button',
+                    screenName: 'HomeScreen',
+                  );
+                } catch (e) {
+                  Logger.error('Failed to track settings button tap', e);
+                }
+                
                 Navigator.pushNamed(context, '/settings');
               },
               tooltip: 'Settings',
@@ -664,6 +747,20 @@ Error reinitializing notification listeners:
                 controller: _pageController,
                 onPageChanged: (index) {
                   Logger.interaction('Account page changed to $index');
+                  
+                  // Track account page change
+                  try {
+                    _analyticsService.trackCustomEvent(
+                      'account_page_changed',
+                      parameters: {
+                        'page_index': index,
+                        'account_id': state.dashboard!.accounts[index].accountID,
+                      },
+                    );
+                  } catch (e) {
+                    Logger.error('Failed to track account page change', e);
+                  }
+                  
                   _homeBloc.add(HomePageChanged(index));
                 },
                 itemCount: state.dashboard!.accounts.length,
