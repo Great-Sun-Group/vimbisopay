@@ -1,19 +1,52 @@
 #!/bin/bash
 #
-# VimbisoPay App Version Update Script
+# VimbisoPay App Debug Version Update Script
 # 
-# This script automates the process of updating the app version across all necessary files:
-# - Updates the version in pubspec.yaml
+# This script automates the process of updating the debug app version and uploading to GitHub:
+# - Updates the version in pubspec.yaml with debug suffix
 # - Updates the version in android/local.properties for Android builds
-# - Updates the CHANGELOG.md with the new version and release notes
-# - Builds a new APK with the updated version
-# - Creates a Git tag and GitHub release with the new version
+# - Builds a new debug APK with the updated version
+# - Creates a Git tag and GitHub release with the debug version
 #
-# The script ensures that both the version name (x.y.z) and version code (build number)
-# are properly synchronized between Flutter and Android.
+# Usage: ./update-debug-version.sh [--api-env dev|prod]
 #
-# Usage: ./update-version.sh
-#
+
+# Default values
+API_ENV="dev"
+UPDATE_PRIORITY="low"
+UPDATE_TYPE="patch"
+MIN_REQUIRED_VERSION=""
+
+# Parse command line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --api-env) API_ENV="$2"; shift ;;
+        --priority) UPDATE_PRIORITY="$2"; shift ;;
+        --type) UPDATE_TYPE="$2"; shift ;;
+        --min-version) MIN_REQUIRED_VERSION="$2"; shift ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Validate API environment
+if [[ "$API_ENV" != "dev" && "$API_ENV" != "prod" ]]; then
+    echo "Error: API environment must be 'dev' or 'prod'"
+    exit 1
+fi
+
+# Validate update priority
+if [[ ! "$UPDATE_PRIORITY" =~ ^(low|medium|high|critical)$ ]]; then
+    echo "Warning: Invalid update priority. Using 'low'."
+    UPDATE_PRIORITY="low"
+fi
+
+# Validate update type
+if [[ ! "$UPDATE_TYPE" =~ ^(patch|minor|major)$ ]]; then
+    echo "Warning: Invalid update type. Using 'patch'."
+    UPDATE_TYPE="patch"
+fi
+
 # URL encoding function
 urlencode() {
   local string="$1"
@@ -48,7 +81,7 @@ current_date=$(date +%Y-%m-%d)
 current_version=$(grep "version:" pubspec.yaml | cut -d' ' -f2)
 
 echo "Current version: $current_version"
-echo "Enter new version (format: x.y.z+b):"
+echo "Enter new debug version (format: x.y.z+b):"
 read new_version
 
 # Validate version format
@@ -61,12 +94,6 @@ fi
 # Parse version components
 version_name=$(echo $new_version | cut -d'+' -f1)
 version_code=$(echo $new_version | cut -d'+' -f2)
-
-# Create URL-safe version for GitHub release URL using proper URL encoding
-url_safe_version=$(urlencode "$new_version")
-
-# Create filename-safe version for APK filenames (replace + with -)
-filename_version="${new_version/+/-}"
 
 # Check if version code is missing (no + in the version string)
 if [ "$version_name" = "$version_code" ]; then
@@ -104,16 +131,40 @@ else
   echo "Version code: $version_code"
 fi
 
+# Add debug suffix to version name
+debug_version_name="${version_name}-debug"
+debug_version="${debug_version_name}+${version_code}"
+
+# Create filename-safe version for APK filenames (replace + with -)
+filename_version="${debug_version/+/-}"
+
+# Create tag name with debug prefix that matches the filename format
+tag_name="debug-v${version_name}-debug-${version_code}"
+
+# Create URL-safe version for GitHub release URL using proper URL encoding
+url_safe_version=$(urlencode "$debug_version")
+
+echo "Debug version: $debug_version"
+echo "Tag name: $tag_name"
+echo "Filename version: $filename_version"
+
 # Update pubspec.yaml version
-sed -i '' "s/version: .*/version: $new_version/" pubspec.yaml
+sed -i '' "s/version: .*/version: $debug_version/" pubspec.yaml
 
 # Update Android local.properties with new version
 if [ -f "android/local.properties" ]; then
-  # Check if properties already exist and update them
-  if grep -q "flutter.versionName" "android/local.properties"; then
-    sed -i '' "s/flutter.versionName=.*/flutter.versionName=$version_name/" "android/local.properties"
+  # Set build mode to debug
+  if grep -q "flutter.buildMode" "android/local.properties"; then
+    sed -i '' "s/flutter.buildMode=.*/flutter.buildMode=debug/" "android/local.properties"
   else
-    echo "flutter.versionName=$version_name" >> "android/local.properties"
+    echo "flutter.buildMode=debug" >> "android/local.properties"
+  fi
+  
+  # Update version name and code
+  if grep -q "flutter.versionName" "android/local.properties"; then
+    sed -i '' "s/flutter.versionName=.*/flutter.versionName=$debug_version_name/" "android/local.properties"
+  else
+    echo "flutter.versionName=$debug_version_name" >> "android/local.properties"
   fi
   
   if grep -q "flutter.versionCode" "android/local.properties"; then
@@ -128,7 +179,8 @@ else
 fi
 
 # Update CHANGELOG.md
-echo -e "\n## [$new_version] - $current_date" >> CHANGELOG.md
+echo -e "\n## [$debug_version] - $current_date (Debug Build)" >> CHANGELOG.md
+echo "- Debug build with API environment: $API_ENV" >> CHANGELOG.md
 
 # Collect changes for both CHANGELOG and GitHub release
 echo "Enter changes (one per line, press Ctrl+D when done):"
@@ -138,67 +190,27 @@ while IFS= read -r line; do
     changes="${changes}- ${line}\n"
 done
 
-# Verify the existence of the keystore file
-if [ ! -f "vimbisopay-release-key.jks" ]; then
-  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
-  echo "Please ensure the keystore file is in the project root directory."
-  exit 1
-fi
-
-# Verify the existence of key.properties
-if [ ! -f "android/key.properties" ]; then
-  echo "Error: key.properties file not found in android directory."
-  echo "Please ensure the key.properties file is properly configured."
-  exit 1
-fi
-
-echo "Building APKs..."
-echo "Building universal APK with release signing..."
-flutter build apk --release
+# Build universal debug APK
+echo "Building universal debug APK..."
+flutter build apk --debug
 
 # Add a delay to ensure the APK is fully written
 sleep 5
 
-# Verify the APK signature
-echo "Verifying universal APK signature..."
-if command -v jarsigner &> /dev/null; then
-  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-release.apk" | grep "verified"
-  if [ $? -ne 0 ]; then
-    echo "Warning: Universal APK signature verification failed. Please check the signing configuration."
-  else
-    echo "Universal APK signature verified successfully."
-  fi
-else
-  echo "Warning: jarsigner not found. Skipping APK signature verification."
-fi
-
-# Locate the universal APK file
-apk_path="build/app/outputs/flutter-apk/app-release.apk"
+# Locate the debug APK file
+apk_path="build/app/outputs/flutter-apk/app-debug.apk"
 if [ ! -f "$apk_path" ]; then
-    # Try alternative path (sometimes it's in a different location)
-    apk_path=$(ls build/app/outputs/flutter-apk/app*.apk 2>/dev/null | head -n 1)
-fi
-
-if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
-    echo "Error: Release APK not found. Search paths:"
-    echo "1. build/app/outputs/flutter-apk/app-release.apk"
-    echo "2. build/app/outputs/flutter-apk/app*.apk"
+    echo "Error: Debug APK not found at $apk_path"
     exit 1
 fi
 
-echo "Found universal APK at: $apk_path"
+echo "Found universal debug APK at: $apk_path"
 
-# Verify file exists and is readable
-if [ ! -r "$apk_path" ]; then
-    echo "Error: APK file is not readable at $apk_path"
-    exit 1
-fi
-
-# Create version-specific APK name for universal APK
+# Create version-specific APK name for debug APK
 version_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}.apk"
 
 # Create version-specific copy
-echo "Copying universal APK to version-specific location..."
+echo "Copying universal debug APK to version-specific location..."
 cp "$apk_path" "$version_apk"
 
 # Verify copy was successful
@@ -207,50 +219,17 @@ if [ ! -f "$version_apk" ]; then
     exit 1
 fi
 
-# Verify file exists and is readable
-if [ ! -r "$version_apk" ]; then
-    echo "Error: Version-specific APK is not readable at $version_apk"
-    exit 1
-fi
-
-# Verify the existence of the keystore file
-if [ ! -f "vimbisopay-release-key.jks" ]; then
-  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
-  echo "Please ensure the keystore file is in the project root directory."
-  exit 1
-fi
-
-# Verify the existence of key.properties
-if [ ! -f "android/key.properties" ]; then
-  echo "Error: key.properties file not found in android directory."
-  echo "Please ensure the key.properties file is properly configured."
-  exit 1
-fi
-
-# Build architecture-specific APKs with release signing
-echo "Building architecture-specific APKs with release signing..."
-flutter build apk --release --split-per-abi
+# Build architecture-specific APKs
+echo "Building architecture-specific debug APKs..."
+flutter build apk --debug --split-per-abi
 
 # Add a delay to ensure the APKs are fully written
 sleep 5
 
-# Verify the APK signature
-echo "Verifying APK signature..."
-if command -v jarsigner &> /dev/null; then
-  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" | grep "verified"
-  if [ $? -ne 0 ]; then
-    echo "Warning: APK signature verification failed. Please check the signing configuration."
-  else
-    echo "APK signature verified successfully."
-  fi
-else
-  echo "Warning: jarsigner not found. Skipping APK signature verification."
-fi
-
 # Define architecture-specific APK paths
-arm64_apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
-arm_apk="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
-x86_64_apk="build/app/outputs/flutter-apk/app-x86_64-release.apk"
+arm64_apk="build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
+arm_apk="build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk"
+x86_64_apk="build/app/outputs/flutter-apk/app-x86_64-debug.apk"
 
 # Create version-specific copies for architecture-specific APKs
 version_arm64_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}-arm64.apk"
@@ -284,19 +263,21 @@ echo "vimbisopay-${filename_version}-arm64.apk: $checksum_arm64" >> "$checksums_
 echo "vimbisopay-${filename_version}-arm.apk: $checksum_arm" >> "$checksums_file"
 echo "vimbisopay-${filename_version}-x86_64.apk: $checksum_x86_64" >> "$checksums_file"
 
+# Prompt for minimum required version if not provided
+if [ -z "$MIN_REQUIRED_VERSION" ]; then
+    echo "Enter minimum required version (format: x.y.z):"
+    read MIN_REQUIRED_VERSION
+    
+    # Validate minimum required version format
+    if ! [[ $MIN_REQUIRED_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "Error: Invalid minimum required version format. Expected format is x.y.z where x, y, and z are numbers."
+        echo "Example: 1.9.0"
+        exit 1
+    fi
+fi
+
 # Create apk-builds directory if it doesn't exist
 mkdir -p apk-builds
-
-# Prompt for minimum required version
-echo "Enter minimum required version (format: x.y.z):"
-read min_required_version
-
-# Validate minimum required version format
-if ! [[ $min_required_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Error: Invalid minimum required version format. Expected format is x.y.z where x, y, and z are numbers."
-  echo "Example: 1.9.0"
-  exit 1
-fi
 
 # Get current branch name
 current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -304,7 +285,7 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 # Commit changes
 echo "Committing version changes..."
 git add pubspec.yaml CHANGELOG.md android/local.properties
-git commit -m "chore: bump version to $new_version"
+git commit -m "chore: bump debug version to $debug_version"
 
 # Push commit
 echo "Pushing commit..."
@@ -316,23 +297,23 @@ fi
 # Create and push tag
 echo "Creating git tag..."
 # Check if tag already exists locally
-if git rev-parse "v$new_version" >/dev/null 2>&1; then
-    echo "Tag v$new_version already exists locally. Deleting..."
-    git tag -d "v$new_version"
+if git rev-parse "$tag_name" >/dev/null 2>&1; then
+    echo "Tag $tag_name already exists locally. Deleting..."
+    git tag -d "$tag_name"
 fi
 
 # Check if tag exists on remote
-if git ls-remote --tags origin | grep -q "refs/tags/v$new_version$"; then
-    echo "Tag v$new_version exists on remote. Deleting..."
-    git push --delete origin "v$new_version" || {
+if git ls-remote --tags origin | grep -q "refs/tags/$tag_name$"; then
+    echo "Tag $tag_name exists on remote. Deleting..."
+    git push --delete origin "$tag_name" || {
         echo "Error: Failed to delete remote tag"
         exit 1
     }
 fi
 
 # Create new tag
-git tag -a "v$new_version" -m "Release v$new_version"
-if ! git push origin "v$new_version"; then
+git tag -a "$tag_name" -m "Debug Release $debug_version"
+if ! git push origin "$tag_name"; then
     echo "Error: Failed to push tag"
     exit 1
 fi
@@ -342,27 +323,27 @@ echo "Waiting for tag to be available on GitHub..."
 sleep 5
 
 # Verify tag exists on remote
-if ! git ls-remote --tags origin | grep -q "refs/tags/v$new_version$"; then
-    echo "Error: Tag v$new_version not found on remote"
+if ! git ls-remote --tags origin | grep -q "refs/tags/$tag_name$"; then
+    echo "Error: Tag $tag_name not found on remote"
     exit 1
 fi
 
 echo "Creating GitHub release..."
 
 # Create GitHub release
-release_response=$(curl -L -v \
+release_response=$(curl -L \
   -X POST \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/$GITHUB_REPO/releases" \
   -d "{
-    \"tag_name\":\"v$new_version\",
+    \"tag_name\":\"$tag_name\",
     \"target_commitish\":\"$current_branch\",
-    \"name\":\"Release v$new_version\",
-    \"body\":\"$(echo -e "$changes" | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')\",
+    \"name\":\"Debug Release $debug_version\",
+    \"body\":\"Debug build with API environment: $API_ENV\n$(echo -e "$changes" | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')\",
     \"draft\":false,
-    \"prerelease\":false
+    \"prerelease\":true
   }")
 
 # Extract release ID from response
@@ -375,12 +356,6 @@ if [ -z "$release_id" ]; then
     if [ -n "$error_message" ]; then
         echo "Error message: $error_message"
     fi
-    # Try to extract validation errors
-    validation_errors=$(echo "$release_response" | grep -o '"errors":\[[^]]*\]' | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
-    if [ -n "$validation_errors" ]; then
-        echo "Validation errors:"
-        echo "$validation_errors"
-    fi
     echo "Full response: $release_response"
     exit 1
 fi
@@ -391,76 +366,46 @@ if [ ! -f "$version_apk" ]; then
     exit 1
 fi
 
-# Verify file exists and is readable
-if [ ! -r "$version_apk" ]; then
-    echo "Error: APK file is not readable at $version_apk"
-    exit 1
-fi
-
 # Define GitHub download base URL
-github_download_base="https://github.com/$GITHUB_REPO/releases/download/v$url_safe_version"
+github_download_base="https://github.com/$GITHUB_REPO/releases/download/$tag_name"
 
-# Prompt for update priority
-echo "Enter update priority (low, medium, high, critical):"
-read update_priority
-
-# Default to medium if not provided or invalid
-if [[ ! "$update_priority" =~ ^(low|medium|high|critical)$ ]]; then
-  echo "Invalid priority. Defaulting to 'medium'."
-  update_priority="medium"
-fi
-
-# Prompt for update type
-echo "Enter update type (patch, minor, major):"
-read update_type
-
-# Default to patch if not provided or invalid
-if [[ ! "$update_type" =~ ^(patch|minor|major)$ ]]; then
-  echo "Invalid update type. Defaulting to 'patch'."
-  update_type="patch"
-fi
-
-# Prompt for release notes if not already collected
-if [ -z "$changes" ]; then
-  echo "Enter release notes (one per line, press Ctrl+D when done):"
-  changes=""
-  while IFS= read -r line; do
-      changes="${changes}${line}\n"
-  done
-fi
+# Create clean version for JSON (without -debug suffix)
+json_version="${version_name}+${version_code}"
 
 # Create JSON file with version information
-json_file="apk-builds/vimbisopay-${new_version}.json"
+json_file="apk-builds/vimbisopay-${debug_version}.json"
 echo "Creating version JSON file at $json_file..."
 cat > "$json_file" << EOF
 {
-  "appId": "com.vimbisopay.vimbisopay_app",
+  "appId": "com.vimbisopay.vimbisopay_app.debug",
   "platform": "android",
-  "version": "$new_version",
-  "minRequiredVersion": "$min_required_version",
-  "updateUrl": "$github_download_base/vimbisopay-${filename_version}.apk",
+  "version": "$json_version",
+  "minRequiredVersion": "$MIN_REQUIRED_VERSION",
+  "updateUrl": "$github_download_base/$(basename "$version_apk")",
   "fileSizeBytes": $(stat -f%z "$version_apk"),
-  "releaseNotes": "$(echo -e "$changes" | sed 's/"/\\"/g' | tr '\n' ' ')",
+  "releaseNotes": "Debug build with API environment: $API_ENV\n$(echo -e "$changes" | sed 's/"/\\"/g' | tr '\n' ' ')",
   "releaseDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "updatePriority": "$update_priority",
-  "updateType": "$update_type",
+  "updatePriority": "$UPDATE_PRIORITY",
+  "updateType": "$UPDATE_TYPE",
   "active": true,
   "checksumAlgorithm": "sha256",
   "checksumUniversal": "$checksum_universal",
   "checksumArm64": "$checksum_arm64",
   "checksumArm": "$checksum_arm",
   "checksumX86_64": "$checksum_x86_64",
-  "checksumUrl": "$github_download_base/vimbisopay-${filename_version}-checksums.txt",
+  "checksumUrl": "$github_download_base/$(basename "$checksums_file")",
   "architectureSpecificDownloads": {
-    "arm64-v8a": "$github_download_base/vimbisopay-${filename_version}-arm64.apk",
-    "armeabi-v7a": "$github_download_base/vimbisopay-${filename_version}-arm.apk",
-    "x86_64": "$github_download_base/vimbisopay-${filename_version}-x86_64.apk"
-  }
+    "arm64-v8a": "$github_download_base/$(basename "$version_arm64_apk")",
+    "armeabi-v7a": "$github_download_base/$(basename "$version_arm_apk")",
+    "x86_64": "$github_download_base/$(basename "$version_x86_64_apk")"
+  },
+  "buildType": "debug",
+  "apiEnvironment": "$API_ENV"
 }
 EOF
 
-# Upload universal APK as release asset
-echo "Uploading universal APK to GitHub release..."
+# Upload universal debug APK as release asset
+echo "Uploading universal debug APK to GitHub release..."
 echo "Using APK file: $version_apk"
 upload_response=$(curl -L \
   -X POST \
@@ -473,7 +418,7 @@ upload_response=$(curl -L \
 
 # Check if upload was successful
 if ! echo "$upload_response" | grep -q '"state":"uploaded"'; then
-    echo "Error: Failed to upload universal APK"
+    echo "Error: Failed to upload universal debug APK"
     # Try to extract error message from response
     error_message=$(echo "$upload_response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
     if [ -n "$error_message" ]; then
@@ -555,21 +500,10 @@ if ! echo "$json_upload_response" | grep -q '"state":"uploaded"'; then
     # Continue even if this upload fails
 fi
 
-echo "Version updated to $new_version"
-echo "Minimum required version: $min_required_version"
-echo "APK locations:"
-echo "  Universal: $version_apk"
-echo "  ARM64: $version_arm64_apk"
-echo "  ARM: $version_arm_apk"
-echo "  x86_64: $version_x86_64_apk"
-echo "Checksums file: $checksums_file"
+echo "Debug version updated to $debug_version"
+echo "API Environment: $API_ENV"
+echo "APK location: $version_apk"
 echo "Version JSON file: $json_file"
-echo "GitHub release created: https://github.com/$GITHUB_REPO/releases/tag/v$new_version"
-echo "Download URLs:"
-echo "  Universal APK: $github_download_base/vimbisopay-${filename_version}.apk"
-echo "  ARM64 APK: $github_download_base/vimbisopay-${filename_version}-arm64.apk"
-echo "  ARM APK: $github_download_base/vimbisopay-${filename_version}-arm.apk"
-echo "  x86_64 APK: $github_download_base/vimbisopay-${filename_version}-x86_64.apk"
-echo "  Checksums: $github_download_base/vimbisopay-${filename_version}-checksums.txt"
-echo "  Version JSON: $github_download_base/vimbisopay-${new_version}.json"
+echo "GitHub release created: https://github.com/$GITHUB_REPO/releases/tag/$tag_name"
+echo "Download URL: $github_download_base/$(basename "$version_apk")"
 echo "Changes have been committed and pushed"

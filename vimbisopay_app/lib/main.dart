@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:lottie/lottie.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -116,6 +118,18 @@ void main() async {
   try {
     print('=== APP STARTING ===');
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Load environment variables
+    print('Loading environment variables...');
+    await dotenv.load(fileName: '.env');
+    print('Environment variables loaded successfully');
+    
+    // Initialize API configuration
+    print('Initializing API configuration...');
+    await ApiConfig.initialize();
+    await ApiConfig.refreshEnvironment();
+    print('API configuration initialized successfully');
+    Logger.data('API environment: ${ApiConfig.environmentName}');
 
     // Initialize Firebase first
     print('Initializing Firebase...');
