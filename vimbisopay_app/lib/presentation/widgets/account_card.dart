@@ -57,14 +57,29 @@ class AccountCard extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    Text(
-                      account.balanceData.netCredexAssetsInDefaultDenom,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          account.balanceData.netCredexAssetsInDefaultDenom.split(' ')[0],
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          account.balanceData.netCredexAssetsInDefaultDenom.split(' ').length > 1 
+                              ? account.balanceData.netCredexAssetsInDefaultDenom.split(' ')[1] 
+                              : 'USD',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -193,7 +208,7 @@ class AccountCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Center( // Added Center widget
                         child: Text(
-                          '\$1,250.00', // Placeholder value
+                          account.balanceData.netCredexAssetsInDefaultDenom,
                           style: const TextStyle(
                             fontSize: HomeConstants.subheadingTextSize,
                             fontWeight: FontWeight.bold,
@@ -299,7 +314,7 @@ class AccountCard extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 2),
                             child: Center(
                               child: Text(
-                                '\$750.00', // Placeholder value
+                                '0.00 USD', // Placeholder value
                                 style: const TextStyle(
                                   fontSize: HomeConstants.subheadingTextSize,
                                   fontWeight: FontWeight.bold,
@@ -314,11 +329,11 @@ class AccountCard extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 2),
                             child: Center(
                               child: Text(
-                                '\$500.00', // Placeholder value
+                                '0.00 USD', // Placeholder value
                                 style: const TextStyle(
                                   fontSize: HomeConstants.subheadingTextSize,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.errorRed,
+                                  color: AppColors.techAzure,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
