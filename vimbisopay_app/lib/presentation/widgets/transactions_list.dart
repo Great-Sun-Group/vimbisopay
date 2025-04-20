@@ -10,6 +10,9 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/empty_state.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/curved_text_painter.dart';
+import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/date_formatter.dart';
+
 
 /// A compact loading animation widget that uses the Lottie animation
 class InlineLoadingAnimation extends StatefulWidget {
@@ -229,10 +232,21 @@ class _TransactionsListState extends State<TransactionsList> {
     final bool isProcessing =
         state.processingCredexIds.contains(offer.credexID);
     final bool isCancelling = state.status == HomeStatus.cancellingCredex;
+    
+    // Determine colors based on secured status
+    final Color accentColor = offer.secured ? AppColors.techAzure : AppColors.yellowMain;
+    final String securedText = offer.secured ? "SECURED" : "UNSECURED";
 
-    final Widget transactionCard = Card(
-      elevation: isSelected ? 2 : 0,
-      color: isSelected ? AppColors.primary.withOpacity(0.05) : null,
+    final Widget transactionCard = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : accentColor,
+          width: isSelected ? 2.0 : 1.0,
+        ),
+      ),
       child: InkWell(
         onTap: (state.status == HomeStatus.acceptingCredex ||
                 isProcessing ||
@@ -252,6 +266,7 @@ class _TransactionsListState extends State<TransactionsList> {
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (_selectionMode && isIncoming)
                 Padding(
@@ -273,18 +288,38 @@ class _TransactionsListState extends State<TransactionsList> {
                     activeColor: AppColors.primary,
                   ),
                 ),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: AppColors.primary,
-                  size: 24,
-                ),
+              // Styled icon with curved text
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Background circle
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                  ),
+                  // Curved text
+                  CustomPaint(
+                    size: const Size(56, 56),
+                    painter: CurvedTextPainter(
+                      text: securedText,
+                      color: accentColor,
+                      fontSize: 8,
+                    ),
+                  ),
+                  // Arrow icon
+                  Positioned(
+                    bottom: 4,
+                    child: Icon(
+                      isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
+                      color: accentColor,
+                      size: 36,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -293,22 +328,25 @@ class _TransactionsListState extends State<TransactionsList> {
                   children: [
                     Text(
                       offer.counterpartyAccountName,
-                      style: const TextStyle(
+                      style: TextStyle(
+                        color: accentColor,
                         fontWeight: FontWeight.w500,
+                        fontSize: 16,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      offer.secured ? 'Secured Credex' : 'Unsecured Credex',
-                      style: TextStyle(
-                        color: offer.secured
-                            ? AppColors.techAzure
-                            : AppColors.warning,
-                        fontSize: 13,
+                    if (offer.dueDate != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        "Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}",
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -320,67 +358,73 @@ class _TransactionsListState extends State<TransactionsList> {
                   Text(
                     offer.formattedInitialAmount,
                     style: TextStyle(
-                      color: isIncoming ? AppColors.techAzure : AppColors.white,
+                      color: accentColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 18,
                     ),
                   ),
                   if (!_selectionMode) ...[
                     const SizedBox(height: 8),
                     if (isIncoming)
-                      ElevatedButton(
-                        onPressed:
-                            (state.status == HomeStatus.acceptingCredex ||
-                                    isProcessing)
-                                ? null
-                                : () => _acceptSingleTransaction(
-                                    context, offer.credexID),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.techAzure,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(60, 30),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isProcessing ? accentColor.withOpacity(0.6) : accentColor,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: isProcessing
-                            ? const SizedBox(
-                                height: 15,
-                                width: 15,
-                                child: InlineLoadingAnimation(size: 15),
-                              )
-                            : const Text(
-                                'Confirm',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 12,
+                        child: GestureDetector(
+                          onTap: (state.status == HomeStatus.acceptingCredex ||
+                                  isProcessing)
+                              ? null
+                              : () => _acceptSingleTransaction(
+                                  context, offer.credexID),
+                          child: isProcessing
+                              ? const SizedBox(
+                                  height: 15,
+                                  width: 15,
+                                  child: InlineLoadingAnimation(size: 15),
+                                )
+                              : const Text(
+                                  'Accept',
+                                  style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
+                        ),
                       )
                     else
-                      ElevatedButton(
-                        onPressed: (isCancelling || isProcessing)
-                            ? null
-                            : () => _cancelTransaction(context, offer.credexID),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isProcessing
-                              ? AppColors.primary.withOpacity(0.6)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isProcessing
+                              ? AppColors.error.withOpacity(0.6)
                               : AppColors.error,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(60, 30),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: isProcessing
-                            ? const Text(
-                                'Processing...',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 12,
+                        child: GestureDetector(
+                          onTap: (isCancelling || isProcessing)
+                              ? null
+                              : () => _cancelTransaction(context, offer.credexID),
+                          child: isProcessing
+                              ? const Text(
+                                  'Processing...',
+                                  style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              )
-                            : const Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
+                        ),
                       ),
                   ],
                 ],
