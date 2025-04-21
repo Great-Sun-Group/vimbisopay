@@ -163,13 +163,13 @@ class AmountInputCard extends StatelessWidget {
             // Amount and denomination input
             AmountInputSection(
               amountController: amountController,
-              amountFocusNode: isEnabled ? amountFocusNode : null,
+              amountFocusNode: amountFocusNode,
               selectedDenomination: selectedDenomination,
               availableDenominations: availableDenominations,
-              onDenominationChanged: isEnabled ? onDenominationChanged : (_) {},
+              onDenominationChanged: onDenominationChanged,
               decimalPlaces: decimalPlaces,
-              onAmountChanged: isEnabled ? onAmountChanged : (_) {},
-              validator: isEnabled ? validator : null,
+              onAmountChanged: onAmountChanged,
+              validator: validator,
               isEnabled: isEnabled,
             ),
             
