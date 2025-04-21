@@ -4,7 +4,7 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
 
 class TierLimitDialog extends StatelessWidget {
-  final String message;
+  final String message; // Kept for backward compatibility
   final String accountId;
   final HomeBloc homeBloc;
 
@@ -28,13 +28,13 @@ class TierLimitDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.warning_amber_rounded,
-              color: AppColors.warning,
+              Icons.star,
+              color: AppColors.primary,
               size: 48,
             ),
             const SizedBox(height: 16),
             const Text(
-              'Daily Limit Reached',
+              'Hustler Tier',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 20,
@@ -42,38 +42,22 @@ class TierLimitDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              message,
+            const Text(
+              'Upgrade to the Hustler tier for \$1/month and get unlimited transactions.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 16,
               ),
             ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'Upgrade to Hustler Tier',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildBenefitRow(Icons.trending_up, 'Higher daily limits'),
-                  const SizedBox(height: 8),
-                  _buildBenefitRow(Icons.support_agent, 'Priority support'),
-                  const SizedBox(height: 8),
-                  _buildBenefitRow(Icons.star, 'Exclusive features'),
-                ],
+            const SizedBox(height: 8),
+            const Text(
+              'The first 10,000 Hustlers get a full year for \$1.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 24),
@@ -114,26 +98,6 @@ class TierLimitDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBenefitRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: AppColors.primary,
-          size: 20,
-        ),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-          ),
-        ),
-      ],
     );
   }
 }
