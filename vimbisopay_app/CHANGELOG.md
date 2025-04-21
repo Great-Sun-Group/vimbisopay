@@ -228,3 +228,7 @@ Example entry format:
 -e 
 ## [4.4.0+01] - 2025-04-21
 - Using dev whatsapp otp and settings clean up
+-e 
+## [4.5.0+02] - 2025-04-22
+- 1.0.0
+- UI clean up and disabled unsecured credexes
