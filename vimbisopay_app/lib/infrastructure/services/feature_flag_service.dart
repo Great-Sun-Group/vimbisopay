@@ -1,4 +1,5 @@
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/config/feature_flags.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -14,6 +15,7 @@ class FeatureFlagService {
   
   // Keys for local overrides in SharedPreferences
   static const String _marketplaceOverrideKey = 'debug_override_marketplace';
+  static const String _debugFeaturesOverrideKey = 'debug_override_debug_features';
   
   /// Creates a new instance of [FeatureFlagService].
   ///
@@ -62,6 +64,7 @@ class FeatureFlagService {
       // Log all config values for debugging
       Logger.data('Current remote config values:');
       Logger.data('- enable_marketplace: ${_remoteConfig.getBool(FeatureFlags.enableMarketplace)}');
+      Logger.data('- enable_debug_features: ${_remoteConfig.getBool(FeatureFlags.enableDebugFeatures)}');
       
       return true;
     } catch (e, stackTrace) {
@@ -153,5 +156,72 @@ class FeatureFlagService {
       return null;
     }
     return _prefs.getBool(_marketplaceOverrideKey);
+  }
+  
+  /// Checks if debug features are enabled.
+  ///
+  /// Returns true if debug features are enabled, false otherwise.
+  /// Debug features are always disabled in release builds, regardless of remote config.
+  bool isDebugFeaturesEnabled() {
+    // For release builds, always return false regardless of remote config or local override
+    if (kReleaseMode) {
+      return false;
+    }
+    
+    // For debug/profile builds, check if there's a local override
+    if (_prefs.containsKey(_debugFeaturesOverrideKey)) {
+      final localOverride = _prefs.getBool(_debugFeaturesOverrideKey);
+      Logger.data('Using local override for debug features: $localOverride');
+      return localOverride ?? _remoteConfig.getBool(FeatureFlags.enableDebugFeatures);
+    }
+    
+    // Otherwise use the remote config value
+    return _remoteConfig.getBool(FeatureFlags.enableDebugFeatures);
+  }
+  
+  /// Sets a local override for the debug features flag.
+  ///
+  /// This is useful for debugging and testing purposes.
+  /// Returns true if the override was set successfully, false otherwise.
+  Future<bool> setDebugFeaturesOverride(bool enabled) async {
+    try {
+      Logger.data('Setting local override for debug features: $enabled');
+      final result = await _prefs.setBool(_debugFeaturesOverrideKey, enabled);
+      return result;
+    } catch (e) {
+      Logger.error('Error setting debug features override', e);
+      return false;
+    }
+  }
+  
+  /// Clears the local override for the debug features flag.
+  ///
+  /// Returns true if the override was cleared successfully, false otherwise.
+  Future<bool> clearDebugFeaturesOverride() async {
+    try {
+      Logger.data('Clearing local override for debug features');
+      final result = await _prefs.remove(_debugFeaturesOverrideKey);
+      return result;
+    } catch (e) {
+      Logger.error('Error clearing debug features override', e);
+      return false;
+    }
+  }
+  
+  /// Checks if there's a local override for the debug features flag.
+  ///
+  /// Returns true if there's a local override, false otherwise.
+  bool hasDebugFeaturesOverride() {
+    return _prefs.containsKey(_debugFeaturesOverrideKey);
+  }
+  
+  /// Gets the value of the local override for the debug features flag.
+  ///
+  /// Returns the value of the override, or null if there's no override.
+  bool? getDebugFeaturesOverrideValue() {
+    if (!_prefs.containsKey(_debugFeaturesOverrideKey)) {
+      return null;
+    }
+    return _prefs.getBool(_debugFeaturesOverrideKey);
   }
 }

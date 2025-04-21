@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
@@ -209,16 +210,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-                // Always show debug option to help troubleshoot feature flags
-                _buildSettingsTile(
-                  icon: Icons.bug_report,
-                  title: 'Debug Tools',
-                  subtitle: 'Feature flags and remote config testing',
-                  onTap: () {
-                    Navigator.pushNamed(context, '/debug');
-                  },
-                ),
-                const SizedBox(height: 12),
+                // Only show debug tools if debug features are enabled
+                if (ServiceLocator.featureFlagService.isDebugFeaturesEnabled()) ...[
+                  _buildSettingsTile(
+                    icon: Icons.bug_report,
+                    title: 'Debug Tools',
+                    subtitle: 'Feature flags and remote config testing',
+                    onTap: () {
+                      Navigator.pushNamed(context, '/debug');
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _buildSettingsTile(
                   icon: Icons.logout,
                   title: 'Logout',
