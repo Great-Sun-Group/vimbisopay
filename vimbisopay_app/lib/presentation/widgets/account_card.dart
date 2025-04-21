@@ -20,7 +20,10 @@ class AccountCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppColors.surface,
-      padding: const EdgeInsets.all(HomeConstants.defaultPadding),
+      padding: const EdgeInsets.symmetric(
+        horizontal: HomeConstants.defaultPadding,
+        vertical: HomeConstants.smallPadding, // Reduced vertical padding
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min, // Changed to min to reduce space
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,8 +93,8 @@ class AccountCard extends StatelessWidget {
           // Account handle
           _buildAccountHandle(),
           
-          // More space between handle and payables
-          const SizedBox(height: 20),
+          // Reduced space between handle and payables
+          const SizedBox(height: 16),
           
           // Balances section
           _buildPayablesSection(),
@@ -170,6 +173,7 @@ class AccountCard extends StatelessWidget {
     // IMPORTANT: Removed ALL top padding here
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // Add mainAxisSize.min to prevent expansion
       children: [
         // Secured section with gold border and title overlay
         Expanded(
@@ -181,7 +185,7 @@ class AccountCard extends StatelessWidget {
               children: [
                 // Main card
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), // Reduced vertical padding
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(8),
@@ -191,9 +195,10 @@ class AccountCard extends StatelessWidget {
                     ),
                   ),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min, // Add mainAxisSize.min to prevent expansion
                     crossAxisAlignment: CrossAxisAlignment.center, // Changed to center
                     children: [
-                      const SizedBox(height: 2),
+                      // Removed SizedBox height
                       // Secured value
                       const Center( // Added Center widget
                         child: Text(
@@ -205,7 +210,8 @@ class AccountCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      // Reduced SizedBox height
+                      const SizedBox(height: 1),
                       Center( // Added Center widget
                         child: Text(
                           account.balanceData.netCredexAssetsInDefaultDenom,
@@ -215,6 +221,7 @@ class AccountCard extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 1, // Limit to one line
                         ),
                       ),
                     ],
@@ -252,7 +259,7 @@ class AccountCard extends StatelessWidget {
               children: [
                 // Main card
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), // Reduced vertical padding
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(8),
@@ -278,30 +285,24 @@ class AccountCard extends StatelessWidget {
                       TableRow(
                         children: [
                           // Receivable label - center aligned
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: Center(
-                              child: Text(
-                                'Receivable',
-                                style: TextStyle(
-                                  fontSize: HomeConstants.bodyTextSize,
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                          const Center(
+                            child: Text(
+                              'Receivable',
+                              style: TextStyle(
+                                fontSize: HomeConstants.bodyTextSize,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                           // Payable label - center aligned
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: Center(
-                              child: Text(
-                                'Payable',
-                                style: TextStyle(
-                                  fontSize: HomeConstants.bodyTextSize,
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                          const Center(
+                            child: Text(
+                              'Payable',
+                              style: TextStyle(
+                                fontSize: HomeConstants.bodyTextSize,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
@@ -310,33 +311,29 @@ class AccountCard extends StatelessWidget {
                       TableRow(
                         children: [
                           // Receivable value - center aligned
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Center(
-                              child: Text(
-                                '0.00 USD', // Placeholder value
-                                style: const TextStyle(
-                                  fontSize: HomeConstants.subheadingTextSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.techAzure,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                          Center(
+                            child: Text(
+                              '0.00 USD', // Placeholder value
+                              style: const TextStyle(
+                                fontSize: HomeConstants.subheadingTextSize,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.techAzure,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1, // Limit to one line
                             ),
                           ),
                           // Payable value - center aligned
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Center(
-                              child: Text(
-                                '0.00 USD', // Placeholder value
-                                style: const TextStyle(
-                                  fontSize: HomeConstants.subheadingTextSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.techAzure,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                          Center(
+                            child: Text(
+                              '0.00 USD', // Placeholder value
+                              style: const TextStyle(
+                                fontSize: HomeConstants.subheadingTextSize,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.techAzure,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1, // Limit to one line
                             ),
                           ),
                         ],
