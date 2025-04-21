@@ -225,3 +225,6 @@ Example entry format:
 ## [4.3.0-debug+01] - 2025-04-20 (Debug Build)
 - Debug build with API environment: dev
 - testing with ryans accounts changes
+-e 
+## [4.4.0+01] - 2025-04-21
+- Using dev whatsapp otp and settings clean up
