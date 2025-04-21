@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/theme/app_spacing.dart';
 import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/domain/entities/security_event.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_pin_bottom_sheet.dart';
@@ -246,19 +247,21 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      SettingsContainer(
-                        title: 'Recent Activity',
-                        children: [
-                          SizedBox(
-                            height: 300,
-                            child: SecurityEventsList(
-                              events: _securityEvents,
-                              onRefresh: _loadSecuritySettings,
-                              isLoading: _isLoadingEvents,
+                      // Only show recent activity if debug features are enabled
+                      if (ServiceLocator.featureFlagService.isDebugFeaturesEnabled())
+                        SettingsContainer(
+                          title: 'Recent Activity',
+                          children: [
+                            SizedBox(
+                              height: 300,
+                              child: SecurityEventsList(
+                                events: _securityEvents,
+                                onRefresh: _loadSecuritySettings,
+                                isLoading: _isLoadingEvents,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ),
       ),

@@ -3,9 +3,12 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
+import 'package:vimbisopay_app/domain/repositories/analytics/analytics_provider.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/analytics/firebase_analytics_provider.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/marketplace/marketplace_repository_impl.dart';
+import 'package:vimbisopay_app/infrastructure/services/analytics_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/config_manager.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
@@ -31,6 +34,10 @@ class ServiceLocator {
   static final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   static final AppStateManager _appStateManager = AppStateManager();
+  
+  // Analytics providers and service
+  static final FirebaseAnalyticsProvider _firebaseAnalyticsProvider = FirebaseAnalyticsProvider(_analytics);
+  static AnalyticsService? _analyticsService;
   
   // Lazy-initialized services that require async initialization
   static FeatureFlagService? _featureFlagService;
@@ -78,6 +85,14 @@ class ServiceLocator {
   static StoreStatusService get storeStatusService => _storeStatusService;
   static FirebaseAnalytics get analytics => _analytics;
   static AppStateManager get appStateManager => _appStateManager;
+  
+  // Getter for AnalyticsService with lazy initialization
+  static AnalyticsService get analyticsService {
+    if (_analyticsService == null) {
+      throw Exception('AnalyticsService not initialized. Call initializeAnalyticsService() first.');
+    }
+    return _analyticsService!;
+  }
   
   // Getter for ConnectivityService with lazy initialization
   static ConnectivityService get connectivityService {
@@ -158,6 +173,25 @@ class ServiceLocator {
     await _configManager!.initialize();
     
     return _configManager!;
+  }
+  
+  // Initialize AnalyticsService
+  static Future<AnalyticsService> initializeAnalyticsService() async {
+    if (_analyticsService != null) {
+      return _analyticsService!;
+    }
+    
+    // Create a list of analytics providers
+    final providers = <AnalyticsProvider>[
+      _firebaseAnalyticsProvider,
+      // Add more providers here as needed
+    ];
+    
+    // Create and initialize the analytics service
+    _analyticsService = AnalyticsService(providers);
+    await _analyticsService!.initialize();
+    
+    return _analyticsService!;
   }
   
   // Initialize ConnectivityService

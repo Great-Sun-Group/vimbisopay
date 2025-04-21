@@ -6,6 +6,8 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/screen_tracker.dart';
+import 'package:vimbisopay_app/core/utils/button_tracker.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
@@ -23,7 +25,12 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
+  @override
+  String get screenName => 'LoginScreen';
+  
+  @override
+  Map<String, dynamic> get screenParameters => {};
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -297,6 +304,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     Logger.interaction('[Login] Login button pressed');
+    
+    // Track login button tap
+    ButtonTracker.trackButtonTap(
+      'login_button',
+      screenName: screenName,
+      parameters: {
+        'phone_number_length': _phoneController.text.length,
+      },
+    );
     
     // Validate form first
     setState(() {
@@ -651,6 +667,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _isLoading 
                             ? null 
                             : () {
+                                // Track forgot password button tap
+                                ButtonTracker.trackButtonTap(
+                                  'forgot_password_button',
+                                  screenName: screenName,
+                                );
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -694,6 +715,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _isLoading
                                   ? null
                                   : () {
+                                      // Track register button tap
+                                      ButtonTracker.trackButtonTap(
+                                        'register_button',
+                                        screenName: screenName,
+                                      );
                                       Navigator.pushNamed(context, '/create-account');
                                     },
                               style: FilledButton.styleFrom(
