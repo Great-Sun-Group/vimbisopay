@@ -168,6 +168,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
             _recipientController.text = state.recipientHandle ?? '';
           }
           
+          // Automatically focus on amount field when verification starts
+          if (state.status == SendCredexStatus.verifyingRecipient) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _amountFocusNode.requestFocus();
+            });
+          }
+          
           // Show tier limit dialog if needed
           if (state.status == SendCredexStatus.error && 
               state.errorMessage != null && 
@@ -270,11 +277,14 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // No extra spacing needed here since the previous card already has margin
                         
                         if (state.verifiedAccountDetails == null) ...[
-                          // Set focus to the recipient input field when it appears
+                          // Only request focus for the recipient field if we're not verifying
+                          // This prevents focus from jumping back when user is interacting with amount field
                           Builder(builder: (context) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              _recipientFocusNode.requestFocus();
-                            });
+                            if (state.status != SendCredexStatus.verifyingRecipient) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _recipientFocusNode.requestFocus();
+                              });
+                            }
                             
                             return RecipientInputCard(
                               recipientController: _recipientController,
@@ -326,13 +336,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             selectedDenomination: state.selectedDenomination,
                             availableDenominations: state.availableDenominations,
                             onDenominationChanged: (denom) {
-                              if (denom != null && state.verifiedAccountDetails != null) {
+                              if (denom != null) {
+                                // Allow denomination change even while verifying
                                 _bloc.add(UpdateDenominationEvent(denom));
                               }
                             },
                             decimalPlaces: state.decimalPlaces,
-                            onAmountChanged: (value) => state.verifiedAccountDetails != null ? 
-                                _bloc.add(UpdateAmountEvent(value)) : null,
+                            onAmountChanged: (value) => _bloc.add(UpdateAmountEvent(value)),
                             onUpgradePressed: () {
                               showDialog(
                                 context: context,
@@ -344,7 +354,6 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                               );
                             },
                             validator: (value) {
-                              if (state.verifiedAccountDetails == null) return null;
                               if (value == null || value.isEmpty) {
                                 return 'Please enter amount';
                               }
@@ -361,8 +370,12 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                               }
                               return null;
                             },
-                            isEnabled: state.verifiedAccountDetails != null,
-                            showFullContent: state.senderAccount != null && state.verifiedAccountDetails != null,
+                            // Enable the amount input as soon as verification starts
+                            isEnabled: state.recipientHandle != null && state.recipientHandle!.isNotEmpty,
+                            // Show full content when either verifying or verified
+                            showFullContent: state.senderAccount != null && 
+                                            (state.verifiedAccountDetails != null || 
+                                             state.status == SendCredexStatus.verifyingRecipient),
                           ),
                         ),
                         
@@ -375,23 +388,24 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             future: widget.databaseHelper.getUser(),
                             builder: (context, snapshot) {
                               // Determine if we should show full content for the Type section
-                              // Only show full content if recipient is verified and amount is entered
+                              // Show full content if handle is being verified or is verified, and amount is entered
                               final hasAmount = double.tryParse(state.amount) != null && double.parse(state.amount) > 0;
-                              final showFullContent = state.verifiedAccountDetails != null && hasAmount;
+                              final isVerifyingOrVerified = state.verifiedAccountDetails != null || 
+                                                           state.status == SendCredexStatus.verifyingRecipient;
+                              final showFullContent = isVerifyingOrVerified && hasAmount;
                               
                               return CredexTypeSection(
                                 credexType: state.credexType,
                                 onCredexTypeChanged: (credexType) => 
-                                    state.verifiedAccountDetails != null ? 
-                                    _bloc.add(UpdateCredexTypeEvent(credexType)) : null,
+                                    _bloc.add(UpdateCredexTypeEvent(credexType)),
                                 dueDate: state.dueDate,
                                 onDueDateChanged: (date) => 
-                                    state.verifiedAccountDetails != null ? 
-                                    _bloc.add(UpdateDueDateEvent(date)) : null,
+                                    _bloc.add(UpdateDueDateEvent(date)),
                                 availableBalance: state.availableBalance,
                                 selectedDenomination: state.selectedDenomination.toString().split('.').last,
                                 accountName: state.senderAccount!.accountName,
-                                isEnabled: state.verifiedAccountDetails != null,
+                                // Enable the type section as soon as verification starts
+                                isEnabled: state.recipientHandle != null && state.recipientHandle!.isNotEmpty,
                                 showFullContent: showFullContent,
                               );
                             },

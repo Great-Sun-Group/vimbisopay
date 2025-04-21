@@ -115,7 +115,7 @@ class CredexTypeSection extends StatelessWidget {
     return StyledCard.gold(
       title: '4. Type',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch, // Changed to stretch to center the text
         children: [
           // Credex Type Selector
           Opacity(
@@ -133,7 +133,7 @@ class CredexTypeSection extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(bottom: 16.0),
               child: Text(
-                "Secured credex may improve your credit score.",
+                "Issuing secured credex gradually improves your credit score.",
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -190,10 +190,25 @@ class CredexTypeSection extends StatelessWidget {
               ),
             ),
           ] else if (credexType == CredexType.UNSECURED) ...[
+            // COMING SOON text with prominent styling - centered
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  "COMING SOON",
+                  style: TextStyle(
+                    color: AppColors.darkRed,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            
             const Padding(
               padding: EdgeInsets.only(bottom: 16.0),
               child: Text(
-                "Boost your credit score when you provide the contracted value to arms length counterparties by the agreed date.",
+                "Issuing unsecured credex and providing the promised value by the agreed date immediately boosts your credit score.",
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,

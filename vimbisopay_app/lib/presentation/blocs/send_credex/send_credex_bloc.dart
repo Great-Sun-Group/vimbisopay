@@ -172,11 +172,15 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       return;
     }
     
+    // Update state to show we're verifying and set recipientHandle
+    // This allows the UI to show and enable the Amount section while verification is in progress
     emit(state.copyWith(
       status: SendCredexStatus.verifyingRecipient,
       isLoading: true,
       errorMessage: null,
       statusMessage: 'Verifying recipient account...',
+      recipientHandle: event.handle,
+      showFullUI: true, // Show the full UI immediately when verification starts
     ));
     
     try {
