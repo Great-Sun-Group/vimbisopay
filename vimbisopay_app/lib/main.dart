@@ -33,6 +33,7 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/navigation_utils.dart';
+import 'package:vimbisopay_app/core/utils/crash_tracker.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/connectivity_banner.dart';
@@ -140,6 +141,16 @@ void main() async {
     print('Initializing Firebase Analytics...');
     final analytics = ServiceLocator.analytics;
     print('Firebase Analytics initialized successfully');
+    
+    // Initialize Analytics Service
+    print('Initializing Analytics Service...');
+    await ServiceLocator.initializeAnalyticsService();
+    print('Analytics Service initialized successfully');
+    
+    // Set up global error handler for tracking crashes
+    print('Setting up global error handler...');
+    CrashTracker.setupGlobalErrorHandler();
+    print('Global error handler set up successfully');
 
     // Set up background message handler
     print('Setting up background message handler...');
