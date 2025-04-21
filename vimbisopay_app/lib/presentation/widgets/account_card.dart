@@ -53,13 +53,6 @@ class AccountCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text(
-                      'Net Balance',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -68,7 +61,7 @@ class AccountCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
+                            color: AppColors.white,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -79,7 +72,7 @@ class AccountCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
+                            color: AppColors.white,
                           ),
                         ),
                       ],
@@ -264,7 +257,7 @@ class AccountCard extends StatelessWidget {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: borderColor,
+                      color: AppColors.techAzure, // Changed from borderColor to AppColors.techAzure
                       width: borderWidth,
                     ),
                   ),
@@ -352,7 +345,7 @@ class AccountCard extends StatelessWidget {
                     child: Text(
                       'Unsecured',
                       style: TextStyle(
-                        color: borderColor,
+                        color: AppColors.techAzure, // Changed from borderColor to AppColors.techAzure
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),

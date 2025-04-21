@@ -476,65 +476,77 @@ class _TransactionsListState extends State<TransactionsList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: transactions.map((transaction) {
-        final dateFormat = DateFormat('MMM d, yyyy h:mm a');
-        final formattedDate = dateFormat.format(transaction.timestamp);
+        // Determine if transaction is incoming or outgoing
+        final bool isIncoming = transaction.amount >= 0;
+        
+        // All transactions are SECURED with gold color
+        final Color accentColor = AppColors.yellowMain;
+        
+        // Text color for amount - red for negative numbers
+        final Color amountColor = isIncoming ? accentColor : AppColors.error;
 
         return Semantics(
           label: _getTransactionSemanticLabel(transaction),
-          child: ListTile(
-            leading: Icon(
-              _getTransactionIcon(transaction.type, transaction.amount),
-              color: transaction.amount >= 0
-                  ? AppColors.techAzure
-                  : AppColors.primary,
-              size: 28,
-            ),
-            title: Text(
-              transaction.description,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.counterpartyAccountName,
-                  style: TextStyle(
-                    color: AppColors.primary.withOpacity(0.8),
-                    fontSize: 13,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4.0),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: accentColor,
+                  width: 1.0,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  formattedDate,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            trailing: Text(
-              transaction.formattedAmount,
-              style: TextStyle(
-                color: transaction.amount >= 0
-                    ? AppColors.techAzure
-                    : AppColors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
               ),
-            ),
-            isThreeLine: true,
-            enabled: false,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            transaction.counterpartyAccountName,
+                            style: TextStyle(
+                              color: accentColor,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('MMM d, yyyy h:mm a').format(transaction.timestamp),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          transaction.formattedAmount,
+                          style: TextStyle(
+                            color: amountColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );

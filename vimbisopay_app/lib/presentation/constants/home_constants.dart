@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 class HomeConstants {
   static const int ledgerPageSize = 20;
-  static const double smallScreenAccountCardHeight = 0.45;
+  static const double smallScreenAccountCardHeight = 0.35; // Reduced from 0.45
   
   // Get constraints for account card
   static BoxConstraints getAccountCardConstraints(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final maxHeight = screenHeight * (screenHeight < 700 ? smallScreenAccountCardHeight : 0.35);
+    final maxHeight = screenHeight * (screenHeight < 700 ? smallScreenAccountCardHeight : 0.28); // Reduced from 0.35
     
     // Ensure minHeight is never greater than maxHeight
-    final minHeight = screenHeight < 800 ? 0.0 : 280.0;
+    final minHeight = screenHeight < 800 ? 0.0 : 220.0; // Reduced from 280.0
     
     return BoxConstraints(
       minHeight: minHeight,
