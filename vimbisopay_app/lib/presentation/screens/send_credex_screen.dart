@@ -168,6 +168,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
             _recipientController.text = state.recipientHandle ?? '';
           }
           
+          // Automatically focus on amount field when verification starts
+          if (state.status == SendCredexStatus.verifyingRecipient) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _amountFocusNode.requestFocus();
+            });
+          }
+          
           // Show tier limit dialog if needed
           if (state.status == SendCredexStatus.error && 
               state.errorMessage != null && 

@@ -28,7 +28,7 @@ class SecuredContractCard extends StatelessWidget {
     return StyledCard.gold(
       title: 'Approve the Contract',
       child: Text(
-        "$memberName transfers title of $amount $denomination from the $senderAccountName account to the $recipientAccountName account, effective on acceptance of this offer.",
+        "$memberName transfers $amount $denomination from their $senderAccountName account to $recipientAccountName, effective on acceptance of this offer.",
         style: const TextStyle(
           color: AppColors.techAzure, // All teal text color
           fontSize: 14,
@@ -145,7 +145,7 @@ class ContractSection extends StatelessWidget {
             children: [
               // Contract text - all teal for secured
               Text(
-                "$memberName transfers title of $amount $denomination from the $senderAccountName account to the $recipientAccountName account, effective on acceptance of this offer.",
+                "$memberName transfers $amount $denomination from the $senderAccountName account to the $recipientAccountName account, effective on acceptance of this offer.",
                 style: const TextStyle(
                   color: AppColors.techAzure, // Teal text color
                   fontSize: 14,
@@ -262,6 +262,26 @@ class ContractSection extends StatelessWidget {
           ),
         );
       } else if (credexType == CredexType.UNSECURED) {
+        // For Unsecured Credex, show only "COMING SOON" message
+        return StyledCard.gold(
+          title: 'Approve the Contract',
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: Text(
+                "COMING SOON",
+                style: TextStyle(
+                  color: AppColors.darkRed,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        );
+        
+        /* Original content commented out
         return StyledCard.gold(
           title: 'Approve the Contract',
           child: Column(
@@ -483,6 +503,7 @@ class ContractSection extends StatelessWidget {
             ],
           ),
         );
+        */
       }
     }
     
