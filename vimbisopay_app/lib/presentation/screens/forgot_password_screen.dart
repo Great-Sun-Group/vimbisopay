@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
-import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
@@ -36,7 +36,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -113,7 +115,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'Enter your phone number and we\'ll send you instructions to reset your password.',
+            'Enter your phone number and we\'ll send you a code on WhatsApp to reset your password.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textPrimary,
@@ -220,17 +222,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       builder: (context) {
         Logger.interaction('[ForgotPassword] Building loading dialog');
         return const LoadingDialog(
-          message: 'Sending instructions...',
+          message: 'Sending code...',
         );
       },
     ));
 
     try {
-      final phoneNumber = '+${_phoneController.text}';
-      final sanitizedPhone =
-          PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
+      // The phone number is already in the correct format (digits only)
+      // thanks to PlainPhoneNumberFormatter
       final result = await _repository.requestOtp(
-        phone: sanitizedPhone,
+        phone: _phoneController.text,
         purpose: 'PASSWORD_RESET',
       );
 
@@ -263,7 +264,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
           Logger.data('[ForgotPassword] Got memberIdfrom response');
           // Show OTP verification dialog with memberId and token
-          _showOtpVerification(sanitizedPhone, memberId);
+          _showOtpVerification(_phoneController.text, memberId);
         },
       );
     } catch (e) {
@@ -317,12 +318,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone),
                             helperText:
-                                'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                                'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                             helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.phone,
                           inputFormatters: [
-                            PhoneNumberFormatter(),
+                            PlainPhoneNumberFormatter(),
                           ],
                           enabled: !_isLoading,
                           onTap: () => _markFieldAsTouched('phone'),

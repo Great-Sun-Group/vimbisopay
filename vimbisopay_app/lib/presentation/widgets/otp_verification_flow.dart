@@ -273,6 +273,7 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
       title: const Text(
         'Verify Phone Number',
         style: TextStyle(
@@ -296,60 +297,68 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
                 ),
               ],
             )
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Please enter the 6-digit code sent to your Whatsapp phone number to verify your account.',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_error != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+          : ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Please enter the 6-digit code sent to your Whatsapp phone number to verify your account.',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
                       ),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontSize: 14,
+                    ),
+                    const SizedBox(height: 16),
+                    if (_error != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.visible,
+                          softWrap: true,
                         ),
                       ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _otpController,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter OTP',
+                        prefixIcon: Icon(Icons.lock_outline),
+                        helperText: 'Enter the 6-digit code',
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _verifyOTP(),
                     ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _otpController,
-                    decoration: const InputDecoration(
-                      labelText: 'Enter OTP',
-                      prefixIcon: Icon(Icons.lock_outline),
-                      helperText: 'Enter the 6-digit code',
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: _isResending ? null : _resendOTP,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                      ),
+                      child: Text(
+                        _isResending ? 'Resending...' : 'Resend OTP',
+                      ),
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _verifyOTP(),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: _isResending ? null : _resendOTP,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                    ),
-                    child: Text(
-                      _isResending ? 'Resending...' : 'Resend OTP',
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
       actions: _isLoading
@@ -366,6 +375,12 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
               ),
               TextButton(
                 onPressed: _verifyOTP,
+                style: ButtonStyle(
+                  minimumSize: MaterialStateProperty.all(const Size(80, 36)),
+                  padding: MaterialStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                ),
                 child: const Text(
                   'Verify',
                   style: TextStyle(

@@ -6,11 +6,16 @@ class PhoneValidator {
     // Remove any non-digit characters before validation
     final String digitsOnly = value.replaceAll(RegExp(r'\D'), '');
     
+    // Validate country code and length
     if (!RegExp(r'^[0-9]{3}[0-9]+$').hasMatch(digitsOnly)) {
-      return 'Start with country code (e.g. 263 or 353)';
+      // Return an empty string instead of an error message
+      // This will still make the validation fail but won't show a message
+      return '';
     }
     if (digitsOnly.length < 10) {
-      return 'Phone number is too short';
+      // Return an empty string instead of an error message
+      // This will still make the validation fail but won't show a message
+      return '';
     }
     return null;
   }

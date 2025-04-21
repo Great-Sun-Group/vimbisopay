@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/utils/screen_tracker.dart';
 import 'package:vimbisopay_app/core/utils/button_tracker.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
@@ -52,7 +53,9 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -64,10 +67,8 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
   Future<void> _loadSavedUser() async {
     final user = await _databaseHelper.getUser();
     if (user != null && mounted) {
-      // Remove the '+' prefix if it exists
-      final phoneNumber = user.phone.startsWith('+') 
-          ? user.phone.substring(1) 
-          : user.phone;
+      // Remove any non-digit characters
+      final phoneNumber = user.phone.replaceAll(RegExp(r'\D'), '');
       setState(() {
         _phoneController.text = phoneNumber;
       });
@@ -350,7 +351,9 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
       },
     ));
 
-    final phoneNumber = '+${_phoneController.text}';
+    // The phone number is already in the correct format (digits only)
+    // thanks to PlainPhoneNumberFormatter
+    final phoneNumber = _phoneController.text;
     final password = _passwordController.text;
     
     Logger.interaction('[Login] Calling login API');
@@ -411,9 +414,8 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
                 ),
               );
 
-              final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
               final otpResult = await _repository.requestOtp(
-                phone: sanitizedPhone,
+                phone: phoneNumber,
                 purpose: 'PASSWORD_RESET',
               );
 
@@ -476,9 +478,8 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
             ),
           );
 
-          final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
           final otpResult = await _repository.requestOtp(
-            phone: sanitizedPhone,
+            phone: phoneNumber,
             purpose: 'PASSWORD_RESET',
           );
 
@@ -562,12 +563,12 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
                           decoration: const InputDecoration(
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone),
-                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                             helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.phone,
                           inputFormatters: [
-                            PhoneNumberFormatter(),
+                            PlainPhoneNumberFormatter(),
                           ],
                           enabled: !_isLoading,
                           onTap: () => _markFieldAsTouched('phone'),

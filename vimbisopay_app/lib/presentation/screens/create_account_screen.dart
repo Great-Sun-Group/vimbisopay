@@ -10,6 +10,7 @@ import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show Lo
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 
 class CreateAccountScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _repository = ServiceLocator.accountRepository;
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _acceptedTerms = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   final Map<String, String?> _fieldErrors = {
@@ -49,7 +49,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -100,8 +102,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           hasValidLastName &&
           hasValidPhone &&
           hasValidPassword &&
-          hasValidConfirmPassword &&
-          _acceptedTerms;
+          hasValidConfirmPassword;
           
       Logger.data('[CreateAccount] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
       if (!_isFormValid) {
@@ -206,7 +207,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     }
     
     try {
-      final phoneNumber = '+${_phoneController.text}';
+      // The phone number is already in the correct format (digits only)
+      // thanks to PlainPhoneNumberFormatter
+      final phoneNumber = _phoneController.text;
       final password = _passwordController.text;
       
       Logger.interaction('[CreateAccount] Starting account creation process');
@@ -509,14 +512,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           child: TextFormField(
                             controller: _phoneController,
                             decoration: const InputDecoration(
-                              labelText: 'Phone Number',
+                              labelText: 'WhatsApp Number',
                               prefixIcon: Icon(Icons.phone),
-                              helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                              helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                               helperMaxLines: 2,
                             ),
                             keyboardType: TextInputType.phone,
                             inputFormatters: [
-                              PhoneNumberFormatter(),
+                              PlainPhoneNumberFormatter(),
                             ],
                             enabled: !_isLoading,
                             onTap: () => _markFieldAsTouched('phone'),
@@ -631,47 +634,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _acceptedTerms,
-                              onChanged: (value) {
-                                setState(() {
-                                  _acceptedTerms = value ?? false;
-                                  _validateForm();
-                                });
-                              },
-                              activeColor: AppColors.primary,
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _acceptedTerms = !_acceptedTerms;
-                                    _validateForm();
-                                  });
-                                },
-                                child: const Text.rich(
-                                  TextSpan(
-                                    text: 'I agree to the ',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: 'Terms and Conditions',
-                                        style: TextStyle(
-                                          color: AppColors.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),
