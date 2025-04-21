@@ -709,7 +709,7 @@ Error reinitializing notification listeners:
   Widget _buildAccountsSection(HomeState state) {
     return Column(
       children: [
-        const SizedBox(height: HomeConstants.defaultPadding),
+        const SizedBox(height: HomeConstants.smallPadding), // Reduced from defaultPadding
         ConstrainedBox(
           constraints: HomeConstants.getAccountCardConstraints(context),
           child: BlocConsumer<HomeBloc, HomeState>(
