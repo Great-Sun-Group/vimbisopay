@@ -70,32 +70,22 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
     result.fold(
       (failure) {
         setState(() {
-          if (failure is InfrastructureFailure) {
-            // Check for daily limit message directly in the failure message
-            if (failure.message != null && 
-                (failure.message!.toLowerCase().contains('daily limit') || 
-                 failure.message!.toLowerCase().contains('try again tomorrow'))) {
-              _error = failure.message;
-              Logger.data('[VERIFY_OTP] Daily limit exceeded: ${failure.message}');
-            } 
-            // Check for RATE_LIMITED code
-            else if (failure.code == 'RATE_LIMITED') {
-              // Check if this is a daily limit message
-              if (failure.message != null && failure.message!.toLowerCase().contains('try again tomorrow')) {
-                _error = 'You have reached the daily limit for OTP requests. Please try again tomorrow.';
-                Logger.data('[VERIFY_OTP] Daily limit exceeded: ${failure.message}');
-              } else {
-                // Regular rate limiting
-                final reason = failure.message?.contains('Try again in') == true 
-                    ? failure.message 
-                    : 'Please wait before verifying another OTP';
-                _error = reason;
-                Logger.data('[VERIFY_OTP] Rate limited: $reason');
-              }
-            } else {
-              _error = failure.message ?? ErrorTranslator.translateError(failure);
-            }
-          } else {
+          // Check for daily limit errors first
+          if (ErrorTranslator.isDailyLimitError(failure)) {
+            _error = ErrorTranslator.getDailyLimitErrorMessage();
+            Logger.data('[VERIFY_OTP] Daily limit exceeded: ${failure.message}');
+          } 
+          // Check for rate limiting
+          else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+            // Regular rate limiting
+            final reason = failure.message?.contains('Try again in') == true 
+                ? failure.message 
+                : 'Please wait before verifying another OTP';
+            _error = reason;
+            Logger.data('[VERIFY_OTP] Rate limited: $reason');
+          } 
+          // Default error handling
+          else {
             _error = failure.message ?? ErrorTranslator.translateError(failure);
           }
         });
@@ -134,32 +124,22 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
     result.fold(
       (failure) {
         setState(() {
-          if (failure is InfrastructureFailure) {
-            // Check for daily limit message directly in the failure message
-            if (failure.message != null && 
-                (failure.message!.toLowerCase().contains('daily limit') || 
-                 failure.message!.toLowerCase().contains('try again tomorrow'))) {
-              _error = failure.message;
-              Logger.data('[RESEND_OTP] Daily limit exceeded: ${failure.message}');
-            } 
-            // Check for RATE_LIMITED code
-            else if (failure.code == 'RATE_LIMITED') {
-              // Check if this is a daily limit message
-              if (failure.message != null && failure.message!.toLowerCase().contains('try again tomorrow')) {
-                _error = 'You have reached the daily limit for OTP requests. Please try again tomorrow.';
-                Logger.data('[RESEND_OTP] Daily limit exceeded: ${failure.message}');
-              } else {
-                // Regular rate limiting
-                final reason = failure.message?.contains('Try again in') == true 
-                    ? failure.message 
-                    : 'Please wait before requesting another OTP';
-                _error = reason;
-                Logger.data('[RESEND_OTP] Rate limited: $reason');
-              }
-            } else {
-              _error = failure.message ?? ErrorTranslator.translateError(failure);
-            }
-          } else {
+          // Check for daily limit errors first
+          if (ErrorTranslator.isDailyLimitError(failure)) {
+            _error = ErrorTranslator.getDailyLimitErrorMessage();
+            Logger.data('[RESEND_OTP] Daily limit exceeded: ${failure.message}');
+          } 
+          // Check for rate limiting
+          else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+            // Regular rate limiting
+            final reason = failure.message?.contains('Try again in') == true 
+                ? failure.message 
+                : 'Please wait before requesting another OTP';
+            _error = reason;
+            Logger.data('[RESEND_OTP] Rate limited: $reason');
+          } 
+          // Default error handling
+          else {
             _error = failure.message ?? ErrorTranslator.translateError(failure);
           }
         });

@@ -424,15 +424,10 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     
               otpResult.fold(
                 (otpFailure) {
-                  // Check for daily limit message directly in the failure message
-                  if (otpFailure is InfrastructureFailure && 
-                      otpFailure.message != null && 
-                      (otpFailure.message!.toLowerCase().contains('daily limit') || 
-                       otpFailure.message!.toLowerCase().contains('try again tomorrow'))) {
-                    _showErrorDialog(otpFailure.message!);
-                  } 
-                  // Otherwise use the error translator
-                  else {
+                  // Use the centralized error handling
+                  if (ErrorTranslator.isDailyLimitError(otpFailure)) {
+                    _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
+                  } else {
                     _showErrorDialog(ErrorTranslator.translateError(otpFailure));
                   }
                 },
@@ -498,15 +493,10 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
 
           otpResult.fold(
             (otpFailure) {
-              // Check for daily limit message directly in the failure message
-              if (otpFailure is InfrastructureFailure && 
-                  otpFailure.message != null && 
-                  (otpFailure.message!.toLowerCase().contains('daily limit') || 
-                   otpFailure.message!.toLowerCase().contains('try again tomorrow'))) {
-                _showErrorDialog(otpFailure.message!);
-              } 
-              // Otherwise use the error translator
-              else {
+              // Use the centralized error handling
+              if (ErrorTranslator.isDailyLimitError(otpFailure)) {
+                _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
+              } else {
                 _showErrorDialog(ErrorTranslator.translateError(otpFailure));
               }
             },
