@@ -424,7 +424,17 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     
               otpResult.fold(
                 (otpFailure) {
-                  _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+                  // Check for daily limit message directly in the failure message
+                  if (otpFailure is InfrastructureFailure && 
+                      otpFailure.message != null && 
+                      (otpFailure.message!.toLowerCase().contains('daily limit') || 
+                       otpFailure.message!.toLowerCase().contains('try again tomorrow'))) {
+                    _showErrorDialog(otpFailure.message!);
+                  } 
+                  // Otherwise use the error translator
+                  else {
+                    _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+                  }
                 },
                 (_) {
                   // Show success dialog
@@ -488,7 +498,17 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
 
           otpResult.fold(
             (otpFailure) {
-              _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+              // Check for daily limit message directly in the failure message
+              if (otpFailure is InfrastructureFailure && 
+                  otpFailure.message != null && 
+                  (otpFailure.message!.toLowerCase().contains('daily limit') || 
+                   otpFailure.message!.toLowerCase().contains('try again tomorrow'))) {
+                _showErrorDialog(otpFailure.message!);
+              } 
+              // Otherwise use the error translator
+              else {
+                _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+              }
             },
             (_) {
               // Show OTP verification flow

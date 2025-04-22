@@ -58,6 +58,11 @@ class ErrorTranslator {
       return 'You\'ve made too many requests. Please wait a moment and try again.';
     }
     
+    if (errorString.contains('daily limit') || 
+        errorString.contains('try again tomorrow')) {
+      return 'You have reached the daily limit for this operation. Please try again tomorrow.';
+    }
+    
     // Default server error message
     return 'Our servers are experiencing issues. Please try again later.';
   }
@@ -109,7 +114,9 @@ class ErrorTranslator {
         errorString.contains('503') ||
         errorString.contains('404') ||
         errorString.contains('429') ||
-        errorString.contains('server')) {
+        errorString.contains('server') ||
+        errorString.contains('try again tomorrow') ||
+        errorString.contains('daily limit')) {
       return getServerErrorMessage(error);
     }
     
