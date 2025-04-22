@@ -89,14 +89,22 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
         (failure) {
           Navigator.of(dialogContext).pop();
           setState(() {
-            if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
-              // Extract the wait time from the error message if available
+            // Check for daily limit errors first
+            if (ErrorTranslator.isDailyLimitError(failure)) {
+              _error = ErrorTranslator.getDailyLimitErrorMessage();
+              Logger.data('[VERIFY_OTP] Daily limit exceeded: ${failure.message}');
+            } 
+            // Check for rate limiting
+            else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+              // Regular rate limiting
               final reason = failure.message?.contains('Try again in') == true 
                   ? failure.message 
                   : 'Please wait before verifying another OTP';
               _error = reason;
               Logger.data('[VERIFY_OTP] Rate limited: $reason');
-            } else {
+            } 
+            // Default error handling
+            else {
               _error = failure.message ?? ErrorTranslator.translateError(failure);
             }
             _isLoading = false;
@@ -234,14 +242,22 @@ class _OTPVerificationFlowState extends State<OTPVerificationFlow> {
       result.fold(
         (failure) {
           setState(() {
-            if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
-              // Extract the wait time from the error message if available
+            // Check for daily limit errors first
+            if (ErrorTranslator.isDailyLimitError(failure)) {
+              _error = ErrorTranslator.getDailyLimitErrorMessage();
+              Logger.data('[RESEND_OTP] Daily limit exceeded: ${failure.message}');
+            } 
+            // Check for rate limiting
+            else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+              // Regular rate limiting
               final reason = failure.message?.contains('Try again in') == true 
                   ? failure.message 
                   : 'Please wait before requesting another OTP';
               _error = reason;
               Logger.data('[RESEND_OTP] Rate limited: $reason');
-            } else {
+            } 
+            // Default error handling
+            else {
               _error = failure.message ?? ErrorTranslator.translateError(failure);
             }
           });

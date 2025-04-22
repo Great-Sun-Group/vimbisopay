@@ -1203,19 +1203,44 @@ class AccountRepositoryImpl implements AccountRepository {
         final responseBody = json.decode(response.body);
         final errorMessage = responseBody['message'] ?? 'Failed to request OTP';
         
-        // Extract error code if available
+        // Extract error code and reason if available
         String? errorCode;
+        String? reason;
+        
+        // Check for daily limit message in the top-level message
+        bool isDailyLimit = errorMessage.toLowerCase().contains("daily") || 
+                           errorMessage.toLowerCase().contains("limit");
+        
         if (responseBody.containsKey('data') && 
             responseBody['data'].containsKey('action') &&
             responseBody['data']['action'].containsKey('details')) {
           errorCode = responseBody['data']['action']['details']['code'];
-          final reason = responseBody['data']['action']['details']['reason'];
-          Logger.error('[REQUEST_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+          reason = responseBody['data']['action']['details']['reason'];
+          
+          // Check for "try again tomorrow" in the reason
+          if (reason != null && reason.toLowerCase().contains("try again tomorrow")) {
+            Logger.error('[REQUEST_OTP] Daily limit exceeded', 'Code: $errorCode, Reason: $reason');
+            // Use a custom error message that will be displayed to the user
+            return Left(InfrastructureFailure(
+              'You have reached the daily limit for OTP requests. Please try again tomorrow.',
+              errorCode
+            ));
+          } else {
+            Logger.error('[REQUEST_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+          }
         } else {
           Logger.error('[REQUEST_OTP] Request failed', errorMessage);
         }
         
-        return Left(InfrastructureFailure(errorMessage, errorCode));
+        // If we detected a daily limit in the top-level message
+        if (isDailyLimit) {
+          return Left(InfrastructureFailure(
+            'You have reached the daily limit for OTP requests. Please try again tomorrow.',
+            errorCode
+          ));
+        }
+        
+        return Left(InfrastructureFailure(reason ?? errorMessage, errorCode));
       }
     } catch (e) {
       Logger.error('[REQUEST_OTP] Exception occurred', e);
@@ -1270,19 +1295,44 @@ Response body: ${response.body}
         final responseBody = json.decode(response.body);
         final errorMessage = responseBody['message'] ?? 'Failed to verify OTP';
         
-        // Extract error code if available
+        // Check for daily limit message in the top-level message
+        bool isDailyLimit = errorMessage.toLowerCase().contains("daily") || 
+                           errorMessage.toLowerCase().contains("limit");
+        
+        // Extract error code and reason if available
         String? errorCode;
+        String? reason;
+        
         if (responseBody.containsKey('data') && 
             responseBody['data'].containsKey('action') &&
             responseBody['data']['action'].containsKey('details')) {
           errorCode = responseBody['data']['action']['details']['code'];
-          final reason = responseBody['data']['action']['details']['reason'];
-          Logger.error('[VERIFY_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+          reason = responseBody['data']['action']['details']['reason'];
+          
+          // Check for "try again tomorrow" in the reason
+          if (reason != null && reason.toLowerCase().contains("try again tomorrow")) {
+            Logger.error('[VERIFY_OTP] Daily limit exceeded', 'Code: $errorCode, Reason: $reason');
+            // Use a custom error message that will be displayed to the user
+            return Left(InfrastructureFailure(
+              'You have reached the daily limit for OTP requests. Please try again tomorrow.',
+              errorCode
+            ));
+          } else {
+            Logger.error('[VERIFY_OTP] Request failed with code: $errorCode', 'Reason: $reason');
+          }
         } else {
           Logger.error('[VERIFY_OTP] Request failed', errorMessage);
         }
         
-        return Left(InfrastructureFailure(errorMessage, errorCode));
+        // If we detected a daily limit in the top-level message
+        if (isDailyLimit) {
+          return Left(InfrastructureFailure(
+            'You have reached the daily limit for OTP requests. Please try again tomorrow.',
+            errorCode
+          ));
+        }
+        
+        return Left(InfrastructureFailure(reason ?? errorMessage, errorCode));
       }
     } catch (e) {
       Logger.error('[VERIFY_OTP] Exception occurred', e);

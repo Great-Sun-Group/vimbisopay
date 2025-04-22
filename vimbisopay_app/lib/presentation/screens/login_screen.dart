@@ -424,7 +424,12 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     
               otpResult.fold(
                 (otpFailure) {
-                  _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+                  // Use the centralized error handling
+                  if (ErrorTranslator.isDailyLimitError(otpFailure)) {
+                    _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
+                  } else {
+                    _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+                  }
                 },
                 (_) {
                   // Show success dialog
@@ -488,7 +493,12 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
 
           otpResult.fold(
             (otpFailure) {
-              _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+              // Use the centralized error handling
+              if (ErrorTranslator.isDailyLimitError(otpFailure)) {
+                _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
+              } else {
+                _showErrorDialog(ErrorTranslator.translateError(otpFailure));
+              }
             },
             (_) {
               // Show OTP verification flow

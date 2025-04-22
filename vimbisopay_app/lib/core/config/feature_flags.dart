@@ -32,6 +32,6 @@ class FeatureFlags {
   /// or when the app is offline.
   static final Map<String, dynamic> defaults = {
     enableMarketplace: false,  // Changed to match Firebase Console setting
-    enableDebugFeatures: false,  // Disabled by default for release builds
+    enableDebugFeatures: true,  // Disabled by default for release builds
   };
 }
