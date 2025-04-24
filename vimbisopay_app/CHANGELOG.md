@@ -232,3 +232,6 @@ Example entry format:
 ## [4.5.0+02] - 2025-04-22
 - 1.0.0
 - UI clean up and disabled unsecured credexes
+-e 
+## [4.5.1+01] - 2025-04-24
+- Testing push notifications
