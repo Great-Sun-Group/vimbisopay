@@ -15,7 +15,7 @@ import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
@@ -495,7 +495,7 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => OTPVerificationFlow(
+                builder: (context) => WhatsAppOTPVerification(
                   token: user.token,
                   phone: phoneNumber,
                   memberId: user.memberId,

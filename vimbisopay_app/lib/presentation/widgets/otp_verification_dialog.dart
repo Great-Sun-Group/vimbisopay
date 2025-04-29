@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 
 class OTPVerificationDialog extends StatelessWidget {
   final String token;
@@ -17,7 +18,10 @@ class OTPVerificationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OTPVerificationFlow(
+    Logger.data('[OTP_DIALOG] Using WhatsApp OTP verification');
+    
+    // Use the WhatsApp OTP verification flow
+    return WhatsAppOTPVerification(
       token: token,
       phone: phone,
       memberId: memberId,

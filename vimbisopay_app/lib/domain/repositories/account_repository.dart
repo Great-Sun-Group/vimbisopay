@@ -93,6 +93,20 @@ abstract class AccountRepository {
     required String purpose,
   });
 
+  /// Store a locally generated OTP in Credex Core
+  /// 
+  /// [memberId] The member ID to store the OTP for
+  /// [phone] The phone number associated with the account
+  /// [otp] The OTP to store
+  /// [purpose] The purpose of the OTP (e.g. 'PASSWORD_RESET')
+  /// Returns a success boolean
+  Future<Either<Failure, bool>> storeOtp({
+    required String memberId,
+    required String phone,
+    required String otp,
+    required String purpose,
+  });
+
   /// Verify an OTP using a token
   /// 
   /// [token] The v1 token to use for verification
