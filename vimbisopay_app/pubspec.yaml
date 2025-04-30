@@ -25,6 +25,7 @@ dependencies:
   encrypt: ^5.0.1
   crypto: ^3.0.3
   pointycastle: ^3.7.3
+  app_links: ^3.4.3
   smooth_page_indicator: ^1.1.0
   equatable: ^2.0.5
   flutter_bloc: ^8.1.3

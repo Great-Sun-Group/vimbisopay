@@ -6,7 +6,7 @@ import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
@@ -128,35 +128,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  void _showOtpVerification(String phone, String memberId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PasswordResetOTPFlow(
-        phone: phone,
-        memberId: memberId,
-        onVerificationComplete: (OtpVerificationResponse response) {
-          // Close OTP dialog
-          Navigator.pop(context);
-          // Show reset password bottom sheet
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            isDismissible: false,
-            enableDrag: false,
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
-            ),
-            builder: (context) => ChangePasswordBottomSheet(
-              resetToken: response.details.resetToken,
-              memberId: response.details.memberId,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   void _showError(String message, {String title = 'Error'}) {
     showDialog(
       context: context,
@@ -222,17 +193,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       builder: (context) {
         Logger.interaction('[ForgotPassword] Building loading dialog');
         return const LoadingDialog(
-          message: 'Sending code...',
+          message: 'Initializing verification...',
         );
       },
     ));
 
     try {
-      // The phone number is already in the correct format (digits only)
-      // thanks to PlainPhoneNumberFormatter
-      final result = await _repository.requestOtp(
+      // Do v1 login to get memberId
+      final v1Result = await _repository.login(
         phone: _phoneController.text,
-        purpose: 'PASSWORD_RESET',
       );
 
       if (!mounted) return;
@@ -247,7 +216,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }
       }
 
-      result.fold(
+      v1Result.fold(
         (failure) {
           cleanup();
           // Use the failure message if available, otherwise translate the error
@@ -255,20 +224,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               failure.message ?? ErrorTranslator.translateError(failure);
           _showError(errorMessage);
         },
-        (response) {
+        (user) {
           cleanup();
-          final memberId = response['data']?['action']?['details']?['memberID'];
-          if (memberId == null) {
-            _showError('Failed to get required information from response');
-            return;
-          }
-          Logger.data('[ForgotPassword] Got memberIdfrom response');
-          // Show OTP verification dialog with memberId and token
-          _showOtpVerification(_phoneController.text, memberId);
+          Logger.data('[ForgotPassword] Got memberId from v1 login');
+          // Show WhatsApp OTP verification dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => WhatsAppOTPVerification(
+              token: user.token,
+              phone: _phoneController.text,
+              memberId: user.memberId,
+              onVerificationComplete: (verifiedUser) {
+                // Close OTP dialog
+                Navigator.pop(context);
+                // Show reset password bottom sheet
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  isDismissible: false,
+                  enableDrag: false,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.85,
+                  ),
+                  builder: (context) => ChangePasswordBottomSheet(
+                    resetToken: verifiedUser.token,
+                    memberId: verifiedUser.memberId,
+                  ),
+                );
+              },
+            ),
+          );
         },
       );
     } catch (e) {
-      Logger.error('[ForgotPassword] Error sending reset instructions', e);
+      Logger.error('[ForgotPassword] Error initializing verification', e);
       if (mounted) {
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {

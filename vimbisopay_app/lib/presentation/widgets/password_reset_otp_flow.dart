@@ -5,6 +5,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
@@ -70,22 +71,14 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
     result.fold(
       (failure) {
         setState(() {
-          // Check for daily limit errors first
-          if (ErrorTranslator.isDailyLimitError(failure)) {
-            _error = ErrorTranslator.getDailyLimitErrorMessage();
-            Logger.data('[VERIFY_OTP] Daily limit exceeded: ${failure.message}');
-          } 
-          // Check for rate limiting
-          else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
-            // Regular rate limiting
+          if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
+            // Extract the wait time from the error message if available
             final reason = failure.message?.contains('Try again in') == true 
                 ? failure.message 
                 : 'Please wait before verifying another OTP';
             _error = reason;
             Logger.data('[VERIFY_OTP] Rate limited: $reason');
-          } 
-          // Default error handling
-          else {
+          } else {
             _error = failure.message ?? ErrorTranslator.translateError(failure);
           }
         });
@@ -97,56 +90,19 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
   }
 
   Future<void> _resendOTP() async {
-    setState(() {
-      _isResending = true;
-      _error = null;
-    });
-
+    // Replace with WhatsApp OTP verification
+    Navigator.of(context).pop(); // Close the current dialog
+    
+    // Show WhatsApp OTP verification dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => LoadingDialog(
-        message: _isResending ? 'Resending verification code...' : 'Sending verification code...',
-        messageStream: _messageController.stream,
+      builder: (context) => WhatsAppOTPVerification(
+        token: '',
+        phone: widget.phone,
+        memberId: widget.memberId,
+        onVerificationComplete: widget.onVerificationComplete,
       ),
-    );
-
-    final result = await _repository.requestOtp(
-      phone: widget.phone,
-      purpose: 'PASSWORD_RESET',
-    );
-
-    if (!mounted) return;
-    Navigator.of(context).pop(); // Pop loading dialog
-
-    setState(() => _isResending = false);
-
-    result.fold(
-      (failure) {
-        setState(() {
-          // Check for daily limit errors first
-          if (ErrorTranslator.isDailyLimitError(failure)) {
-            _error = ErrorTranslator.getDailyLimitErrorMessage();
-            Logger.data('[RESEND_OTP] Daily limit exceeded: ${failure.message}');
-          } 
-          // Check for rate limiting
-          else if (failure is InfrastructureFailure && failure.code == 'RATE_LIMITED') {
-            // Regular rate limiting
-            final reason = failure.message?.contains('Try again in') == true 
-                ? failure.message 
-                : 'Please wait before requesting another OTP';
-            _error = reason;
-            Logger.data('[RESEND_OTP] Rate limited: $reason');
-          } 
-          // Default error handling
-          else {
-            _error = failure.message ?? ErrorTranslator.translateError(failure);
-          }
-        });
-      },
-      (_) {
-        setState(() => _error = null);
-      },
     );
   }
 

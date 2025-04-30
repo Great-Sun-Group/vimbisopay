@@ -15,7 +15,7 @@ import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
@@ -359,6 +359,8 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     Logger.interaction('[Login] Calling login API');
     Logger.performance('[Login] API call start: login');
     
+    Logger.data('[Login] Password: $password'); // Log the password for debugging
+    
     final result = await _repository.loginV2(
       phone: phoneNumber,
       password: password,
@@ -383,163 +385,25 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
         Logger.error('[Login] Login failed', failure);
         cleanup();
 
-        // Check if this is a PASSWORD_REQUIRED error
-        if (failure is AuthFailure && failure.isPasswordRequired) {
-          // Show loading while doing v1 login
-                showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => LoadingDialog(
-                  message: 'Initializing verification...',
-            ),
-          );
-
-          // Do v1 login first to get token
-          final v1Result = await _repository.login(phone: phoneNumber);
-
-          if (!mounted) return;
-          Navigator.pop(context); // Pop loading dialog
-          
-          v1Result.fold(
-            (v1Failure) {
-              _showErrorDialog(ErrorTranslator.translateError(v1Failure));
-            },
-            (v1User) async {
-              // Request OTP with loading dialog
-                  showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => LoadingDialog(
-                          message: 'Sending verification code...',
-                ),
-              );
-
-              final otpResult = await _repository.requestOtp(
-                phone: phoneNumber,
-                purpose: 'PASSWORD_RESET',
-              );
-
-              if (!mounted) return;
-              Navigator.pop(context); // Pop loading dialog
-    
-              otpResult.fold(
-                (otpFailure) {
-                  // Use the centralized error handling
-                  if (ErrorTranslator.isDailyLimitError(otpFailure)) {
-                    _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
-                  } else {
-                    _showErrorDialog(ErrorTranslator.translateError(otpFailure));
-                  }
-                },
-                (_) {
-                  // Show success dialog
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => SuccessDialog(
-                      title: 'Code Sent',
-                      message: 'A verification code has been sent to your Whatsapp phone number.',
-                      onDismiss: () {
-                        Navigator.pop(context);
-                        // Show OTP dialog
-                              // Show OTP dialog with stored password
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => OTPVerificationDialog(
-                                  token: v1User.token,
-                                  phone: phoneNumber,
-                                  memberId: v1User.memberId,
-                                  password: password,
-                                ),
-                              );
-                      },
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        } else {
-          // Use the failure message if available, otherwise translate the error
-          final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
-          _showErrorDialog(errorMessage);
-        }
+        // Use the failure message if available, otherwise translate the error
+        final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
+        _showErrorDialog(errorMessage);
       },
       (user) async {
         Logger.interaction('[Login] Login successful');
+        cleanup();
         
-        // Check if OTP verification is needed
-        if (user.version == 'v2' && user.authMethod == 'password' && !user.otpVerified) {
-          Logger.interaction('[Login] OTP verification required');
-          cleanup();
-          
-          // Request OTP
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => LoadingDialog(
-                  message: 'Sending verification code...',
-            ),
+        // No OTP verification needed, proceed normally
+        Logger.interaction('[Login] Saving user data');
+        await _databaseHelper.saveUser(user);
+        
+        if (mounted) {
+          Logger.interaction('[Login] Navigating to auth screen');
+          Navigator.pushReplacementNamed(
+            context,
+            '/auth',
+            arguments: user,
           );
-
-          final otpResult = await _repository.requestOtp(
-            phone: phoneNumber,
-            purpose: 'PASSWORD_RESET',
-          );
-
-          if (!mounted) return;
-          Navigator.pop(context); // Pop loading dialog
-
-          otpResult.fold(
-            (otpFailure) {
-              // Use the centralized error handling
-              if (ErrorTranslator.isDailyLimitError(otpFailure)) {
-                _showErrorDialog(ErrorTranslator.getDailyLimitErrorMessage());
-              } else {
-                _showErrorDialog(ErrorTranslator.translateError(otpFailure));
-              }
-            },
-            (_) {
-              // Show OTP verification flow
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => OTPVerificationFlow(
-                  token: user.token,
-                  phone: phoneNumber,
-                  memberId: user.memberId,
-                  user: user,
-                  onVerificationComplete: (verifiedUser) async {
-                    // Save verified user
-                    await _databaseHelper.saveUser(verifiedUser);
-                    
-                    if (mounted) {
-                      // Navigate to auth screen
-                      Navigator.pushReplacementNamed(
-                        context,
-                        '/auth',
-                        arguments: verifiedUser,
-                      );
-                    }
-                  },
-                ),
-              );
-            },
-          );
-        } else {
-          // No OTP verification needed, proceed normally
-          Logger.interaction('[Login] Saving user data');
-          await _databaseHelper.saveUser(user);
-          
-          if (mounted) {
-            Logger.interaction('[Login] Navigating to auth screen');
-            Navigator.pushReplacementNamed(
-              context,
-              '/auth',
-              arguments: user,
-            );
-          }
         }
       },
     );
