@@ -235,3 +235,6 @@ Example entry format:
 -e 
 ## [4.5.1+01] - 2025-04-24
 - Testing push notifications
+-e 
+## [4.5.2+02] - 2025-04-30
+- Updated Whatsapp verification flow

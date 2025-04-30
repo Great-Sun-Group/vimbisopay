@@ -1,7 +1,7 @@
 name: vimbisopay_app
 description: A new Flutter project.
 publish_to: 'none'
-version: 4.5.1+01
+version: 4.5.2+02
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
