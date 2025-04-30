@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/presentation/screens/debug/api_config_tab.dart';
 import 'package:vimbisopay_app/presentation/screens/debug/app_updates_tab.dart';
 import 'package:vimbisopay_app/presentation/screens/debug/feature_flags_tab.dart';
 import 'package:vimbisopay_app/presentation/screens/debug/notifications_tab.dart';
+import 'package:vimbisopay_app/presentation/screens/debug/whatsapp_otp_tab.dart';
 
 /// Debug screen for the VimbisoPay app.
 ///
@@ -27,7 +28,7 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -50,6 +51,7 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
             Tab(text: 'Feature Flags'),
             Tab(text: 'App Updates'),
             Tab(text: 'Notifications'),
+            Tab(text: 'WhatsApp OTP'),
           ],
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
@@ -70,6 +72,9 @@ class _DebugScreenState extends State<DebugScreen> with SingleTickerProviderStat
           
           // Notifications Tab
           NotificationsTab(),
+          
+          // WhatsApp OTP Tab
+          WhatsAppOTPTab(),
         ],
       ),
     );

@@ -39,6 +39,17 @@ class OTPUtils {
     return Uri.parse(url);
   }
 
+  /// Creates a deep link back to the app for verification completion
+  /// 
+  /// [phone] The phone number to include in the deep link
+  /// Returns a URI for the app deep link
+  static String createAppDeepLink(String phone) {
+    final encodedPhone = Uri.encodeComponent(phone);
+    final url = 'vimbisopay://verification-complete?phone=$encodedPhone&status=success';
+    Logger.data('[OTP_UTILS] Created app deep link: $url');
+    return url;
+  }
+
   /// Opens WhatsApp with a pre-populated verification message
   /// 
   /// [otp] The OTP to include in the message

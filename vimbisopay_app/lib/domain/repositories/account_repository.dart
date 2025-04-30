@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
+import 'package:vimbisopay_app/domain/entities/verification_status.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> loginV2({
@@ -99,8 +100,8 @@ abstract class AccountRepository {
   /// [phone] The phone number associated with the account
   /// [otp] The OTP to store
   /// [purpose] The purpose of the OTP (e.g. 'PASSWORD_RESET')
-  /// Returns a success boolean
-  Future<Either<Failure, bool>> storeOtp({
+  /// Returns a map containing the verification token and expiry time
+  Future<Either<Failure, Map<String, dynamic>>> storeOtp({
     required String memberId,
     required String phone,
     required String otp,
@@ -145,5 +146,13 @@ abstract class AccountRepository {
   Future<bool> resetPassword({
     required String resetToken,
     required String newPassword,
+  });
+  
+  /// Check if an OTP has been verified for a given phone number
+  /// 
+  /// [phone] The phone number to check verification status for
+  /// Returns a verification status object with verification details
+  Future<Either<Failure, VerificationStatus>> checkOtpVerificationStatus({
+    required String phone,
   });
 }

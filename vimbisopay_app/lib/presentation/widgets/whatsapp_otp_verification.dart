@@ -3,7 +3,9 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/otp_utils.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
+import 'package:vimbisopay_app/core/utils/deep_link_handler.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/entities/verification_status.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
@@ -39,15 +41,47 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
   final _repository = ServiceLocator.accountRepository;
   bool _isLoading = true;
   bool _isGeneratingOTP = false;
+  bool _isCheckingStatus = false;
   bool _otpSent = false;
   String? _otp;
   String? _error;
   bool _verificationComplete = false;
+  String? _verificationToken;
+  int? _tokenExpiresIn;
   
   @override
   void initState() {
     super.initState();
-    _generateAndStoreOTP();
+    
+    // Register verification callback with DeepLinkHandler
+    DeepLinkHandler.registerVerificationCallback(_handleDeepLinkVerification);
+    
+    // Schedule OTP generation after the widget is fully initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _generateAndStoreOTP();
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    // Unregister verification callback when widget is disposed
+    DeepLinkHandler.unregisterVerificationCallback();
+    super.dispose();
+  }
+  
+  /// Handle verification deep link
+  void _handleDeepLinkVerification(String phone) {
+    Logger.data('[WhatsAppOTPVerification] Received verification deep link for phone: $phone');
+    
+    // Check if the phone number matches
+    if (phone == widget.phone) {
+      // Check verification status
+      _checkVerificationStatus();
+    } else {
+      Logger.data('[WhatsAppOTPVerification] Phone number mismatch: $phone != ${widget.phone}');
+    }
   }
   
   /// Generates an OTP and stores it in Credex Core
@@ -95,25 +129,39 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
             _isLoading = false;
           });
         },
-        (_) {
+        (data) {
           setState(() {
             _otp = otp;
+            _verificationToken = data['verificationToken'] as String?;
+            _tokenExpiresIn = data['expiresIn'] as int?;
             _isGeneratingOTP = false;
             _isLoading = false;
           });
+          
+          Logger.data('[WhatsAppOTPVerification] OTP stored with token: ${_verificationToken != null ? '[REDACTED]' : 'null'}, expires in: $_tokenExpiresIn seconds');
         },
       );
     } catch (e) {
-      // Dismiss loading dialog if it's showing
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
-      }
+      // Log the error
+      Logger.error('[WhatsAppOTPVerification] Error generating OTP', e);
       
-      setState(() {
-        _error = ErrorTranslator.translateError(e);
-        _isGeneratingOTP = false;
-        _isLoading = false;
-      });
+      // Safely handle dialog dismissal using a post-frame callback
+      if (mounted) {
+        // First update the state
+        setState(() {
+          _error = ErrorTranslator.translateError(e);
+          _isGeneratingOTP = false;
+          _isLoading = false;
+        });
+        
+        // Then schedule dialog dismissal after the current frame is complete
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Check if there's a dialog to dismiss
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        });
+      }
     }
   }
   
@@ -137,6 +185,104 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
       setState(() {
         _error = ErrorTranslator.translateError(e);
       });
+    }
+  }
+  
+  /// Checks if the OTP has been verified
+  Future<void> _checkVerificationStatus() async {
+    if (_isCheckingStatus) return;
+    
+    setState(() {
+      _isCheckingStatus = true;
+      _error = null;
+    });
+    
+    try {
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => LoadingDialog(
+            message: 'Checking verification status...',
+          ),
+        );
+      }
+      
+      // Check OTP verification status
+      final result = await _repository.checkOtpVerificationStatus(
+        phone: widget.phone,
+      );
+      
+      // Dismiss loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      result.fold(
+        (failure) {
+          setState(() {
+            _error = failure.message ?? ErrorTranslator.translateError(failure);
+            _isCheckingStatus = false;
+          });
+        },
+        (status) {
+          // Explicitly cast status to VerificationStatus
+          final verificationStatus = status as VerificationStatus;
+          setState(() {
+            _verificationComplete = verificationStatus.verified;
+            _isCheckingStatus = false;
+          });
+          
+          if (verificationStatus.verified) {
+            // Call the completion callback with either the provided user or a placeholder
+            // This ensures the flow continues even in password reset where user might be null
+            if (widget.user != null) {
+              widget.onVerificationComplete(widget.user!);
+            } else {
+              // For password reset flow, create a minimal User with just the memberId
+              // and the verification token that we received during OTP storage
+              final tempUser = User(
+                memberId: widget.memberId,
+                phone: widget.phone,
+                token: _verificationToken ?? widget.token, // Use the stored token from initial OTP storage
+              );
+              
+              Logger.data('[WhatsAppOTPVerification] Verification complete with stored token: ${_verificationToken != null ? '[REDACTED]' : 'null'}');
+              widget.onVerificationComplete(tempUser);
+            }
+            
+            // Close the dialog after a short delay to show the success state
+            if (mounted) {
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (mounted && Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              });
+            }
+          }
+        },
+      );
+    } catch (e) {
+      // Log the error
+      Logger.error('[WhatsAppOTPVerification] Error checking verification status', e);
+      
+      // Safely handle dialog dismissal using a post-frame callback
+      if (mounted) {
+        // First update the state
+        setState(() {
+          _error = ErrorTranslator.translateError(e);
+          _isCheckingStatus = false;
+        });
+        
+        // Then schedule dialog dismissal after the current frame is complete
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Check if there's a dialog to dismiss
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        });
+      }
     }
   }
   
@@ -317,6 +463,27 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                     
                     if (_otpSent) const SizedBox(height: 16),
                     
+                    // Check verification status button
+                    if (_otpSent && !_verificationComplete)
+                      FilledButton.icon(
+                        onPressed: _isCheckingStatus ? null : _checkVerificationStatus,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.refresh),
+                        label: Text(
+                          _isCheckingStatus ? 'Checking...' : 'Check Verification Status',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    
+                    if (_otpSent && !_verificationComplete) const SizedBox(height: 16),
+                    
                     // Regenerate OTP button
                     if (_otpSent && !_verificationComplete)
                       TextButton.icon(
@@ -324,6 +491,47 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                         icon: const Icon(Icons.refresh),
                         label: Text(
                           _isGeneratingOTP ? 'Generating...' : 'Generate New Code',
+                        ),
+                      ),
+                      
+                    // Success message
+                    if (_verificationComplete)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.success.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: AppColors.success,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Verification Successful!',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Your phone number has been verified. You can now continue with the process.',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       ),
                   ],

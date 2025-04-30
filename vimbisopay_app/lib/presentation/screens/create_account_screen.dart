@@ -325,51 +325,35 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 messageController.add('Sending verification code...');
                 await Future.delayed(const Duration(milliseconds: 300));
                 
-                // Request OTP for verification
-                final otpResult = await _repository.requestOtp(
-                  phone: phoneNumber,
-                  purpose: 'PASSWORD_RESET',
-                );
-
-                if (!mounted) return;
-
-                otpResult.fold(
-                  (failure) {
-                    Logger.error('[CreateAccount] OTP request failed', failure);
-                    cleanup();
-                    _showError(ErrorTranslator.translateError(failure));
-                  },
-                  (_) {
-                    Logger.interaction('[CreateAccount] OTP sent successfully');
-                    cleanup();
-                    
-                    if (mounted) {
-                      // Show OTP verification flow
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => WhatsAppOTPVerification(
-                          token: user.token,
-                          phone: phoneNumber,
-                          memberId: user.memberId,
-                          password: password,
-                          isAccountCreation: true,
-                          user: userToSave, // Pass the complete user object
-                          onVerificationComplete: (verifiedUser) {
-                            Logger.interaction('[CreateAccount] OTP verification complete');
-                            Logger.interaction('[CreateAccount] Navigating to security setup');
-                            
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                              '/security-setup',
-                              (route) => false,
-                              arguments: verifiedUser,
-                            );
-                          },
-                        ),
-                      );
-                    }
-                  },
-                );
+                // Skip OTP request and directly show WhatsApp OTP verification
+                Logger.interaction('[CreateAccount] Showing WhatsApp OTP verification');
+                cleanup();
+                
+                if (mounted) {
+                  // Show OTP verification flow
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => WhatsAppOTPVerification(
+                      token: user.token,
+                      phone: phoneNumber,
+                      memberId: user.memberId,
+                      password: password,
+                      isAccountCreation: true,
+                      user: userToSave, // Pass the complete user object
+                      onVerificationComplete: (verifiedUser) {
+                        Logger.interaction('[CreateAccount] OTP verification complete');
+                        Logger.interaction('[CreateAccount] Navigating to security setup');
+                        
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/security-setup',
+                          (route) => false,
+                          arguments: verifiedUser,
+                        );
+                      },
+                    ),
+                  );
+                }
               } else {
                 Logger.interaction('[CreateAccount] User already verified, navigating to security setup');
                 await Future.delayed(const Duration(milliseconds: 300));

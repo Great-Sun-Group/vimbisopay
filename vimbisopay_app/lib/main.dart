@@ -27,6 +27,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_
 import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/test_whatsapp_otp.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/utils/database_test.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -34,6 +35,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/navigation_utils.dart';
 import 'package:vimbisopay_app/core/utils/crash_tracker.dart';
+import 'package:vimbisopay_app/core/utils/deep_link_handler.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/connectivity_banner.dart';
@@ -189,6 +191,11 @@ void main() async {
     print('Initializing ConnectivityService...');
     await ServiceLocator.initializeConnectivityService();
     print('ConnectivityService initialized successfully');
+    
+    // Initialize DeepLinkHandler
+    print('Initializing DeepLinkHandler...');
+    await DeepLinkHandler.initialize();
+    print('DeepLinkHandler initialized successfully');
     
     // Schedule full notification service initialization for after UI is rendered
     Future.delayed(const Duration(seconds: 1), () async {
@@ -515,6 +522,13 @@ class MyApp extends StatelessWidget {
           if (settings.name == '/debug') {
             return MaterialPageRoute(
               builder: (context) => const DebugScreen(),
+              settings: settings,
+            );
+          }
+          
+          if (settings.name == '/test-whatsapp-otp') {
+            return MaterialPageRoute(
+              builder: (context) => const TestWhatsAppOTP(),
               settings: settings,
             );
           }

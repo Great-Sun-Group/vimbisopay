@@ -102,7 +102,7 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
       final bool success;
       if (widget.resetToken != null) {
         success = await _repository.resetPassword(
-          resetToken: widget.resetToken!,
+          resetToken: widget.resetToken!, // Use the verification token
           newPassword: newPassword,
         );
       } else {
