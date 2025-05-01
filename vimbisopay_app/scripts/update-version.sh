@@ -14,6 +14,25 @@
 #
 # Usage: ./update-version.sh
 #
+# URL encoding function
+urlencode() {
+  local string="$1"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
+
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+    c=${string:$pos:1}
+    case "$c" in
+      [-_.~a-zA-Z0-9] ) o="${c}" ;;
+      "+" )             o="%2B" ;;
+      * )               printf -v o '%%%02x' "'$c"
+    esac
+    encoded+="${o}"
+  done
+  echo "${encoded}"
+}
+
 # Source GitHub configuration
 source "$(dirname "$0")/github_config.sh"
 
@@ -42,6 +61,12 @@ fi
 # Parse version components
 version_name=$(echo $new_version | cut -d'+' -f1)
 version_code=$(echo $new_version | cut -d'+' -f2)
+
+# Create URL-safe version for GitHub release URL using proper URL encoding
+url_safe_version=$(urlencode "$new_version")
+
+# Create filename-safe version for APK filenames (replace + with -)
+filename_version="${new_version/+/-}"
 
 # Check if version code is missing (no + in the version string)
 if [ "$version_name" = "$version_code" ]; then
@@ -113,13 +138,41 @@ while IFS= read -r line; do
     changes="${changes}- ${line}\n"
 done
 
-echo "Building new APK..."
+# Verify the existence of the keystore file
+if [ ! -f "vimbisopay-release-key.jks" ]; then
+  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
+  echo "Please ensure the keystore file is in the project root directory."
+  exit 1
+fi
+
+# Verify the existence of key.properties
+if [ ! -f "android/key.properties" ]; then
+  echo "Error: key.properties file not found in android directory."
+  echo "Please ensure the key.properties file is properly configured."
+  exit 1
+fi
+
+echo "Building APKs..."
+echo "Building universal APK with release signing..."
 flutter build apk --release
 
 # Add a delay to ensure the APK is fully written
 sleep 5
 
-# Locate the APK file
+# Verify the APK signature
+echo "Verifying universal APK signature..."
+if command -v jarsigner &> /dev/null; then
+  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-release.apk" | grep "verified"
+  if [ $? -ne 0 ]; then
+    echo "Warning: Universal APK signature verification failed. Please check the signing configuration."
+  else
+    echo "Universal APK signature verified successfully."
+  fi
+else
+  echo "Warning: jarsigner not found. Skipping APK signature verification."
+fi
+
+# Locate the universal APK file
 apk_path="build/app/outputs/flutter-apk/app-release.apk"
 if [ ! -f "$apk_path" ]; then
     # Try alternative path (sometimes it's in a different location)
@@ -133,7 +186,7 @@ if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
     exit 1
 fi
 
-echo "Found APK at: $apk_path"
+echo "Found universal APK at: $apk_path"
 
 # Verify file exists and is readable
 if [ ! -r "$apk_path" ]; then
@@ -141,11 +194,11 @@ if [ ! -r "$apk_path" ]; then
     exit 1
 fi
 
-# Create version-specific APK name
-version_apk="build/app/outputs/flutter-apk/vimbisopay-${new_version}.apk"
+# Create version-specific APK name for universal APK
+version_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}.apk"
 
 # Create version-specific copy
-echo "Copying APK to version-specific location..."
+echo "Copying universal APK to version-specific location..."
 cp "$apk_path" "$version_apk"
 
 # Verify copy was successful
@@ -158,6 +211,91 @@ fi
 if [ ! -r "$version_apk" ]; then
     echo "Error: Version-specific APK is not readable at $version_apk"
     exit 1
+fi
+
+# Verify the existence of the keystore file
+if [ ! -f "vimbisopay-release-key.jks" ]; then
+  echo "Error: Release keystore file (vimbisopay-release-key.jks) not found."
+  echo "Please ensure the keystore file is in the project root directory."
+  exit 1
+fi
+
+# Verify the existence of key.properties
+if [ ! -f "android/key.properties" ]; then
+  echo "Error: key.properties file not found in android directory."
+  echo "Please ensure the key.properties file is properly configured."
+  exit 1
+fi
+
+# Build architecture-specific APKs with release signing
+echo "Building architecture-specific APKs with release signing..."
+flutter build apk --release --split-per-abi
+
+# Add a delay to ensure the APKs are fully written
+sleep 5
+
+# Verify the APK signature
+echo "Verifying APK signature..."
+if command -v jarsigner &> /dev/null; then
+  jarsigner -verify -verbose -certs "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" | grep "verified"
+  if [ $? -ne 0 ]; then
+    echo "Warning: APK signature verification failed. Please check the signing configuration."
+  else
+    echo "APK signature verified successfully."
+  fi
+else
+  echo "Warning: jarsigner not found. Skipping APK signature verification."
+fi
+
+# Define architecture-specific APK paths
+arm64_apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+arm_apk="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+x86_64_apk="build/app/outputs/flutter-apk/app-x86_64-release.apk"
+
+# Create version-specific copies for architecture-specific APKs
+version_arm64_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}-arm64.apk"
+version_arm_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}-arm.apk"
+version_x86_64_apk="build/app/outputs/flutter-apk/vimbisopay-${filename_version}-x86_64.apk"
+
+# Copy architecture-specific APKs to version-specific locations
+echo "Copying architecture-specific APKs to version-specific locations..."
+cp "$arm64_apk" "$version_arm64_apk"
+cp "$arm_apk" "$version_arm_apk"
+cp "$x86_64_apk" "$version_x86_64_apk"
+
+# Verify copies were successful
+if [ ! -f "$version_arm64_apk" ] || [ ! -f "$version_arm_apk" ] || [ ! -f "$version_x86_64_apk" ]; then
+    echo "Error: Failed to create one or more version-specific architecture APKs"
+    exit 1
+fi
+
+# Generate checksums for all APKs
+echo "Generating checksums..."
+checksum_universal=$(shasum -a 256 "$version_apk" | awk '{print $1}')
+checksum_arm64=$(shasum -a 256 "$version_arm64_apk" | awk '{print $1}')
+checksum_arm=$(shasum -a 256 "$version_arm_apk" | awk '{print $1}')
+checksum_x86_64=$(shasum -a 256 "$version_x86_64_apk" | awk '{print $1}')
+
+# Create checksums file
+checksums_file="build/app/outputs/flutter-apk/vimbisopay-${filename_version}-checksums.txt"
+echo "Creating checksums file at $checksums_file..."
+echo "vimbisopay-${filename_version}.apk: $checksum_universal" > "$checksums_file"
+echo "vimbisopay-${filename_version}-arm64.apk: $checksum_arm64" >> "$checksums_file"
+echo "vimbisopay-${filename_version}-arm.apk: $checksum_arm" >> "$checksums_file"
+echo "vimbisopay-${filename_version}-x86_64.apk: $checksum_x86_64" >> "$checksums_file"
+
+# Create apk-builds directory if it doesn't exist
+mkdir -p apk-builds
+
+# Prompt for minimum required version
+echo "Enter minimum required version (format: x.y.z):"
+read min_required_version
+
+# Validate minimum required version format
+if ! [[ $min_required_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: Invalid minimum required version format. Expected format is x.y.z where x, y, and z are numbers."
+  echo "Example: 1.9.0"
+  exit 1
 fi
 
 # Get current branch name
@@ -259,10 +397,72 @@ if [ ! -r "$version_apk" ]; then
     exit 1
 fi
 
-# Upload APK as release asset
-echo "Uploading APK to GitHub release..."
+# Define GitHub download base URL
+github_download_base="https://github.com/$GITHUB_REPO/releases/download/v$url_safe_version"
+
+# Prompt for update priority
+echo "Enter update priority (low, medium, high, critical):"
+read update_priority
+
+# Default to medium if not provided or invalid
+if [[ ! "$update_priority" =~ ^(low|medium|high|critical)$ ]]; then
+  echo "Invalid priority. Defaulting to 'medium'."
+  update_priority="medium"
+fi
+
+# Prompt for update type
+echo "Enter update type (patch, minor, major):"
+read update_type
+
+# Default to patch if not provided or invalid
+if [[ ! "$update_type" =~ ^(patch|minor|major)$ ]]; then
+  echo "Invalid update type. Defaulting to 'patch'."
+  update_type="patch"
+fi
+
+# Prompt for release notes if not already collected
+if [ -z "$changes" ]; then
+  echo "Enter release notes (one per line, press Ctrl+D when done):"
+  changes=""
+  while IFS= read -r line; do
+      changes="${changes}${line}\n"
+  done
+fi
+
+# Create JSON file with version information
+json_file="apk-builds/vimbisopay-${new_version}.json"
+echo "Creating version JSON file at $json_file..."
+cat > "$json_file" << EOF
+{
+  "appId": "com.vimbisopay.vimbisopay_app",
+  "platform": "android",
+  "version": "$new_version",
+  "minRequiredVersion": "$min_required_version",
+  "updateUrl": "$github_download_base/vimbisopay-${filename_version}.apk",
+  "fileSizeBytes": $(stat -f%z "$version_apk"),
+  "releaseNotes": "$(echo -e "$changes" | sed 's/"/\\"/g' | tr '\n' ' ')",
+  "releaseDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "updatePriority": "$update_priority",
+  "updateType": "$update_type",
+  "active": true,
+  "checksumAlgorithm": "sha256",
+  "checksumUniversal": "$checksum_universal",
+  "checksumArm64": "$checksum_arm64",
+  "checksumArm": "$checksum_arm",
+  "checksumX86_64": "$checksum_x86_64",
+  "checksumUrl": "$github_download_base/vimbisopay-${filename_version}-checksums.txt",
+  "architectureSpecificDownloads": {
+    "arm64-v8a": "$github_download_base/vimbisopay-${filename_version}-arm64.apk",
+    "armeabi-v7a": "$github_download_base/vimbisopay-${filename_version}-arm.apk",
+    "x86_64": "$github_download_base/vimbisopay-${filename_version}-x86_64.apk"
+  }
+}
+EOF
+
+# Upload universal APK as release asset
+echo "Uploading universal APK to GitHub release..."
 echo "Using APK file: $version_apk"
-upload_response=$(curl -L -v \
+upload_response=$(curl -L \
   -X POST \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -273,7 +473,7 @@ upload_response=$(curl -L -v \
 
 # Check if upload was successful
 if ! echo "$upload_response" | grep -q '"state":"uploaded"'; then
-    echo "Error: Failed to upload APK"
+    echo "Error: Failed to upload universal APK"
     # Try to extract error message from response
     error_message=$(echo "$upload_response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
     if [ -n "$error_message" ]; then
@@ -283,8 +483,93 @@ if ! echo "$upload_response" | grep -q '"state":"uploaded"'; then
     exit 1
 fi
 
+# Upload architecture-specific APKs
+echo "Uploading architecture-specific APKs to GitHub release..."
+for arch_apk in "$version_arm64_apk" "$version_arm_apk" "$version_x86_64_apk"; do
+    echo "Uploading: $arch_apk"
+    arch_upload_response=$(curl -L \
+      -X POST \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Content-Type: application/octet-stream" \
+      "https://uploads.github.com/repos/$GITHUB_REPO/releases/$release_id/assets?name=$(basename "$arch_apk")" \
+      --data-binary "@$arch_apk")
+    
+    # Check if upload was successful
+    if ! echo "$arch_upload_response" | grep -q '"state":"uploaded"'; then
+        echo "Error: Failed to upload architecture-specific APK: $arch_apk"
+        # Try to extract error message from response
+        error_message=$(echo "$arch_upload_response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+        if [ -n "$error_message" ]; then
+            echo "Error message: $error_message"
+        fi
+        echo "Full response: $arch_upload_response"
+        # Continue with other uploads even if one fails
+    fi
+done
+
+# Upload checksums file
+echo "Uploading checksums file to GitHub release..."
+checksums_upload_response=$(curl -L \
+  -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -H "Content-Type: application/octet-stream" \
+  "https://uploads.github.com/repos/$GITHUB_REPO/releases/$release_id/assets?name=$(basename "$checksums_file")" \
+  --data-binary "@$checksums_file")
+
+# Check if upload was successful
+if ! echo "$checksums_upload_response" | grep -q '"state":"uploaded"'; then
+    echo "Error: Failed to upload checksums file"
+    # Try to extract error message from response
+    error_message=$(echo "$checksums_upload_response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$error_message" ]; then
+        echo "Error message: $error_message"
+    fi
+    echo "Full response: $checksums_upload_response"
+    # Continue even if this upload fails
+fi
+
+# Upload JSON file
+echo "Uploading version JSON file to GitHub release..."
+json_upload_response=$(curl -L \
+  -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -H "Content-Type: application/octet-stream" \
+  "https://uploads.github.com/repos/$GITHUB_REPO/releases/$release_id/assets?name=$(basename "$json_file")" \
+  --data-binary "@$json_file")
+
+# Check if upload was successful
+if ! echo "$json_upload_response" | grep -q '"state":"uploaded"'; then
+    echo "Error: Failed to upload version JSON file"
+    # Try to extract error message from response
+    error_message=$(echo "$json_upload_response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$error_message" ]; then
+        echo "Error message: $error_message"
+    fi
+    echo "Full response: $json_upload_response"
+    # Continue even if this upload fails
+fi
+
 echo "Version updated to $new_version"
-echo "APK location: $version_apk"
+echo "Minimum required version: $min_required_version"
+echo "APK locations:"
+echo "  Universal: $version_apk"
+echo "  ARM64: $version_arm64_apk"
+echo "  ARM: $version_arm_apk"
+echo "  x86_64: $version_x86_64_apk"
+echo "Checksums file: $checksums_file"
+echo "Version JSON file: $json_file"
 echo "GitHub release created: https://github.com/$GITHUB_REPO/releases/tag/v$new_version"
-echo "APK download URL: https://github.com/$GITHUB_REPO/releases/download/v$new_version/$(basename "$version_apk")"
+echo "Download URLs:"
+echo "  Universal APK: $github_download_base/vimbisopay-${filename_version}.apk"
+echo "  ARM64 APK: $github_download_base/vimbisopay-${filename_version}-arm64.apk"
+echo "  ARM APK: $github_download_base/vimbisopay-${filename_version}-arm.apk"
+echo "  x86_64 APK: $github_download_base/vimbisopay-${filename_version}-x86_64.apk"
+echo "  Checksums: $github_download_base/vimbisopay-${filename_version}-checksums.txt"
+echo "  Version JSON: $github_download_base/vimbisopay-${new_version}.json"
 echo "Changes have been committed and pushed"

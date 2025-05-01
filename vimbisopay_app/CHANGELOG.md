@@ -157,3 +157,84 @@ Example entry format:
 -e 
 ## [2.1.0+01] - 2025-04-14
 - testing app update
+-e 
+## [2.1.1+02] - 2025-04-17
+-e 
+## [2.1.1+03] - 2025-04-17
+- testing urls 
+-e 
+## [2.1.2+11] - 2025-04-17
+- testing auto app update on device 
+-e 
+## [2.2.0+1] - 2025-04-17
+- checking version checksums
+-e 
+## [2.2.0+2] - 2025-04-17
+- version check
+-e 
+## [2.3.0+01] - 2025-04-17
+- formatted urls
+-e 
+## [2.4.0+2] - 2025-04-18
+- checking self install
+-e 
+## [2.5.0+03] - 2025-04-18
+- test url formatting
+-e 
+## [2.6.0+4] - 2025-04-18
+- using package installer 
+-e 
+## [2.7.0+01] - 2025-04-18
+- testing package installer
+-e 
+## [2.8.1+01] - 2025-04-18
+- package inster test
+-e 
+## [2.9.1+3] - 2025-04-18
+- testing version number
+-e 
+## [3.0.0-debug+01] - 2025-04-18 (Debug Build)
+- Debug build with API environment: dev
+- testing debug flavour
+-e 
+## [3.0.1-debug+01] - 2025-04-18 (Debug Build)
+- Debug build with API environment: dev
+- test debug builds
+
+## [3.2.2-debug+2] - 2025-04-18 (Debug Build)
+- Debug build with API environment: dev
+- testing debug version
+-e 
+## [4.0.0+01] - 2025-04-19
+- Release managenet framework
+-e 
+## [4.0.0+02] - 2025-04-19
+- Testing release signing keys
+-e 
+## [4.0.0+03] - 2025-04-19
+- Debuging release version
+-e 
+## [4.1.0-debug+01] - 2025-04-19 (Debug Build)
+- Debug build with API environment: dev
+- testing auto update
+-e 
+## [4.2.0-debug+12] - 2025-04-19 (Debug Build)
+- Debug build with API environment: dev
+- TESTING VERSION DOWNGRADE
+-e 
+## [4.3.0-debug+01] - 2025-04-20 (Debug Build)
+- Debug build with API environment: dev
+- testing with ryans accounts changes
+-e 
+## [4.4.0+01] - 2025-04-21
+- Using dev whatsapp otp and settings clean up
+-e 
+## [4.5.0+02] - 2025-04-22
+- 1.0.0
+- UI clean up and disabled unsecured credexes
+-e 
+## [4.5.1+01] - 2025-04-24
+- Testing push notifications
+-e 
+## [4.5.2+02] - 2025-04-30
+- Updated Whatsapp verification flow

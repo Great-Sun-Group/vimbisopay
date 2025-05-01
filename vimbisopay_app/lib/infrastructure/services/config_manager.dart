@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
@@ -128,9 +129,19 @@ class ConfigManager {
   
   /// Downloads and installs an update.
   ///
+  /// If integrity information is available in the update info, it will be used
+  /// to verify the downloaded file before installation.
+  ///
   /// Returns true if the download and installation was successful, false otherwise.
-  Future<bool> downloadAndInstallUpdate(String url) {
-    return _appUpdateService.downloadAndInstallUpdate(url);
+  Future<bool> downloadAndInstallUpdate(String url, {Map<String, dynamic>? updateInfo}) {
+    // Extract integrity information if available
+    Map<String, dynamic>? integrity;
+    if (updateInfo != null && updateInfo.containsKey('integrity')) {
+      integrity = updateInfo['integrity'] as Map<String, dynamic>;
+      Logger.data('Integrity information found: ${jsonEncode(integrity)}');
+    }
+    
+    return _appUpdateService.downloadAndInstallUpdate(url, integrity: integrity);
   }
   
   /// Defers an update until later.
@@ -141,5 +152,15 @@ class ConfigManager {
   /// Clears the deferred status of an update.
   Future<void> clearDeferredUpdateStatus() {
     return _appUpdateService.clearDeferredStatus();
+  }
+  
+  /// Retries the installation of a previously downloaded update.
+  ///
+  /// This is useful when the user has been redirected to enable "Allow from this source"
+  /// in the settings and wants to continue the installation process.
+  ///
+  /// Returns true if the retry was successful, false otherwise.
+  Future<bool> retryInstallation() {
+    return _appUpdateService.retryInstallation();
   }
 }

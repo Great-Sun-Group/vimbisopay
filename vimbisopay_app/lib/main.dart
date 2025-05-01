@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:lottie/lottie.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/presentation/screens/intro_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/create_account_screen.dart';
@@ -25,12 +27,15 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_
 import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
+import 'package:vimbisopay_app/presentation/widgets/test_whatsapp_otp.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/utils/database_test.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/navigation_utils.dart';
+import 'package:vimbisopay_app/core/utils/crash_tracker.dart';
+import 'package:vimbisopay_app/core/utils/deep_link_handler.dart';
 import 'package:vimbisopay_app/presentation/models/send_credex_arguments.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/connectivity_banner.dart';
@@ -117,6 +122,18 @@ void main() async {
     print('=== APP STARTING ===');
     WidgetsFlutterBinding.ensureInitialized();
 
+    // Load environment variables
+    print('Loading environment variables...');
+    await dotenv.load(fileName: '.env');
+    print('Environment variables loaded successfully');
+    
+    // Initialize API configuration
+    print('Initializing API configuration...');
+    await ApiConfig.initialize();
+    await ApiConfig.refreshEnvironment();
+    print('API configuration initialized successfully');
+    Logger.data('API environment: ${ApiConfig.environmentName}');
+
     // Initialize Firebase first
     print('Initializing Firebase...');
     await Firebase.initializeApp();
@@ -126,6 +143,16 @@ void main() async {
     print('Initializing Firebase Analytics...');
     final analytics = ServiceLocator.analytics;
     print('Firebase Analytics initialized successfully');
+    
+    // Initialize Analytics Service
+    print('Initializing Analytics Service...');
+    await ServiceLocator.initializeAnalyticsService();
+    print('Analytics Service initialized successfully');
+    
+    // Set up global error handler for tracking crashes
+    print('Setting up global error handler...');
+    CrashTracker.setupGlobalErrorHandler();
+    print('Global error handler set up successfully');
 
     // Set up background message handler
     print('Setting up background message handler...');
@@ -164,6 +191,11 @@ void main() async {
     print('Initializing ConnectivityService...');
     await ServiceLocator.initializeConnectivityService();
     print('ConnectivityService initialized successfully');
+    
+    // Initialize DeepLinkHandler
+    print('Initializing DeepLinkHandler...');
+    await DeepLinkHandler.initialize();
+    print('DeepLinkHandler initialized successfully');
     
     // Schedule full notification service initialization for after UI is rendered
     Future.delayed(const Duration(seconds: 1), () async {
@@ -490,6 +522,13 @@ class MyApp extends StatelessWidget {
           if (settings.name == '/debug') {
             return MaterialPageRoute(
               builder: (context) => const DebugScreen(),
+              settings: settings,
+            );
+          }
+          
+          if (settings.name == '/test-whatsapp-otp') {
+            return MaterialPageRoute(
+              builder: (context) => const TestWhatsAppOTP(),
               settings: settings,
             );
           }

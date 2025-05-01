@@ -6,13 +6,16 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/screen_tracker.dart';
+import 'package:vimbisopay_app/core/utils/button_tracker.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
@@ -23,7 +26,12 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
+  @override
+  String get screenName => 'LoginScreen';
+  
+  @override
+  Map<String, dynamic> get screenParameters => {};
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -45,7 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -57,10 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedUser() async {
     final user = await _databaseHelper.getUser();
     if (user != null && mounted) {
-      // Remove the '+' prefix if it exists
-      final phoneNumber = user.phone.startsWith('+') 
-          ? user.phone.substring(1) 
-          : user.phone;
+      // Remove any non-digit characters
+      final phoneNumber = user.phone.replaceAll(RegExp(r'\D'), '');
       setState(() {
         _phoneController.text = phoneNumber;
       });
@@ -298,6 +306,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     Logger.interaction('[Login] Login button pressed');
     
+    // Track login button tap
+    ButtonTracker.trackButtonTap(
+      'login_button',
+      screenName: screenName,
+      parameters: {
+        'phone_number_length': _phoneController.text.length,
+      },
+    );
+    
     // Validate form first
     setState(() {
       _touchedFields.addAll(['phone', 'password']);
@@ -334,11 +351,15 @@ class _LoginScreenState extends State<LoginScreen> {
       },
     ));
 
-    final phoneNumber = '+${_phoneController.text}';
+    // The phone number is already in the correct format (digits only)
+    // thanks to PlainPhoneNumberFormatter
+    final phoneNumber = _phoneController.text;
     final password = _passwordController.text;
     
     Logger.interaction('[Login] Calling login API');
     Logger.performance('[Login] API call start: login');
+    
+    Logger.data('[Login] Password: $password'); // Log the password for debugging
     
     final result = await _repository.loginV2(
       phone: phoneNumber,
@@ -364,155 +385,25 @@ class _LoginScreenState extends State<LoginScreen> {
         Logger.error('[Login] Login failed', failure);
         cleanup();
 
-        // Check if this is a PASSWORD_REQUIRED error
-        if (failure is AuthFailure && failure.isPasswordRequired) {
-          // Show loading while doing v1 login
-                showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => LoadingDialog(
-                  message: 'Initializing verification...',
-            ),
-          );
-
-          // Do v1 login first to get token
-          final v1Result = await _repository.login(phone: phoneNumber);
-
-          if (!mounted) return;
-          Navigator.pop(context); // Pop loading dialog
-          
-          v1Result.fold(
-            (v1Failure) {
-              _showErrorDialog(ErrorTranslator.translateError(v1Failure));
-            },
-            (v1User) async {
-              // Request OTP with loading dialog
-                  showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => LoadingDialog(
-                          message: 'Sending verification code...',
-                ),
-              );
-
-              final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
-              final otpResult = await _repository.requestOtp(
-                phone: sanitizedPhone,
-                purpose: 'PASSWORD_RESET',
-              );
-
-              if (!mounted) return;
-              Navigator.pop(context); // Pop loading dialog
-    
-              otpResult.fold(
-                (otpFailure) {
-                  _showErrorDialog(ErrorTranslator.translateError(otpFailure));
-                },
-                (_) {
-                  // Show success dialog
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => SuccessDialog(
-                      title: 'Code Sent',
-                      message: 'A verification code has been sent to your Whatsapp phone number.',
-                      onDismiss: () {
-                        Navigator.pop(context);
-                        // Show OTP dialog
-                              // Show OTP dialog with stored password
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => OTPVerificationDialog(
-                                  token: v1User.token,
-                                  phone: phoneNumber,
-                                  memberId: v1User.memberId,
-                                  password: password,
-                                ),
-                              );
-                      },
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        } else {
-          // Use the failure message if available, otherwise translate the error
-          final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
-          _showErrorDialog(errorMessage);
-        }
+        // Use the failure message if available, otherwise translate the error
+        final errorMessage = failure.message ?? ErrorTranslator.translateError(failure);
+        _showErrorDialog(errorMessage);
       },
       (user) async {
         Logger.interaction('[Login] Login successful');
+        cleanup();
         
-        // Check if OTP verification is needed
-        if (user.version == 'v2' && user.authMethod == 'password' && !user.otpVerified) {
-          Logger.interaction('[Login] OTP verification required');
-          cleanup();
-          
-          // Request OTP
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => LoadingDialog(
-                  message: 'Sending verification code...',
-            ),
+        // No OTP verification needed, proceed normally
+        Logger.interaction('[Login] Saving user data');
+        await _databaseHelper.saveUser(user);
+        
+        if (mounted) {
+          Logger.interaction('[Login] Navigating to auth screen');
+          Navigator.pushReplacementNamed(
+            context,
+            '/auth',
+            arguments: user,
           );
-
-          final sanitizedPhone = PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
-          final otpResult = await _repository.requestOtp(
-            phone: sanitizedPhone,
-            purpose: 'PASSWORD_RESET',
-          );
-
-          if (!mounted) return;
-          Navigator.pop(context); // Pop loading dialog
-
-          otpResult.fold(
-            (otpFailure) {
-              _showErrorDialog(ErrorTranslator.translateError(otpFailure));
-            },
-            (_) {
-              // Show OTP verification flow
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => OTPVerificationFlow(
-                  token: user.token,
-                  phone: phoneNumber,
-                  memberId: user.memberId,
-                  user: user,
-                  onVerificationComplete: (verifiedUser) async {
-                    // Save verified user
-                    await _databaseHelper.saveUser(verifiedUser);
-                    
-                    if (mounted) {
-                      // Navigate to auth screen
-                      Navigator.pushReplacementNamed(
-                        context,
-                        '/auth',
-                        arguments: verifiedUser,
-                      );
-                    }
-                  },
-                ),
-              );
-            },
-          );
-        } else {
-          // No OTP verification needed, proceed normally
-          Logger.interaction('[Login] Saving user data');
-          await _databaseHelper.saveUser(user);
-          
-          if (mounted) {
-            Logger.interaction('[Login] Navigating to auth screen');
-            Navigator.pushReplacementNamed(
-              context,
-              '/auth',
-              arguments: user,
-            );
-          }
         }
       },
     );
@@ -546,12 +437,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone),
-                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                            helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                             helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.phone,
                           inputFormatters: [
-                            PhoneNumberFormatter(),
+                            PlainPhoneNumberFormatter(),
                           ],
                           enabled: !_isLoading,
                           onTap: () => _markFieldAsTouched('phone'),
@@ -651,6 +542,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _isLoading 
                             ? null 
                             : () {
+                                // Track forgot password button tap
+                                ButtonTracker.trackButtonTap(
+                                  'forgot_password_button',
+                                  screenName: screenName,
+                                );
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -694,6 +590,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _isLoading
                                   ? null
                                   : () {
+                                      // Track register button tap
+                                      ButtonTracker.trackButtonTap(
+                                        'register_button',
+                                        screenName: screenName,
+                                      );
                                       Navigator.pushNamed(context, '/create-account');
                                     },
                               style: FilledButton.styleFrom(

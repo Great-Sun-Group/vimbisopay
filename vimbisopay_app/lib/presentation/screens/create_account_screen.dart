@@ -7,9 +7,10 @@ import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 
 class CreateAccountScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _repository = ServiceLocator.accountRepository;
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _acceptedTerms = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   final Map<String, String?> _fieldErrors = {
@@ -49,7 +49,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -100,8 +102,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           hasValidLastName &&
           hasValidPhone &&
           hasValidPassword &&
-          hasValidConfirmPassword &&
-          _acceptedTerms;
+          hasValidConfirmPassword;
           
       Logger.data('[CreateAccount] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
       if (!_isFormValid) {
@@ -206,7 +207,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     }
     
     try {
-      final phoneNumber = '+${_phoneController.text}';
+      // The phone number is already in the correct format (digits only)
+      // thanks to PlainPhoneNumberFormatter
+      final phoneNumber = _phoneController.text;
       final password = _passwordController.text;
       
       Logger.interaction('[CreateAccount] Starting account creation process');
@@ -322,51 +325,35 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 messageController.add('Sending verification code...');
                 await Future.delayed(const Duration(milliseconds: 300));
                 
-                // Request OTP for verification
-                final otpResult = await _repository.requestOtp(
-                  phone: phoneNumber,
-                  purpose: 'PASSWORD_RESET',
-                );
-
-                if (!mounted) return;
-
-                otpResult.fold(
-                  (failure) {
-                    Logger.error('[CreateAccount] OTP request failed', failure);
-                    cleanup();
-                    _showError(ErrorTranslator.translateError(failure));
-                  },
-                  (_) {
-                    Logger.interaction('[CreateAccount] OTP sent successfully');
-                    cleanup();
-                    
-                    if (mounted) {
-                      // Show OTP verification flow
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => OTPVerificationFlow(
-                          token: user.token,
-                          phone: phoneNumber,
-                          memberId: user.memberId,
-                          password: password,
-                          isAccountCreation: true,
-                          user: userToSave, // Pass the complete user object
-                          onVerificationComplete: (verifiedUser) {
-                            Logger.interaction('[CreateAccount] OTP verification complete');
-                            Logger.interaction('[CreateAccount] Navigating to security setup');
-                            
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                              '/security-setup',
-                              (route) => false,
-                              arguments: verifiedUser,
-                            );
-                          },
-                        ),
-                      );
-                    }
-                  },
-                );
+                // Skip OTP request and directly show WhatsApp OTP verification
+                Logger.interaction('[CreateAccount] Showing WhatsApp OTP verification');
+                cleanup();
+                
+                if (mounted) {
+                  // Show OTP verification flow
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => WhatsAppOTPVerification(
+                      token: user.token,
+                      phone: phoneNumber,
+                      memberId: user.memberId,
+                      password: password,
+                      isAccountCreation: true,
+                      user: userToSave, // Pass the complete user object
+                      onVerificationComplete: (verifiedUser) {
+                        Logger.interaction('[CreateAccount] OTP verification complete');
+                        Logger.interaction('[CreateAccount] Navigating to security setup');
+                        
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/security-setup',
+                          (route) => false,
+                          arguments: verifiedUser,
+                        );
+                      },
+                    ),
+                  );
+                }
               } else {
                 Logger.interaction('[CreateAccount] User already verified, navigating to security setup');
                 await Future.delayed(const Duration(milliseconds: 300));
@@ -509,14 +496,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           child: TextFormField(
                             controller: _phoneController,
                             decoration: const InputDecoration(
-                              labelText: 'Phone Number',
+                              labelText: 'WhatsApp Number',
                               prefixIcon: Icon(Icons.phone),
-                              helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                              helperText: 'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                               helperMaxLines: 2,
                             ),
                             keyboardType: TextInputType.phone,
                             inputFormatters: [
-                              PhoneNumberFormatter(),
+                              PlainPhoneNumberFormatter(),
                             ],
                             enabled: !_isLoading,
                             onTap: () => _markFieldAsTouched('phone'),
@@ -631,47 +618,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _acceptedTerms,
-                              onChanged: (value) {
-                                setState(() {
-                                  _acceptedTerms = value ?? false;
-                                  _validateForm();
-                                });
-                              },
-                              activeColor: AppColors.primary,
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _acceptedTerms = !_acceptedTerms;
-                                    _validateForm();
-                                  });
-                                },
-                                child: const Text.rich(
-                                  TextSpan(
-                                    text: 'I agree to the ',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: 'Terms and Conditions',
-                                        style: TextStyle(
-                                          color: AppColors.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),

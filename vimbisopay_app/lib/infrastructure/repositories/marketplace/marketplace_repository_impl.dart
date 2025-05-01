@@ -2088,7 +2088,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     return _executeAuthenticatedRequest<Map<String, dynamic>>(
       request: (token) async {
         // Call the getStorefront API endpoint with authentication
-        final url = 'https://dev.mycredex.dev/getStorefront/$accountId';
+        final url = '$_baseUrl/getStorefront/$accountId';
         Logger.data('[STOREFRONT] Sending GET request to $url');
 
         final response = await _loggedRequest(

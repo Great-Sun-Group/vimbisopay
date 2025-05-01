@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -6,11 +7,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:convert';
 
 /// Service for managing app updates in the VimbisoPay app.
 ///
@@ -45,13 +46,24 @@ class AppUpdateService {
       final packageInfo = await PackageInfo.fromPlatform();
       final versionName = packageInfo.version;
       final buildNumber = packageInfo.buildNumber;
-      final currentVersion = "$versionName+$buildNumber";
+      
+      // For API requests, strip the "-debug" suffix if present
+      String apiVersionName = versionName;
+      bool isDebugBuild = false;
+      if (versionName.contains("-debug")) {
+        isDebugBuild = true;
+        apiVersionName = versionName.replaceAll("-debug", "");
+        Logger.data('Debug build detected, using API version: $apiVersionName');
+      }
+      
+      final currentVersion = "$apiVersionName+$buildNumber";
       final packageName = packageInfo.packageName;
       stopwatch.stop();
       
       Logger.data('Current version name: $versionName');
       Logger.data('Current build number: $buildNumber');
       Logger.data('Full app version: $currentVersion');
+      Logger.data('Is debug build: $isDebugBuild');
       Logger.data('Package name: $packageName');
       Logger.performance('PackageInfo retrieved in ${stopwatch.elapsedMilliseconds}ms');
       
@@ -176,10 +188,16 @@ class AppUpdateService {
   
   /// Downloads and installs an update from the given URL.
   ///
+  /// If integrity information is provided, the downloaded file will be verified
+  /// before installation.
+  ///
   /// Returns true if the download and installation was successful, false otherwise.
-  Future<bool> downloadAndInstallUpdate(String url) async {
+  Future<bool> downloadAndInstallUpdate(String url, {Map<String, dynamic>? integrity}) async {
     Logger.state('Starting downloadAndInstallUpdate in AppUpdateService');
     Logger.data('Download URL: $url');
+    if (integrity != null) {
+      Logger.data('Integrity info provided: ${jsonEncode(integrity)}');
+    }
     
     try {
       // For Android, download and install the APK
@@ -216,10 +234,28 @@ class AppUpdateService {
           Logger.data('File written in ${writeStopwatch.elapsedMilliseconds}ms');
           Logger.data('File size: ${file.lengthSync()} bytes');
           
-          // Install the APK
-          Logger.state('Installing APK from: $filePath');
+          // Verify file integrity if integrity information is provided
+          if (integrity != null) {
+            Logger.state('Verifying file integrity');
+            final verificationResult = await _verifyFileIntegrity(
+              filePath, 
+              integrity['algorithm'] ?? 'sha256',
+              integrity['checksum'],
+              checksumUrl: integrity['checksumUrl']
+            );
+            
+            if (!verificationResult) {
+              Logger.error('File integrity verification failed');
+              return false;
+            }
+            
+            Logger.state('File integrity verification successful');
+          }
+          
+          // Initiate APK installation
+          Logger.state('Initiating APK installation from: $filePath');
           if (await _installApk(filePath)) {
-            Logger.state('APK installation successful');
+            Logger.state('APK installation request sent to Android package installer');
             
             // Clear deferred status after successful installation
             Logger.state('Clearing deferred update status');
@@ -442,6 +478,31 @@ class AppUpdateService {
         Logger.data('Getting Android device info');
         final androidInfo = await deviceInfoPlugin.androidInfo;
         
+        // Get device architecture
+        String architecture = 'unknown';
+        try {
+          if (androidInfo.supportedAbis.isNotEmpty) {
+            // Get the primary ABI (first in the list)
+            final primaryAbi = androidInfo.supportedAbis.first;
+            
+            // Map ABI to common architecture names
+            if (primaryAbi.contains('arm64')) {
+              architecture = 'arm64-v8a';
+            } else if (primaryAbi.contains('armeabi')) {
+              architecture = 'armeabi-v7a';
+            } else if (primaryAbi.contains('x86_64')) {
+              architecture = 'x86_64';
+            } else if (primaryAbi.contains('x86')) {
+              architecture = 'x86';
+            } else {
+              architecture = primaryAbi;
+            }
+          }
+          Logger.data('Device architecture: $architecture');
+        } catch (e) {
+          Logger.error('Error getting device architecture', e);
+        }
+        
         final result = {
           'android_version': androidInfo.version.release,
           'device_model': androidInfo.model,
@@ -450,6 +511,7 @@ class AppUpdateService {
           'brand': androidInfo.brand,
           'device': androidInfo.device,
           'sdk_int': androidInfo.version.sdkInt,
+          'architecture': architecture,
         };
         
         stopwatch.stop();
@@ -488,9 +550,64 @@ class AppUpdateService {
     }
   }
   
-  /// Installs an APK file.
+  /// Retries the installation of the previously downloaded APK.
   ///
-  /// Returns true if the installation was successful, false otherwise.
+  /// This method should be called after the user has enabled the "Allow from this source" setting.
+  /// It will retry the installation of the APK that was previously downloaded.
+  ///
+  /// Returns true if the retry was successful, false otherwise.
+  Future<bool> retryInstallation() async {
+    Logger.state('Retrying APK installation');
+    
+    try {
+      if (Platform.isAndroid) {
+        // Use the method channel to retry APK installation on Android
+        Logger.state('Using Android-specific method channel to retry APK installation');
+        final stopwatch = Stopwatch()..start();
+        
+        try {
+          // Create a method channel to communicate with the native code
+          const channel = MethodChannel('com.vimbisopay.vimbisopay_app/apk_installer');
+          Logger.data('Invoking method channel for retry');
+          
+          // Call the native method to retry the APK installation
+          final result = await channel.invokeMethod<bool>('retryInstallation');
+          
+          stopwatch.stop();
+          Logger.performance('Method channel call completed in ${stopwatch.elapsedMilliseconds}ms');
+          Logger.data('Method channel result: $result');
+          
+          if (result == true) {
+            Logger.state('APK installation retry request sent successfully via method channel');
+            Logger.state('Note: User must approve installation and restart app to complete update');
+            return true;
+          } else {
+            Logger.error('Failed to send APK installation retry request via method channel');
+            return false;
+          }
+        } on PlatformException catch (e, stackTrace) {
+          stopwatch.stop();
+          Logger.error('Platform exception in method channel', e, stackTrace);
+          Logger.data('Error code: ${e.code}');
+          Logger.data('Error message: ${e.message}');
+          Logger.data('Error details: ${e.details}');
+          return false;
+        }
+      } else {
+        Logger.error('Retry installation is only supported on Android');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Error retrying APK installation', e, stackTrace);
+      return false;
+    }
+  }
+
+  /// Initiates the installation of an APK file.
+  ///
+  /// Returns true if the installation request was successfully sent to the Android package installer,
+  /// false otherwise. Note that this does not guarantee the installation was completed or approved by the user.
+  /// The user must manually approve the installation and restart the app to use the new version.
   Future<bool> _installApk(String filePath) async {
     Logger.state('Starting _installApk');
     Logger.data('APK file path: $filePath');
@@ -509,8 +626,8 @@ class AppUpdateService {
       Logger.data('APK file last modified: ${file.lastModifiedSync()}');
       
       if (Platform.isAndroid) {
-        // Use the method channel to install the APK on Android
-        Logger.state('Using Android-specific method channel for APK installation');
+        // Use the method channel to initiate APK installation on Android
+        Logger.state('Using Android-specific method channel to initiate APK installation');
         final stopwatch = Stopwatch()..start();
         
         try {
@@ -526,10 +643,11 @@ class AppUpdateService {
           Logger.data('Method channel result: $result');
           
           if (result == true) {
-            Logger.state('APK installation initiated successfully via method channel');
+            Logger.state('APK installation request sent successfully via method channel');
+            Logger.state('Note: User must approve installation and restart app to complete update');
             return true;
           } else {
-            Logger.error('APK installation failed via method channel');
+            Logger.error('Failed to send APK installation request via method channel');
             return false;
           }
         } on PlatformException catch (e, stackTrace) {
@@ -562,6 +680,141 @@ class AppUpdateService {
       }
     } catch (e, stackTrace) {
       Logger.error('Error installing APK', e, stackTrace);
+      return false;
+    }
+  }
+  
+  /// Verifies the integrity of a file by calculating its checksum.
+  ///
+  /// If the expected checksum is provided, it will be used for verification.
+  /// If the checksumUrl is provided and the direct verification fails or no checksum is provided,
+  /// it will attempt to fetch the checksum from the URL as a fallback.
+  ///
+  /// Returns true if the calculated checksum matches the expected checksum,
+  /// false otherwise.
+  Future<bool> _verifyFileIntegrity(String filePath, String algorithm, String? expectedChecksum, {String? checksumUrl}) async {
+    Logger.state('Starting file integrity verification');
+    Logger.data('File path: $filePath');
+    Logger.data('Algorithm: $algorithm');
+    Logger.data('Expected checksum: $expectedChecksum');
+    Logger.data('Checksum URL: $checksumUrl');
+    
+    try {
+      final file = File(filePath);
+      
+      // Verify file exists and is readable
+      if (!file.existsSync()) {
+        Logger.error('File does not exist at path: $filePath');
+        return false;
+      }
+      
+      final fileSize = file.lengthSync();
+      Logger.data('File size: $fileSize bytes');
+      
+      // Calculate checksum
+      Logger.state('Calculating file checksum');
+      final stopwatch = Stopwatch()..start();
+      
+      final bytes = await file.readAsBytes();
+      String calculatedChecksum;
+      
+      if (algorithm.toLowerCase() == 'sha256') {
+        final digest = crypto.sha256.convert(bytes);
+        calculatedChecksum = digest.toString();
+      } else {
+        Logger.error('Unsupported algorithm: $algorithm');
+        return false;
+      }
+      
+      stopwatch.stop();
+      Logger.performance('Checksum calculated in ${stopwatch.elapsedMilliseconds}ms');
+      Logger.data('Calculated checksum: $calculatedChecksum');
+      
+      // First try direct verification if expected checksum is provided
+      if (expectedChecksum != null) {
+        final isValid = calculatedChecksum.toLowerCase() == expectedChecksum.toLowerCase();
+        
+        if (isValid) {
+          Logger.state('Checksum verification successful');
+          return true;
+        } else {
+          Logger.error('Direct checksum verification failed');
+          Logger.data('Expected: $expectedChecksum');
+          Logger.data('Calculated: $calculatedChecksum');
+          
+          // If checksumUrl is not provided, return false
+          if (checksumUrl == null) {
+            Logger.error('No checksum URL provided for fallback verification');
+            return false;
+          }
+        }
+      } else if (checksumUrl == null) {
+        Logger.error('Neither expected checksum nor checksum URL provided');
+        return false;
+      }
+      
+      // Try to fetch checksum from URL as fallback
+      Logger.state('Attempting to fetch checksum from URL: $checksumUrl');
+      final checksumFetchStopwatch = Stopwatch()..start();
+      
+      try {
+        final response = await _httpClient.get(Uri.parse(checksumUrl!));
+        checksumFetchStopwatch.stop();
+        
+        Logger.performance('Checksum fetched in ${checksumFetchStopwatch.elapsedMilliseconds}ms');
+        Logger.data('Response status code: ${response.statusCode}');
+        
+        if (response.statusCode == 200) {
+          final checksumFileContent = response.body;
+          Logger.data('Checksum file content: $checksumFileContent');
+          
+          // Parse the checksum file to find the relevant checksum
+          // Checksum files typically contain lines like: "<checksum> <filename>"
+          final fileName = filePath.split('/').last;
+          final checksumLines = checksumFileContent.split('\n');
+          
+          String? fetchedChecksum;
+          for (final line in checksumLines) {
+            final parts = line.trim().split(RegExp(r'\s+'));
+            if (parts.length >= 2) {
+              final checksum = parts[0];
+              final fileNameInLine = parts.sublist(1).join(' ');
+              
+              if (fileNameInLine.contains(fileName)) {
+                fetchedChecksum = checksum;
+                Logger.data('Found matching checksum in file: $fetchedChecksum for $fileNameInLine');
+                break;
+              }
+            }
+          }
+          
+          if (fetchedChecksum != null) {
+            final isValid = calculatedChecksum.toLowerCase() == fetchedChecksum.toLowerCase();
+            
+            if (isValid) {
+              Logger.state('Checksum verification successful using fetched checksum');
+              return true;
+            } else {
+              Logger.error('Checksum verification failed using fetched checksum');
+              Logger.data('Fetched: $fetchedChecksum');
+              Logger.data('Calculated: $calculatedChecksum');
+              return false;
+            }
+          } else {
+            Logger.error('Could not find matching checksum in fetched file');
+            return false;
+          }
+        } else {
+          Logger.error('Failed to fetch checksum file: ${response.statusCode}');
+          return false;
+        }
+      } catch (e, stackTrace) {
+        checksumFetchStopwatch.stop();
+        Logger.error('Error fetching checksum from URL', e, stackTrace);
+        return false;
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Error verifying file integrity', e, stackTrace);
       return false;
     }
   }

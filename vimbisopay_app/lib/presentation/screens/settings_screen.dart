@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
+import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
@@ -12,8 +14,42 @@ import 'package:vimbisopay_app/presentation/screens/notifications_settings_scree
 import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _appVersion = '';
+  bool _isLoadingVersion = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = '${packageInfo.version} (${packageInfo.buildNumber})';
+          _isLoadingVersion = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading app version', e);
+      if (mounted) {
+        setState(() {
+          _appVersion = 'Unknown';
+          _isLoadingVersion = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,16 +194,34 @@ class SettingsScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 12),
-                // Always show debug option to help troubleshoot feature flags
+                // App Version
                 _buildSettingsTile(
-                  icon: Icons.bug_report,
-                  title: 'Debug Tools',
-                  subtitle: 'Feature flags and remote config testing',
+                  icon: Icons.info_outline,
+                  title: 'App Version',
+                  subtitle: _isLoadingVersion ? 'Loading...' : _appVersion,
                   onTap: () {
-                    Navigator.pushNamed(context, '/debug');
+                    // Show a toast with the full version info
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('App Version: $_appVersion'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
+                // Only show debug tools if debug features are enabled
+                if (ServiceLocator.featureFlagService.isDebugFeaturesEnabled()) ...[
+                  _buildSettingsTile(
+                    icon: Icons.bug_report,
+                    title: 'Debug Tools',
+                    subtitle: 'Feature flags and remote config testing',
+                    onTap: () {
+                      Navigator.pushNamed(context, '/debug');
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _buildSettingsTile(
                   icon: Icons.logout,
                   title: 'Logout',

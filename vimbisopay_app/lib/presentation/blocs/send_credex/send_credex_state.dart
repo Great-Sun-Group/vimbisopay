@@ -113,8 +113,9 @@ class SendCredexState extends Equatable {
       isRecipientVerified && 
       double.tryParse(amount) != null && 
       double.parse(amount) > 0 && 
-      // Only check balance for secured Credex
-      (credexType != CredexType.SECURED || double.parse(amount) <= availableBalance);
+      // Only check balance for secured Credex and disable for Unsecured (COMING SOON)
+      credexType == CredexType.SECURED && 
+      double.parse(amount) <= availableBalance;
   
   // Helper property to maintain backward compatibility
   bool get isSecuredCredex => credexType == CredexType.SECURED;

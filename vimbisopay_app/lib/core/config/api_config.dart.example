@@ -1,4 +1,116 @@
+// This is an example configuration file.
+// Copy this to api_config.dart and update with your actual values.
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Enum representing the available API environments
+enum ApiEnvironment {
+  development,
+  production,
+}
+
+/// Configuration for API endpoints and related settings
 class ApiConfig {
-  static const String apiKey = 'Your API key here';
-  static const String baseUrl = 'https://dev.mycredex.dev';
+  // Default environment based on build mode
+  static ApiEnvironment _environment = kReleaseMode 
+      ? ApiEnvironment.production 
+      : ApiEnvironment.development;
+  
+  // Key for storing environment preference
+  static const String _prefKey = 'api_environment';
+  static bool _initialized = false;
+  
+  /// Initialize API configuration from SharedPreferences
+  static Future<void> initialize() async {
+    if (_initialized || kReleaseMode) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final envString = prefs.getString(_prefKey);
+      
+      if (envString != null) {
+        _environment = ApiEnvironment.values.firstWhere(
+          (e) => e.toString() == envString,
+          orElse: () => ApiEnvironment.development,
+        );
+      }
+      
+      _initialized = true;
+    } catch (e) {
+      // Fallback to default
+      _environment = ApiEnvironment.development;
+    }
+  }
+  
+  /// Set the API environment (only works in debug builds)
+  static Future<void> setEnvironment(ApiEnvironment env) async {
+    // Only allow overriding in debug mode
+    if (kReleaseMode) return;
+    
+    _environment = env;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefKey, env.toString());
+    } catch (e) {
+      // Handle error
+    }
+  }
+  
+  /// Get the current API environment
+  static ApiEnvironment get environment => _environment;
+  
+  /// Get the API key for the current environment
+  static String get apiKey {
+    String? key;
+    
+    switch (_environment) {
+      case ApiEnvironment.development:
+        key = dotenv.env['DEV_API_KEY'];
+      case ApiEnvironment.production:
+        key = dotenv.env['PROD_API_KEY'];
+    }
+    
+    if (key == null || key.isEmpty) {
+      throw Exception('API key not found in .env file for ${_environment.name} environment');
+    }
+    
+    return key;
+  }
+  
+  /// Get the base URL for the current environment
+  static String get baseUrl {
+    String? url;
+    
+    switch (_environment) {
+      case ApiEnvironment.development:
+        url = dotenv.env['DEV_BASE_URL'];
+      case ApiEnvironment.production:
+        url = dotenv.env['PROD_BASE_URL'];
+    }
+    
+    if (url == null || url.isEmpty) {
+      throw Exception('Base URL not found in .env file for ${_environment.name} environment');
+    }
+    
+    return url;
+  }
+  
+  /// Get a human-readable name for the current environment
+  static String get environmentName {
+    switch (_environment) {
+      case ApiEnvironment.development:
+        return 'Development';
+      case ApiEnvironment.production:
+        return 'Production';
+    }
+  }
+  
+  /// Check if the current environment is development
+  static bool get isDevelopment => _environment == ApiEnvironment.development;
+  
+  /// Check if the current environment is production
+  static bool get isProduction => _environment == ApiEnvironment.production;
 }

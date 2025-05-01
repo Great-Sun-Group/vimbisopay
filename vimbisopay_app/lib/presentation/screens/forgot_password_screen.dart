@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
-import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
+import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/password_reset_otp_flow.dart';
+import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/presentation/widgets/change_password_bottom_sheet.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
@@ -36,7 +36,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   String? _getFieldError(String fieldName) {
-    return _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    // Only return non-empty error messages
+    final error = _touchedFields.contains(fieldName) ? _fieldErrors[fieldName] : null;
+    return (error != null && error.isNotEmpty) ? error : null;
   }
 
   @override
@@ -113,7 +115,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'Enter your phone number and we\'ll send you instructions to reset your password.',
+            'Enter your phone number and we\'ll send you a code on WhatsApp to reset your password.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textPrimary,
@@ -122,35 +124,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-
-  void _showOtpVerification(String phone, String memberId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PasswordResetOTPFlow(
-        phone: phone,
-        memberId: memberId,
-        onVerificationComplete: (OtpVerificationResponse response) {
-          // Close OTP dialog
-          Navigator.pop(context);
-          // Show reset password bottom sheet
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            isDismissible: false,
-            enableDrag: false,
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
-            ),
-            builder: (context) => ChangePasswordBottomSheet(
-              resetToken: response.details.resetToken,
-              memberId: response.details.memberId,
-            ),
-          );
-        },
       ),
     );
   }
@@ -220,18 +193,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       builder: (context) {
         Logger.interaction('[ForgotPassword] Building loading dialog');
         return const LoadingDialog(
-          message: 'Sending instructions...',
+          message: 'Initializing verification...',
         );
       },
     ));
 
     try {
-      final phoneNumber = '+${_phoneController.text}';
-      final sanitizedPhone =
-          PhoneNumberFormatter.sanitizePhoneNumber(phoneNumber);
-      final result = await _repository.requestOtp(
-        phone: sanitizedPhone,
-        purpose: 'PASSWORD_RESET',
+      // Do v1 login to get memberId
+      final v1Result = await _repository.login(
+        phone: _phoneController.text,
       );
 
       if (!mounted) return;
@@ -246,7 +216,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }
       }
 
-      result.fold(
+      v1Result.fold(
         (failure) {
           cleanup();
           // Use the failure message if available, otherwise translate the error
@@ -254,20 +224,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               failure.message ?? ErrorTranslator.translateError(failure);
           _showError(errorMessage);
         },
-        (response) {
+        (user) {
           cleanup();
-          final memberId = response['data']?['action']?['details']?['memberID'];
-          if (memberId == null) {
-            _showError('Failed to get required information from response');
-            return;
-          }
-          Logger.data('[ForgotPassword] Got memberIdfrom response');
-          // Show OTP verification dialog with memberId and token
-          _showOtpVerification(sanitizedPhone, memberId);
+          Logger.data('[ForgotPassword] Got memberId from v1 login');
+          // Show WhatsApp OTP verification dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => WhatsAppOTPVerification(
+              token: user.token,
+              phone: _phoneController.text,
+              memberId: user.memberId,
+              onVerificationComplete: (verifiedUser) {
+                // Close OTP dialog
+                Navigator.pop(context);
+                // Show reset password bottom sheet
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  isDismissible: false,
+                  enableDrag: false,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.85,
+                  ),
+                  builder: (context) => ChangePasswordBottomSheet(
+                    resetToken: verifiedUser.token,
+                    memberId: verifiedUser.memberId,
+                  ),
+                );
+              },
+            ),
+          );
         },
       );
     } catch (e) {
-      Logger.error('[ForgotPassword] Error sending reset instructions', e);
+      Logger.error('[ForgotPassword] Error initializing verification', e);
       if (mounted) {
         Navigator.of(context).pop(); // Pop loading dialog
         setState(() {
@@ -317,12 +308,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone),
                             helperText:
-                                'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland)',
+                                'Start with country code (e.g. 263 for Zimbabwe, 353 for Ireland, 1 for USA/Canada)',
                             helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.phone,
                           inputFormatters: [
-                            PhoneNumberFormatter(),
+                            PlainPhoneNumberFormatter(),
                           ],
                           enabled: !_isLoading,
                           onTap: () => _markFieldAsTouched('phone'),
