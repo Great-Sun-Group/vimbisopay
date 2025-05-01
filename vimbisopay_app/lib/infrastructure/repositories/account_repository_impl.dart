@@ -2,7 +2,6 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/base_account_repository.dart';
 
 // Import mixins
@@ -26,11 +25,9 @@ class AccountRepositoryImpl extends BaseAccountRepository with
     implements AccountRepository {
 
   AccountRepositoryImpl({
-    required PasswordService passwordService,
     DatabaseHelper? databaseHelper,
     http.Client? httpClient,
   }) : super(
-         passwordService: passwordService,
          databaseHelper: databaseHelper ?? DatabaseHelper(),
          httpClient: httpClient ?? http.Client(),
        );
@@ -38,12 +35,10 @@ class AccountRepositoryImpl extends BaseAccountRepository with
   // For testing
   @visibleForTesting
   static AccountRepositoryImpl createForTesting({
-    required PasswordService passwordService,
     DatabaseHelper? databaseHelper,
     http.Client? httpClient,
   }) {
     return AccountRepositoryImpl(
-      passwordService: passwordService,
       databaseHelper: databaseHelper,
       httpClient: httpClient,
     );

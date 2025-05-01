@@ -147,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildSettingsTile(
                   icon: Icons.security,
                   title: 'Security Settings',
-                  subtitle: 'PIN, password, and authentication',
+                  subtitle: 'PIN and authentication',
                   onTap: () {
                     Navigator.push(
                       context,

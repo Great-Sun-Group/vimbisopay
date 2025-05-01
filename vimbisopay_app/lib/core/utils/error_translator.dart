@@ -83,9 +83,8 @@ class ErrorTranslator {
       return 'You don\'t have permission to access this resource.';
     }
     
-    if (errorString.contains('invalid credentials') || 
-        errorString.contains('incorrect password')) {
-      return 'The username or password you entered is incorrect.';
+    if (errorString.contains('invalid credentials')) {
+      return 'The phone number you entered is incorrect.';
     }
     
     // Default auth error message

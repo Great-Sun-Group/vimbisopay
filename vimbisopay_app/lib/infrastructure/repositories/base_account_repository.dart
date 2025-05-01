@@ -6,7 +6,6 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
 
 /// Base class that provides common utilities for the AccountRepository implementation
@@ -14,11 +13,9 @@ abstract class BaseAccountRepository {
   final String baseUrl = ApiConfig.baseUrl;
   
   final DatabaseHelper databaseHelper;
-  final PasswordService passwordService;
   final http.Client httpClient;
   
   BaseAccountRepository({
-    required this.passwordService,
     required this.databaseHelper,
     required this.httpClient,
   });

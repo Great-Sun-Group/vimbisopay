@@ -35,9 +35,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
-  final AccountRepository _accountRepository = AccountRepositoryImpl(
-    passwordService: ServiceLocator.passwordService,
-  );
+  final AccountRepository _accountRepository = AccountRepositoryImpl();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   late HomeBloc _homeBloc;
   bool _isDisposed = false;
