@@ -269,7 +269,7 @@ class HomeActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Check if marketplace feature is enabled
-    final bool isMarketplaceEnabled = ServiceLocator.featureFlagService.isMarketplaceEnabled();
+    final bool isMarketplaceEnabled = ServiceLocator.featureFlagService.isMarketplaceEnabledSync();
     
     // Create navigation items
     final List<BottomNavigationBarItem> items = [

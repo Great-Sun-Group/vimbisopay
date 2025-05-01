@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -13,7 +13,7 @@ import 'dart:io';
 /// for accessing configuration values.
 class RemoteConfigService {
   final http.Client _httpClient;
-  final SharedPreferences _prefs;
+  final StorageService _storage;
   final String _baseUrl;
   
   // Keys for SharedPreferences
@@ -28,17 +28,17 @@ class RemoteConfigService {
   
   /// Creates a new instance of [RemoteConfigService].
   ///
-  /// Requires an instance of [http.Client] and [SharedPreferences].
-  RemoteConfigService(this._httpClient, this._prefs, this._baseUrl);
+  /// Requires an instance of [http.Client] and [StorageService].
+  RemoteConfigService(this._httpClient, this._storage, this._baseUrl);
   
   /// Initializes the remote config service.
   ///
-  /// Loads the cached config from SharedPreferences.
+  /// Loads the cached config from storage.
   /// Returns true if initialization was successful, false otherwise.
   Future<bool> initialize() async {
     try {
-      // Load cached config from SharedPreferences
-      final cachedConfigJson = _prefs.getString(_configCacheKey);
+      // Load cached config from storage
+      final cachedConfigJson = await _storage.getString(_configCacheKey);
       if (cachedConfigJson != null) {
         _cachedConfig = jsonDecode(cachedConfigJson) as Map<String, dynamic>;
         Logger.data('Loaded cached remote config');
@@ -69,7 +69,7 @@ class RemoteConfigService {
       final userId = user?.memberId;
       
       // Get last config timestamp
-      final lastConfigTimestamp = _prefs.getInt(_configTimestampKey);
+      final lastConfigTimestamp = await _storage.getInt(_configTimestampKey);
       
       // Build request body
       final requestBody = {
@@ -92,12 +92,12 @@ class RemoteConfigService {
         
         // Cache the config
         _cachedConfig = data;
-        await _prefs.setString(_configCacheKey, jsonEncode(data));
+        await _storage.setString(_configCacheKey, jsonEncode(data));
         
         // Store the timestamp
         final timestamp = data['config_timestamp'] as int?;
         if (timestamp != null) {
-          await _prefs.setInt(_configTimestampKey, timestamp);
+          await _storage.setInt(_configTimestampKey, timestamp);
         }
         
         Logger.data('Successfully fetched remote config from server');
@@ -218,12 +218,12 @@ class RemoteConfigService {
   /// Checks if the cached config is still valid.
   ///
   /// Returns true if the cached config is still valid, false otherwise.
-  bool isCacheValid() {
+  Future<bool> isCacheValid() async {
     if (_cachedConfig == null) {
       return false;
     }
     
-    final timestamp = _prefs.getInt(_configTimestampKey);
+    final timestamp = await _storage.getInt(_configTimestampKey);
     if (timestamp == null) {
       return false;
     }
@@ -232,6 +232,20 @@ class RemoteConfigService {
     final now = DateTime.now().millisecondsSinceEpoch;
     
     return now - timestamp < ttl * 1000;
+  }
+  
+  /// Synchronous version of isCacheValid for backward compatibility.
+  /// 
+  /// This method should only be used in contexts where async/await is not possible.
+  /// Prefer using the async version when possible.
+  bool isCacheValidSync() {
+    if (_cachedConfig == null) {
+      return false;
+    }
+    
+    // We can't access storage synchronously, so we have to assume the cache is valid
+    // This is a compromise for backward compatibility
+    return true;
   }
   
   /// Gets device information for the config request.

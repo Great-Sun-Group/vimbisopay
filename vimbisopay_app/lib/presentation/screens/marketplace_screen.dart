@@ -8,7 +8,7 @@ import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/presentation/helpers/marketplace_first_visit_helper.dart';
 import 'package:vimbisopay_app/presentation/widgets/marketplace/product_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/marketplace/marketplace_states.dart';
 import 'package:vimbisopay_app/presentation/widgets/marketplace/vendor_cta_widget.dart';
@@ -232,47 +232,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Future<void> _checkFirstTimeVisit() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final isFirstVisit = !prefs.containsKey('has_visited_marketplace');
-
-      if (isFirstVisit) {
-        // Mark as visited
-        await prefs.setBool('has_visited_marketplace', true);
-
-        // Show first-time prompt after the screen is built
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _showFirstTimeMarketplaceDialog();
-          });
-        }
-      }
+      // Use the MarketplaceFirstVisitHelper to handle first-time visit
+      final helper = MarketplaceFirstVisitHelper(context, _navigateToVendorRegistration);
+      await helper.checkFirstTimeVisit();
     } catch (e) {
       Logger.error('Error checking first-time visit', e);
     }
-  }
-
-  void _showFirstTimeMarketplaceDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Welcome to Vimbiso Marketplace!'),
-        content: const Text(
-            'Would you like to sell your products and services in the marketplace?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Not Now'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _navigateToVendorRegistration();
-            },
-            child: const Text('Become a Vendor'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

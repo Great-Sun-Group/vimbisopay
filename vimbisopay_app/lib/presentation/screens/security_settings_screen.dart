@@ -248,7 +248,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       // Only show recent activity if debug features are enabled
-                      if (ServiceLocator.featureFlagService.isDebugFeaturesEnabled())
+                      if (ServiceLocator.featureFlagService.isDebugFeaturesEnabledSync())
                         SettingsContainer(
                           title: 'Recent Activity',
                           children: [

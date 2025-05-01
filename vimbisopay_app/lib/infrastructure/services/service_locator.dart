@@ -1,7 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service_provider.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/repositories/analytics/analytics_provider.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
@@ -134,14 +135,23 @@ class ServiceLocator {
     return _configManager!;
   }
   
+  // Getter for StorageService
+  static StorageService get storageService => StorageServiceProvider.storageService;
+  
+  // Initialize StorageService
+  static Future<StorageService> initializeStorageService() async {
+    return await StorageServiceProvider.initialize();
+  }
+  
   // Initialize FeatureFlagService
   static Future<FeatureFlagService> initializeFeatureFlagService() async {
     if (_featureFlagService != null) {
       return _featureFlagService!;
     }
     
-    final prefs = await SharedPreferences.getInstance();
-    _featureFlagService = FeatureFlagService(_remoteConfig, prefs);
+    // Initialize storage service if not already initialized
+    final storage = await initializeStorageService();
+    _featureFlagService = FeatureFlagService(_remoteConfig, storage);
     return _featureFlagService!;
   }
   
@@ -151,18 +161,20 @@ class ServiceLocator {
       return _configManager!;
     }
     
+    // Initialize StorageService if not already initialized
+    final storage = await initializeStorageService();
+    
     // Initialize FeatureFlagService if not already initialized
     if (_featureFlagService == null) {
       await initializeFeatureFlagService();
     }
     
     // Initialize RemoteConfigService
-    final prefs = await SharedPreferences.getInstance();
-    _remoteConfigService = RemoteConfigService(_httpClient, prefs, ApiConfig.baseUrl);
+    _remoteConfigService = RemoteConfigService(_httpClient, storage, ApiConfig.baseUrl);
     await _remoteConfigService!.initialize();
     
     // Initialize AppUpdateService
-    _appUpdateService = AppUpdateService(_httpClient, prefs, ApiConfig.baseUrl);
+    _appUpdateService = AppUpdateService(_httpClient, storage, ApiConfig.baseUrl);
     
     // Initialize ConfigManager
     _configManager = ConfigManager(

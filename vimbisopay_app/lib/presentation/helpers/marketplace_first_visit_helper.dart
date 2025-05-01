@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 
 /// A helper class for handling first-time visit to the marketplace.
@@ -14,12 +15,12 @@ class MarketplaceFirstVisitHelper {
   /// If it is, shows a welcome dialog.
   Future<void> checkFirstTimeVisit() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final isFirstVisit = !prefs.containsKey('has_visited_marketplace');
+      final storage = ServiceLocator.storageService;
+      final isFirstVisit = !(await storage.containsKey('has_visited_marketplace'));
       
       if (isFirstVisit) {
         // Mark as visited
-        await prefs.setBool('has_visited_marketplace', true);
+        await storage.setBool('has_visited_marketplace', true);
         
         // Show first-time prompt after the screen is built
         WidgetsBinding.instance.addPostFrameCallback((_) {

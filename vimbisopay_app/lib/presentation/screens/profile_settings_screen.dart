@@ -488,7 +488,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             const SizedBox(height: 24),
             
             // Marketplace Settings Section (only if feature flag is enabled)
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) ...[
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) ...[
               _buildMarketplaceSection(),
               const SizedBox(height: 24),
             ],
