@@ -1,6 +1,6 @@
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:vimbisopay_app/core/config/feature_flags.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 
@@ -11,7 +11,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 /// It also supports local overrides for debugging purposes.
 class FeatureFlagService {
   final FirebaseRemoteConfig _remoteConfig;
-  final SharedPreferences _prefs;
+  final StorageService _storage;
   
   // Keys for local overrides in SharedPreferences
   static const String _marketplaceOverrideKey = 'debug_override_marketplace';
@@ -19,8 +19,8 @@ class FeatureFlagService {
   
   /// Creates a new instance of [FeatureFlagService].
   ///
-  /// Requires an instance of [FirebaseRemoteConfig] and [SharedPreferences].
-  FeatureFlagService(this._remoteConfig, this._prefs);
+  /// Requires an instance of [FirebaseRemoteConfig] and [StorageService].
+  FeatureFlagService(this._remoteConfig, this._storage);
   
   /// Initializes the feature flag service.
   ///
@@ -100,15 +100,25 @@ class FeatureFlagService {
   ///
   /// Returns true if the marketplace feature is enabled, false otherwise.
   /// If a local override is set, it takes precedence over the remote config value.
-  bool isMarketplaceEnabled() {
+  Future<bool> isMarketplaceEnabled() async {
     // Check if there's a local override
-    if (_prefs.containsKey(_marketplaceOverrideKey)) {
-      final localOverride = _prefs.getBool(_marketplaceOverrideKey);
+    final hasOverride = await _storage.containsKey(_marketplaceOverrideKey);
+    if (hasOverride) {
+      final localOverride = await _storage.getBool(_marketplaceOverrideKey);
       Logger.data('Using local override for marketplace feature: $localOverride');
       return localOverride ?? _remoteConfig.getBool(FeatureFlags.enableMarketplace);
     }
     
     // Otherwise use the remote config value
+    return _remoteConfig.getBool(FeatureFlags.enableMarketplace);
+  }
+  
+  /// Synchronous version of isMarketplaceEnabled for backward compatibility.
+  /// 
+  /// This method should only be used in contexts where async/await is not possible.
+  /// Prefer using the async version when possible.
+  bool isMarketplaceEnabledSync() {
+    // For synchronous calls, we can only use the remote config value
     return _remoteConfig.getBool(FeatureFlags.enableMarketplace);
   }
   
@@ -119,8 +129,7 @@ class FeatureFlagService {
   Future<bool> setMarketplaceOverride(bool enabled) async {
     try {
       Logger.data('Setting local override for marketplace feature: $enabled');
-      final result = await _prefs.setBool(_marketplaceOverrideKey, enabled);
-      return result;
+      return await _storage.setBool(_marketplaceOverrideKey, enabled);
     } catch (e) {
       Logger.error('Error setting marketplace override', e);
       return false;
@@ -133,8 +142,7 @@ class FeatureFlagService {
   Future<bool> clearMarketplaceOverride() async {
     try {
       Logger.data('Clearing local override for marketplace feature');
-      final result = await _prefs.remove(_marketplaceOverrideKey);
-      return result;
+      return await _storage.remove(_marketplaceOverrideKey);
     } catch (e) {
       Logger.error('Error clearing marketplace override', e);
       return false;
@@ -144,38 +152,54 @@ class FeatureFlagService {
   /// Checks if there's a local override for the marketplace feature flag.
   ///
   /// Returns true if there's a local override, false otherwise.
-  bool hasMarketplaceOverride() {
-    return _prefs.containsKey(_marketplaceOverrideKey);
+  Future<bool> hasMarketplaceOverride() async {
+    return await _storage.containsKey(_marketplaceOverrideKey);
   }
   
   /// Gets the value of the local override for the marketplace feature flag.
   ///
   /// Returns the value of the override, or null if there's no override.
-  bool? getMarketplaceOverrideValue() {
-    if (!_prefs.containsKey(_marketplaceOverrideKey)) {
+  Future<bool?> getMarketplaceOverrideValue() async {
+    final hasKey = await _storage.containsKey(_marketplaceOverrideKey);
+    if (!hasKey) {
       return null;
     }
-    return _prefs.getBool(_marketplaceOverrideKey);
+    return await _storage.getBool(_marketplaceOverrideKey);
   }
   
   /// Checks if debug features are enabled.
   ///
   /// Returns true if debug features are enabled, false otherwise.
   /// Debug features are always disabled in release builds, regardless of remote config.
-  bool isDebugFeaturesEnabled() {
+  Future<bool> isDebugFeaturesEnabled() async {
     // For release builds, always return false regardless of remote config or local override
     if (kReleaseMode) {
       return false;
     }
     
     // For debug/profile builds, check if there's a local override
-    if (_prefs.containsKey(_debugFeaturesOverrideKey)) {
-      final localOverride = _prefs.getBool(_debugFeaturesOverrideKey);
+    final hasOverride = await _storage.containsKey(_debugFeaturesOverrideKey);
+    if (hasOverride) {
+      final localOverride = await _storage.getBool(_debugFeaturesOverrideKey);
       Logger.data('Using local override for debug features: $localOverride');
       return localOverride ?? _remoteConfig.getBool(FeatureFlags.enableDebugFeatures);
     }
     
     // Otherwise use the remote config value
+    return _remoteConfig.getBool(FeatureFlags.enableDebugFeatures);
+  }
+  
+  /// Synchronous version of isDebugFeaturesEnabled for backward compatibility.
+  /// 
+  /// This method should only be used in contexts where async/await is not possible.
+  /// Prefer using the async version when possible.
+  bool isDebugFeaturesEnabledSync() {
+    // For release builds, always return false
+    if (kReleaseMode) {
+      return false;
+    }
+    
+    // For synchronous calls, we can only use the remote config value
     return _remoteConfig.getBool(FeatureFlags.enableDebugFeatures);
   }
   
@@ -186,8 +210,7 @@ class FeatureFlagService {
   Future<bool> setDebugFeaturesOverride(bool enabled) async {
     try {
       Logger.data('Setting local override for debug features: $enabled');
-      final result = await _prefs.setBool(_debugFeaturesOverrideKey, enabled);
-      return result;
+      return await _storage.setBool(_debugFeaturesOverrideKey, enabled);
     } catch (e) {
       Logger.error('Error setting debug features override', e);
       return false;
@@ -200,8 +223,7 @@ class FeatureFlagService {
   Future<bool> clearDebugFeaturesOverride() async {
     try {
       Logger.data('Clearing local override for debug features');
-      final result = await _prefs.remove(_debugFeaturesOverrideKey);
-      return result;
+      return await _storage.remove(_debugFeaturesOverrideKey);
     } catch (e) {
       Logger.error('Error clearing debug features override', e);
       return false;
@@ -211,17 +233,18 @@ class FeatureFlagService {
   /// Checks if there's a local override for the debug features flag.
   ///
   /// Returns true if there's a local override, false otherwise.
-  bool hasDebugFeaturesOverride() {
-    return _prefs.containsKey(_debugFeaturesOverrideKey);
+  Future<bool> hasDebugFeaturesOverride() async {
+    return await _storage.containsKey(_debugFeaturesOverrideKey);
   }
   
   /// Gets the value of the local override for the debug features flag.
   ///
   /// Returns the value of the override, or null if there's no override.
-  bool? getDebugFeaturesOverrideValue() {
-    if (!_prefs.containsKey(_debugFeaturesOverrideKey)) {
+  Future<bool?> getDebugFeaturesOverrideValue() async {
+    final hasKey = await _storage.containsKey(_debugFeaturesOverrideKey);
+    if (!hasKey) {
       return null;
     }
-    return _prefs.getBool(_debugFeaturesOverrideKey);
+    return await _storage.getBool(_debugFeaturesOverrideKey);
   }
 }

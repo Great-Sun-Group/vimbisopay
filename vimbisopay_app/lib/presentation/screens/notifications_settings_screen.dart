@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/theme/app_spacing.dart';
 import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
@@ -16,7 +16,7 @@ class NotificationsSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => NotificationsBloc(
-        context.read<SharedPreferences>(),
+        context.read<StorageService>(),
       )..add(NotificationsInitialize()),
       child: const NotificationsSettingsView(),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
@@ -223,8 +224,9 @@ NotificationService initialized successfully:
 ''');
   }
 
-  final prefs = await SharedPreferences.getInstance();
-  runApp(MyApp(sharedPreferences: prefs));
+  // Initialize storage service
+  final storageService = await StorageServiceProvider.initialize();
+  runApp(MyApp(storageService: storageService));
 }
 
 /// Shows the app update screen.
@@ -273,10 +275,10 @@ Future<void> _showUpdateScreen(Map<String, dynamic> updateInfo) async {
 }
 
 class MyApp extends StatelessWidget {
-  final SharedPreferences sharedPreferences;
+  final StorageService storageService;
 
   const MyApp({
-    required this.sharedPreferences,
+    required this.storageService,
     super.key,
   });
 
@@ -284,12 +286,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SharedPreferences>.value(value: sharedPreferences),
+        Provider<StorageService>.value(value: storageService),
         Provider<DatabaseHelper>.value(
           value: ServiceLocator.databaseHelper,
         ),
         BlocProvider(
-          create: (context) => NotificationsBloc(sharedPreferences)
+          create: (context) => NotificationsBloc(storageService)
             ..add(NotificationsInitialize()),
         ),
         StreamProvider<User?>(
@@ -363,7 +365,7 @@ class MyApp extends StatelessWidget {
 
           if (settings.name == '/marketplace') {
             // Only allow access if the marketplace feature is enabled
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               return MaterialPageRoute(
                 builder: (context) => const MarketplaceScreen(),
                 settings: settings,
@@ -380,7 +382,7 @@ class MyApp extends StatelessWidget {
 
           // Search results screen
           if (settings.name == '/search-results') {
-            if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (!ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               return MaterialPageRoute(
                   builder: (context) => const HomeScreen());
             }
@@ -396,7 +398,7 @@ class MyApp extends StatelessWidget {
 
           // Product detail screen
           if (settings.name == '/product-detail') {
-            if (!ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (!ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               return MaterialPageRoute(
                   builder: (context) => const HomeScreen());
             }
@@ -416,7 +418,7 @@ class MyApp extends StatelessWidget {
           // Vendor profile screen route
           if (settings.name == '/vendor-profile') {
             // Only allow access if the marketplace feature is enabled
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               final args = settings.arguments as Map<String, dynamic>?;
               if (args == null || !args.containsKey('vendorId')) {
                 Logger.error('No vendor ID provided for vendor-profile route');
@@ -445,7 +447,7 @@ class MyApp extends StatelessWidget {
           // Vendor registration screen route
           if (settings.name == '/vendor-registration') {
             // Only allow access if the marketplace feature is enabled
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               final args = settings.arguments as Map<String, dynamic>?;
               if (args == null || !args.containsKey('memberId')) {
                 Logger.error(
@@ -475,7 +477,7 @@ class MyApp extends StatelessWidget {
           // Vendor sales tab screen route
           if (settings.name == '/vendor-sales-tab') {
             // Only allow access if the marketplace feature is enabled
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               return MaterialPageRoute(
                 builder: (context) => const VendorSalesTabScreen(),
                 settings: settings,
@@ -493,7 +495,7 @@ class MyApp extends StatelessWidget {
           // Buyer invoice detail screen route
           if (settings.name == '/buyer-invoice-detail') {
             // Only allow access if the marketplace feature is enabled
-            if (ServiceLocator.featureFlagService.isMarketplaceEnabled()) {
+            if (ServiceLocator.featureFlagService.isMarketplaceEnabledSync()) {
               final args = settings.arguments as Map<String, dynamic>?;
               if (args == null || !args.containsKey('invoiceId')) {
                 Logger.error(
@@ -651,8 +653,8 @@ class _IntroWrapperState extends State<IntroWrapper>
 
   Future<void> _checkInitialState() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final hasShownIntro = prefs.getBool('hasShownIntro') ?? false;
+      final storage = ServiceLocator.storageService;
+      final hasShownIntro = await storage.getBool('hasShownIntro') ?? false;
 
       // First check if we have a user in the database
       final hasUser = await _databaseHelper.hasUser();
@@ -700,8 +702,8 @@ class _IntroWrapperState extends State<IntroWrapper>
   }
 
   Future<void> _onIntroComplete() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasShownIntro', true);
+    final storage = ServiceLocator.storageService;
+    await storage.setBool('hasShownIntro', true);
 
     if (mounted) {
       setState(() {
@@ -818,8 +820,8 @@ class LoginSignupScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 TextButton(
                   onPressed: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('hasShownIntro');
+                    final storage = ServiceLocator.storageService;
+                    await storage.remove('hasShownIntro');
                     if (context.mounted) {
                       NavigationUtils.safeNavigateReplacementTo(
                         context,

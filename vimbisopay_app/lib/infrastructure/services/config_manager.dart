@@ -42,7 +42,7 @@ class ConfigManager {
       }
       
       // Fetch remote config if cache is invalid
-      if (!_remoteConfigService.isCacheValid()) {
+      if (!_remoteConfigService.isCacheValidSync()) {
         await _remoteConfigService.fetchConfig();
       }
       
@@ -82,7 +82,7 @@ class ConfigManager {
     
     // If the key is 'enable_marketplace', use the feature flag service
     if (key == 'enable_marketplace') {
-      return _featureFlagService.isMarketplaceEnabled();
+      return _featureFlagService.isMarketplaceEnabledSync();
     }
     
     return serverValue;
