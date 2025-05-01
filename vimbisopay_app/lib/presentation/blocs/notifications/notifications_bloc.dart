@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/notification_preferences.dart';
 
@@ -36,9 +36,9 @@ class NotificationsError extends NotificationsState {
 
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   static const String _prefsKey = 'notification_preferences';
-  final SharedPreferences _prefs;
+  final StorageService _storage;
 
-  NotificationsBloc(this._prefs) : super(NotificationsInitial()) {
+  NotificationsBloc(this._storage) : super(NotificationsInitial()) {
     on<NotificationsInitialize>(_onInitialize);
     on<UpdateNotificationPreference>(_onUpdatePreference);
   }
@@ -50,7 +50,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     try {
       emit(NotificationsLoading());
       
-      final prefsJson = _prefs.getString(_prefsKey);
+      final prefsJson = await _storage.getString(_prefsKey);
       Logger.data('''
 Initializing notification preferences:
 - Has stored preferences: ${prefsJson != null}
@@ -74,7 +74,7 @@ Notification preferences initialized:
 
       // Ensure preferences are saved even if this is the first initialization
       if (prefsJson == null) {
-        await _prefs.setString(
+        await _storage.setString(
           _prefsKey,
           jsonEncode(preferences.toJson()),
         );
@@ -102,7 +102,7 @@ Updating notification preferences:
 - New preferences: $prefsJson
 ''');
 
-      await _prefs.setString(_prefsKey, prefsJson);
+      await _storage.setString(_prefsKey, prefsJson);
       Logger.data('Notification preferences saved successfully');
 
       emit(NotificationsLoaded(event.preferences));

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_filter.dart';
@@ -128,8 +127,8 @@ Created stream controllers:
 ''');
 
       // Initialize notification filter
-      final prefs = await SharedPreferences.getInstance();
-      _notificationFilter = NotificationFilter(prefs);
+      final storage = ServiceLocator.storageService;
+      _notificationFilter = NotificationFilter(storage);
 
       final initialSettings = await _firebaseMessaging.getNotificationSettings();
       Logger.data('Initial notification settings: ${initialSettings.authorizationStatus}');
@@ -210,7 +209,7 @@ FCM Token obtained successfully:
           }
 
           // Format notification content based on privacy settings
-          final formattedBody = _notificationFilter.formatNotificationContent(message);
+          final formattedBody = await _notificationFilter.formatNotificationContent(message);
           final processedMessage = RemoteMessage(
             messageId: message.messageId,
             notification: RemoteNotification(

@@ -1,16 +1,16 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:vimbisopay_app/domain/entities/notification_preferences.dart';
 import 'dart:convert';
 
 class NotificationFilter {
   static const String _prefsKey = 'notification_preferences';
-  final SharedPreferences _prefs;
+  final StorageService _storage;
 
-  NotificationFilter(this._prefs);
+  NotificationFilter(this._storage);
 
   Future<bool> shouldShowNotification(RemoteMessage message) async {
-    final prefsJson = _prefs.getString(_prefsKey);
+    final prefsJson = await _storage.getString(_prefsKey);
     print('Notification Filter - Message Data: ${message.data}');
     print('Notification Filter - Type: ${message.data['type']}');
     
@@ -74,8 +74,8 @@ class NotificationFilter {
     }
   }
 
-  bool shouldHidePreviewContent() {
-    final prefsJson = _prefs.getString(_prefsKey);
+  Future<bool> shouldHidePreviewContent() async {
+    final prefsJson = await _storage.getString(_prefsKey);
     if (prefsJson == null) {
       return false;
     }
@@ -90,8 +90,8 @@ class NotificationFilter {
     }
   }
 
-  String formatNotificationContent(RemoteMessage message) {
-    if (!shouldHidePreviewContent()) {
+  Future<String> formatNotificationContent(RemoteMessage message) async {
+    if (!(await shouldHidePreviewContent())) {
       return message.notification?.body ?? '';
     }
 

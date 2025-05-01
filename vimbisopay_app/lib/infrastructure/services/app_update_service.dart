@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vimbisopay_app/infrastructure/services/storage/storage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:vimbisopay_app/core/config/api_config.dart';
@@ -19,7 +19,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 /// It supports both optional and mandatory updates, and can download and install APK files.
 class AppUpdateService {
   final http.Client _httpClient;
-  final SharedPreferences _prefs;
+  final StorageService _storage;
   final String _baseUrl;
   
   // Keys for SharedPreferences
@@ -29,8 +29,8 @@ class AppUpdateService {
   
   /// Creates a new instance of [AppUpdateService].
   ///
-  /// Requires an instance of [http.Client] and [SharedPreferences].
-  AppUpdateService(this._httpClient, this._prefs, this._baseUrl);
+  /// Requires an instance of [http.Client] and [StorageService].
+  AppUpdateService(this._httpClient, this._storage, this._baseUrl);
   
   /// Checks if an update is available for the app.
   ///
@@ -126,9 +126,9 @@ class AppUpdateService {
         Logger.performance('Response parsed in ${parseStopwatch.elapsedMilliseconds}ms');
         Logger.data('Response data: ${jsonEncode(responseData)}');
         
-        // Update last check time
-        await _prefs.setInt(_lastCheckTimeKey, DateTime.now().millisecondsSinceEpoch);
-        Logger.data('Updated last check time: ${DateTime.now().toIso8601String()}');
+      // Update last check time
+      await _storage.setInt(_lastCheckTimeKey, DateTime.now().millisecondsSinceEpoch);
+      Logger.data('Updated last check time: ${DateTime.now().toIso8601String()}');
         
         // Handle new response structure
         if (responseData.containsKey('data') && 
@@ -143,8 +143,8 @@ class AppUpdateService {
             Logger.state('Update available: ${details['latest_version']}');
             
             // Check if this update was previously deferred
-            final deferredVersion = _prefs.getString(_deferredVersionKey);
-            final updateDeferred = _prefs.getBool(_updateDeferredKey) ?? false;
+            final deferredVersion = await _storage.getString(_deferredVersionKey);
+            final updateDeferred = await _storage.getBool(_updateDeferredKey) ?? false;
             
             Logger.data('Deferred version: $deferredVersion');
             Logger.data('Update deferred: $updateDeferred');
@@ -259,8 +259,8 @@ class AppUpdateService {
             
             // Clear deferred status after successful installation
             Logger.state('Clearing deferred update status');
-            await _prefs.remove(_updateDeferredKey);
-            await _prefs.remove(_deferredVersionKey);
+            await _storage.remove(_updateDeferredKey);
+            await _storage.remove(_deferredVersionKey);
             
             return true;
           } else {
@@ -297,13 +297,15 @@ class AppUpdateService {
     Logger.state('Deferring update for version: $version');
     
     try {
-      await _prefs.setBool(_updateDeferredKey, true);
-      await _prefs.setString(_deferredVersionKey, version);
+      await _storage.setBool(_updateDeferredKey, true);
+      await _storage.setString(_deferredVersionKey, version);
       
       Logger.data('Update deferred successfully');
       Logger.data('Deferred version: $version');
-      Logger.data('Deferred key set: ${_prefs.getBool(_updateDeferredKey)}');
-      Logger.data('Deferred version key set: ${_prefs.getString(_deferredVersionKey)}');
+      final deferredKeySet = await _storage.getBool(_updateDeferredKey);
+      final deferredVersionKeySet = await _storage.getString(_deferredVersionKey);
+      Logger.data('Deferred key set: $deferredKeySet');
+      Logger.data('Deferred version key set: $deferredVersionKeySet');
     } catch (e, stackTrace) {
       Logger.error('Error deferring update', e, stackTrace);
       throw e; // Re-throw to allow UI to handle the error
@@ -317,11 +319,11 @@ class AppUpdateService {
     Logger.state('Clearing deferred update status');
     
     try {
-      final hadDeferredStatus = _prefs.containsKey(_updateDeferredKey);
-      final deferredVersion = _prefs.getString(_deferredVersionKey);
+      final hadDeferredStatus = await _storage.containsKey(_updateDeferredKey);
+      final deferredVersion = await _storage.getString(_deferredVersionKey);
       
-      await _prefs.remove(_updateDeferredKey);
-      await _prefs.remove(_deferredVersionKey);
+      await _storage.remove(_updateDeferredKey);
+      await _storage.remove(_deferredVersionKey);
       
       Logger.data('Deferred status cleared');
       Logger.data('Had deferred status: $hadDeferredStatus');

@@ -43,19 +43,43 @@ class _FeatureFlagsTabState extends State<FeatureFlagsTab> {
     
     setState(() {
       // Marketplace feature
-      _marketplaceEnabled = featureFlagService.isMarketplaceEnabled();
+      _marketplaceEnabled = featureFlagService.isMarketplaceEnabledSync();
       _marketplaceDefaultValue = FeatureFlags.defaults[FeatureFlags.enableMarketplace].toString();
       _marketplaceRemoteValue = remoteConfig.getValue(FeatureFlags.enableMarketplace).asBool().toString();
-      _hasMarketplaceOverride = featureFlagService.hasMarketplaceOverride();
-      _marketplaceOverrideValue = featureFlagService.getMarketplaceOverrideValue();
       
       // Debug features
-      _debugFeaturesEnabled = featureFlagService.isDebugFeaturesEnabled();
+      _debugFeaturesEnabled = featureFlagService.isDebugFeaturesEnabledSync();
       _debugFeaturesDefaultValue = FeatureFlags.defaults[FeatureFlags.enableDebugFeatures].toString();
       _debugFeaturesRemoteValue = remoteConfig.getValue(FeatureFlags.enableDebugFeatures).asBool().toString();
-      _hasDebugFeaturesOverride = featureFlagService.hasDebugFeaturesOverride();
-      _debugFeaturesOverrideValue = featureFlagService.getDebugFeaturesOverrideValue();
     });
+    
+    // These methods are async, so we need to update them separately
+    _loadAsyncValues();
+  }
+  
+  Future<void> _loadAsyncValues() async {
+    final featureFlagService = ServiceLocator.featureFlagService;
+    
+    try {
+      // Load marketplace async values
+      final hasMarketplaceOverride = await featureFlagService.hasMarketplaceOverride();
+      final marketplaceOverrideValue = await featureFlagService.getMarketplaceOverrideValue();
+      
+      // Load debug features async values
+      final hasDebugFeaturesOverride = await featureFlagService.hasDebugFeaturesOverride();
+      final debugFeaturesOverrideValue = await featureFlagService.getDebugFeaturesOverrideValue();
+      
+      if (mounted) {
+        setState(() {
+          _hasMarketplaceOverride = hasMarketplaceOverride;
+          _marketplaceOverrideValue = marketplaceOverrideValue;
+          _hasDebugFeaturesOverride = hasDebugFeaturesOverride;
+          _debugFeaturesOverrideValue = debugFeaturesOverrideValue;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading async feature flag values', e);
+    }
   }
 
   Future<void> _forceRefresh() async {

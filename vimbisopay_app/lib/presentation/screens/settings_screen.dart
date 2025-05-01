@@ -211,7 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 // Only show debug tools if debug features are enabled
-                if (ServiceLocator.featureFlagService.isDebugFeaturesEnabled()) ...[
+                if (ServiceLocator.featureFlagService.isDebugFeaturesEnabledSync()) ...[
                   _buildSettingsTile(
                     icon: Icons.bug_report,
                     title: 'Debug Tools',

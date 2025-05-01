@@ -15,7 +15,7 @@ dependencies:
   mobile_scanner: ^3.4.1
   http: ^1.1.0
   dartz: ^0.10.1
-  shared_preferences: ^2.2.0
+  # shared_preferences: 2.2.2  # Removed due to compatibility issues with Android
   flutter_secure_storage: ^8.0.0
   local_auth: ^2.1.6
   pin_code_fields: ^8.0.1
@@ -55,6 +55,10 @@ dev_dependencies:
   bloc_test: ^9.1.4
   build_runner: ^2.4.6
   mocktail: ^1.0.0
+
+# Override specific dependencies to fix compatibility issues
+dependency_overrides:
+  # shared_preferences_android override removed to fix compatibility issues
 
 flutter:
   uses-material-design: true
