@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/theme/app_spacing.dart';
-import 'package:vimbisopay_app/core/theme/app_text_styles.dart';
 import 'package:vimbisopay_app/domain/entities/notification_preferences.dart';
 import 'package:vimbisopay_app/presentation/blocs/notifications/notifications_bloc.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';

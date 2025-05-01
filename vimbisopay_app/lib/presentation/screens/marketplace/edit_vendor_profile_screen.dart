@@ -219,7 +219,7 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
       }
       
       Logger.data('[EDIT_VENDOR] Dashboard found, checking accountsInternal');
-      if (user.dashboard!.accountsInternal == null || user.dashboard!.accountsInternal.isEmpty) {
+      if (user.dashboard!.accountsInternal.isEmpty) {
         Logger.error('[EDIT_VENDOR] accountsInternal is null or empty', user.dashboard?.toMap());
         throw Exception('Internal accounts not found. Please log out and log in again.');
       }
@@ -254,10 +254,6 @@ class _EditVendorProfileScreenState extends State<EditVendorProfileScreen> {
           Logger.error('[EDIT_VENDOR] Error finding DIGITAL_ASSET account', e);
           throw Exception('No internal accounts available');
         }
-      }
-      
-      if (digitalAssetAccountId == null) {
-        throw Exception('Could not determine account ID for image upload');
       }
       
       // Upload image

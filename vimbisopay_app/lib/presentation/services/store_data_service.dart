@@ -263,7 +263,7 @@ class StoreDataService {
                 final profilePictureThumbnail = product['profilePictureThumbnail'] as String?;
                 
                 // Create image URLs list with profile picture thumbnail if available
-                List<String> imageUrls = [];
+                final List<String> imageUrls = [];
                 if (profilePictureThumbnail != null && profilePictureThumbnail.isNotEmpty) {
                   Logger.data('[STORE_INFO] Adding profile picture thumbnail to product: $profilePictureThumbnail');
                   imageUrls.add(profilePictureThumbnail);
@@ -299,7 +299,7 @@ class StoreDataService {
                 storeId: vendorObj.id,
                 vendor: vendorObj,
                 products: vendorProducts,
-                profileImageUrl: "",  // No profile image in the new API response
+                profileImageUrl: '',  // No profile image in the new API response
               );
               Logger.data('[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
               
@@ -320,7 +320,7 @@ class StoreDataService {
               errorMessage: '',
               vendor: vendorObj,
               products: vendorProducts,
-              profileThumbnailUrl: "",
+              profileThumbnailUrl: '',
             );
           } catch (e, stackTrace) {
             Logger.error('[STORE_INFO] Error parsing storefront data', e);

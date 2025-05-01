@@ -49,7 +49,7 @@ class DueDateSelector extends StatelessWidget {
                   Expanded(
                     child: Text(
                       selectedDate == null 
-                          ? "Recommended for business" 
+                          ? 'Recommended for business' 
                           : DateFormatter.formatLongDate(selectedDate!),
                       style: TextStyle(
                         color: selectedDate == null
@@ -83,10 +83,10 @@ class DueDateSelector extends StatelessWidget {
                   child: const Text('Clear'),
                 ),
               )
-            : Padding(
-                padding: const EdgeInsets.only(top: 8.0),
+            : const Padding(
+                padding: EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "Unsecured credexes without a due date are primarily intended for use between family and friends.",
+                  'Unsecured credexes without a due date are primarily intended for use between family and friends.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -127,7 +127,7 @@ class DueDateSelector extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.arrow_back, color: AppColors.techAzure),
+                          icon: const Icon(Icons.arrow_back, color: AppColors.techAzure),
                           onPressed: () {
                             setState(() {
                               viewDate = DateTime(
@@ -139,15 +139,15 @@ class DueDateSelector extends StatelessWidget {
                           },
                         ),
                         Text(
-                          "${_getMonthName(viewDate.month)} ${viewDate.year}",
-                          style: TextStyle(
+                          '${_getMonthName(viewDate.month)} ${viewDate.year}',
+                          style: const TextStyle(
                             color: AppColors.techAzure,
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.arrow_forward, color: AppColors.techAzure),
+                          icon: const Icon(Icons.arrow_forward, color: AppColors.techAzure),
                           onPressed: () {
                             setState(() {
                               viewDate = DateTime(
@@ -171,7 +171,7 @@ class DueDateSelector extends StatelessWidget {
                           width: 30,
                           child: Text(
                             _getDayName(index),
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontWeight: FontWeight.bold,
                             ),
@@ -186,8 +186,8 @@ class DueDateSelector extends StatelessWidget {
                     // Calendar grid
                     GridView.builder(
                       shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 7,
                         childAspectRatio: 1.0,
                       ),
@@ -261,7 +261,7 @@ class DueDateSelector extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.techAzure,
                       ),
-                      child: Text('Cancel'),
+                      child: const Text('Cancel'),
                     ),
                   ],
                 ),

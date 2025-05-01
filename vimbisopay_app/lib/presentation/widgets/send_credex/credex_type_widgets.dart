@@ -140,7 +140,7 @@ class _DueDateSelectorState extends State<DueDateSelector> {
                   Expanded(
                     child: Text(
                       widget.selectedDate == null 
-                          ? "Recommended for business" 
+                          ? 'Recommended for business' 
                           : _formatDate(_effectiveDate!),
                       style: TextStyle(
                         color: widget.selectedDate == null
@@ -180,10 +180,10 @@ class _DueDateSelectorState extends State<DueDateSelector> {
                   child: const Text('Clear'),
                 ),
               )
-            : Padding(
-                padding: const EdgeInsets.only(top: 8.0),
+            : const Padding(
+                padding: EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "Unsecured credexes without a due date are primarily intended for use between family and friends.",
+                  'Unsecured credexes without a due date are primarily intended for use between family and friends.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,

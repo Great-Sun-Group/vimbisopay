@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/credex_request.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart' as credex;

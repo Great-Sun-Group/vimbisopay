@@ -520,9 +520,9 @@ class _FeatureFlagsTabState extends State<FeatureFlagsTab> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      const Row(
                         children: [
-                          const Text(
+                          Text(
                             'Firebase Analytics: ',
                             style: TextStyle(
                               fontSize: 14,

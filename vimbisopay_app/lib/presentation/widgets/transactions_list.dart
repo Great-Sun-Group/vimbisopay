@@ -235,7 +235,7 @@ class _TransactionsListState extends State<TransactionsList> {
     
     // Determine colors based on secured status
     final Color accentColor = offer.secured ? AppColors.techAzure : AppColors.yellowMain;
-    final String securedText = offer.secured ? "SECURED" : "UNSECURED";
+    final String securedText = offer.secured ? 'SECURED' : 'UNSECURED';
 
     final Widget transactionCard = Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
@@ -339,7 +339,7 @@ class _TransactionsListState extends State<TransactionsList> {
                     if (offer.dueDate != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        "Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}",
+                        'Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}',
                         style: TextStyle(
                           color: accentColor,
                           fontSize: 12,
@@ -480,7 +480,7 @@ class _TransactionsListState extends State<TransactionsList> {
         final bool isIncoming = transaction.amount >= 0;
         
         // All transactions are SECURED with gold color
-        final Color accentColor = AppColors.yellowMain;
+        const Color accentColor = AppColors.yellowMain;
         
         // Text color for amount - red for negative numbers
         final Color amountColor = isIncoming ? accentColor : AppColors.error;
@@ -510,7 +510,7 @@ class _TransactionsListState extends State<TransactionsList> {
                         children: [
                           Text(
                             transaction.counterpartyAccountName,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: accentColor,
                               fontWeight: FontWeight.w500,
                               fontSize: 16,

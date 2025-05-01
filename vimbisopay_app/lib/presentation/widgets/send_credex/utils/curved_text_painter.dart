@@ -20,11 +20,11 @@ class CurvedTextPainter extends CustomPainter {
     
     // Calculate the angle between each character
     final charCount = text.length;
-    final totalAngle = math.pi; // Half circle (top half)
+    const totalAngle = math.pi; // Half circle (top half)
     final anglePerChar = totalAngle / (charCount - 1);
     
     // Start from the left side of the top half circle (-90 degrees + half of the total angle)
-    final startAngle = -math.pi / 2 - totalAngle / 2;
+    const startAngle = -math.pi / 2 - totalAngle / 2;
     
     for (int i = 0; i < charCount; i++) {
       final char = text[i];

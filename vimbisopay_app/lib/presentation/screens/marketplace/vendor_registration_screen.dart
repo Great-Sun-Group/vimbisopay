@@ -110,7 +110,7 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
         storeAccountHandle: storeHandle,
       );
       
-      final enableSuccess = await enableResult.fold(
+      final enableSuccess = enableResult.fold(
         (failure) {
           setState(() {
             _isLoading = false;
@@ -131,7 +131,7 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
         vendorBio: _businessNameController.text,
       );
       
-      final updateSuccess = await updateResult.fold(
+      final updateSuccess = updateResult.fold(
         (failure) {
           setState(() {
             _isLoading = false;
@@ -151,8 +151,8 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
         memberId: widget.memberId,
         businessName: _businessNameController.text,
         description: _descriptionController.text,
-        email: "", // Empty string since Contact Information section is removed
-        phone: "", // Empty string since Contact Information section is removed
+        email: '', // Empty string since Contact Information section is removed
+        phone: '', // Empty string since Contact Information section is removed
       );
 
       result.fold(

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:vimbisopay_app/core/config/api_config.dart';
@@ -34,7 +33,7 @@ class PasswordService {
   }
 
   Future<String> hashPassword(String password) async {
-    final codec = const Utf8Codec();
+    const codec = Utf8Codec();
     final key = codec.encode(password);
     final hash = sha256.convert(key);
     return base64.encode(hash.bytes);

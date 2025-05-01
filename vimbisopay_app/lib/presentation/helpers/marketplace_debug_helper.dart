@@ -66,8 +66,8 @@ class MarketplaceDebugHelper {
             onPressed: () {
               Navigator.pop(context);
               // Set test values for debugging
-              final testMemberId = 'test_member_id';
-              final testVendorId = 'v_test';
+              const testMemberId = 'test_member_id';
+              const testVendorId = 'v_test';
               _onDebugValuesSet(testMemberId, true, testVendorId);
               
               Logger.data('DEBUG MODE: Set test vendor values - memberId: $testMemberId, isVendor: true, vendorId: $testVendorId');

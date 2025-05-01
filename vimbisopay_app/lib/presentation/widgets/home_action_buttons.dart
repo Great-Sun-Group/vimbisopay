@@ -149,7 +149,7 @@ class HomeActionButtons extends StatelessWidget {
         if (result.startsWith(UrlConstants.invoiceUrlPattern) || 
             result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
           // This is an invoice QR code, extract the invoice ID and navigate to the invoice detail screen
-          String invoiceId = "";
+          String invoiceId = '';
           if (result.startsWith(UrlConstants.invoiceUrlPattern)) {
             invoiceId = result.substring(UrlConstants.invoiceUrlPattern.length);
           } else if (result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {

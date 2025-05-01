@@ -13,7 +13,6 @@ import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/index.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/transaction_success_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
 
 class SendCredexScreen extends StatefulWidget {
@@ -118,7 +117,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
       if (result.startsWith(UrlConstants.invoiceUrlPattern) || 
           result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
         // This is an invoice QR code, extract the invoice ID and navigate to the invoice detail screen
-        String invoiceId = "";
+        String invoiceId = '';
         if (result.startsWith(UrlConstants.invoiceUrlPattern)) {
           invoiceId = result.substring(UrlConstants.invoiceUrlPattern.length);
         } else if (result.startsWith(UrlConstants.invoiceDeepLinkPattern)) {
@@ -255,7 +254,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                     snapshot.data != null && 
                                     snapshot.data!.dashboard != null) {
                                   profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
-                                  memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
+                                  memberName = '${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}';
                                 }
                                 
                                 return SenderAccountCard(
@@ -310,7 +309,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                   snapshot.data != null && 
                                   snapshot.data!.dashboard != null) {
                                 profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
-                                memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
+                                memberName = '${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}';
                               }
                               
                               return VerifiedRecipientCard(
@@ -328,7 +327,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // Amount section - always visible but disabled until recipient is verified
                         const SizedBox(height: 16),
                         
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: AmountInputCard(
                             amountController: _amountController,
@@ -347,7 +346,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                               showDialog(
                                 context: context,
                                 builder: (context) => TierLimitDialog(
-                                  message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+                                  message: 'Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.',
                                   accountId: widget.senderAccount.accountID,
                                   homeBloc: widget.homeBloc,
                                 ),
@@ -382,7 +381,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // Credex Type Section - always visible but disabled until recipient is verified
                         const SizedBox(height: 16),
                         
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: FutureBuilder<User?>(
                             future: widget.databaseHelper.getUser(),
@@ -415,16 +414,16 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // Contract and counterparty preview sections - always visible but may be empty
                         const SizedBox(height: 16),
                         
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: FutureBuilder<User?>(
                             future: widget.databaseHelper.getUser(),
                             builder: (context, snapshot) {
-                              String memberName = "You";
+                              String memberName = 'You';
                               if (snapshot.hasData && 
                                   snapshot.data != null && 
                                   snapshot.data!.dashboard != null) {
-                                memberName = "${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}";
+                                memberName = '${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}';
                               }
                               
                               return Column(

@@ -143,7 +143,7 @@ class _BasketItemCardState extends State<BasketItemCard> {
                       // If this is the first keystroke and the value still contains the original value
                       if (_isFirstTap && value.contains(widget.item.amount.toStringAsFixed(2))) {
                         // Clear the field and set the value to just the new character
-                        final newChar = value.replaceAll(widget.item.amount.toStringAsFixed(2), "");
+                        final newChar = value.replaceAll(widget.item.amount.toStringAsFixed(2), '');
                         _amountController.text = newChar;
                         // Move cursor to the end
                         _amountController.selection = TextSelection.fromPosition(

@@ -8,9 +8,6 @@ import 'package:vimbisopay_app/domain/entities/marketplace/store.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
-import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
-import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 
 import 'dart:convert';
 import 'dart:io';
@@ -103,17 +100,11 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                   true) {
             Logger.data('[MARKETPLACE] Token expired, attempting to refresh');
 
-            if (user.passwordHash == null) {
-              Logger.error(
-                  '[MARKETPLACE] No stored password hash for token refresh');
-              return const Left(InfrastructureFailure(
-                  'Authentication failed: No stored password hash'));
-            }
+            // No password hash check needed for v1 login
 
             // Use the injected AccountRepository to refresh the token
-            final loginResult = await _accountRepository.loginV2(
+            final loginResult = await _accountRepository.login(
               phone: user.phone,
-              passwordHash: user.passwordHash,
             );
 
             return loginResult.fold(
@@ -427,12 +418,12 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           String vendorId = '';
           String name = '';
           String description = '';
-          int price = 0;
-          String currency = 'USD';
-          bool isAvailable = true;
+          const int price = 0;
+          const String currency = 'USD';
+          const bool isAvailable = true;
           String? accountId;
           String? storeName;
-          List<String> imageUrls = [];
+          final List<String> imageUrls = [];
           
           // Create Store object if store data is available
           Store? store;
@@ -530,7 +521,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           return Right(product);
         } else if (response.statusCode == 404) {
           Logger.error('[MARKETPLACE] Product not found with status code 404');
-          return Left(NotFoundFailure('Product not found'));
+          return const Left(NotFoundFailure('Product not found'));
         } else {
           Logger.error(
               '[MARKETPLACE] Server error with status code ${response.statusCode}');
@@ -555,7 +546,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
     // If query is empty and we have location, use "a" as default query
     final effectiveQuery =
-        query.isEmpty && (latitude != null || longitude != null) ? "*" : query;
+        query.isEmpty && (latitude != null || longitude != null) ? '*' : query;
 
     return _executeAuthenticatedRequest<List<Product>>(
       request: (token) async {
@@ -659,7 +650,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
                 }
                 
                 // Build image URLs list
-                List<String> imageUrls = [];
+                final List<String> imageUrls = [];
                 if (productData['thumbnailPicUrl'] != null) {
                   imageUrls.add(productData['thumbnailPicUrl']);
                   Logger.data('[MARKETPLACE] Added thumbnail URL to image URLs');
@@ -760,7 +751,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
               responseData['data']['action']['details']['accountID'];
           if (accountId == null) {
             Logger.error('[MARKETPLACE] Account ID not found in response');
-            return Left(ServerFailure('Account ID not found in response'));
+            return const Left(ServerFailure('Account ID not found in response'));
           }
 
           Logger.data('[MARKETPLACE] Account ID: $accountId');
@@ -809,7 +800,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       if (accountResult.isLeft()) {
         return Left(accountResult.fold(
           (failure) => failure,
-          (_) => ServerFailure('Failed to create internal account'),
+          (_) => const ServerFailure('Failed to create internal account'),
         ));
       }
 
@@ -1031,7 +1022,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
               return Right(product);
             } else {
               Logger.error('[MARKETPLACE] Product data not found in response');
-              return Left(NotFoundFailure('Product not found in response'));
+              return const Left(NotFoundFailure('Product not found in response'));
             }
           } catch (e) {
             Logger.error(
@@ -1040,7 +1031,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           }
         } else if (response.statusCode == 404) {
           Logger.error('[MARKETPLACE] Product not found with status code 404');
-          return Left(NotFoundFailure('Product not found'));
+          return const Left(NotFoundFailure('Product not found'));
         } else {
           Logger.error(
               '[MARKETPLACE] Server error with status code ${response.statusCode}');
@@ -1151,7 +1142,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             if (invoiceDetails == null) {
               Logger.error(
                   '[MARKETPLACE] Invoice details not found in response');
-              return Left(
+              return const Left(
                   ServerFailure('Invoice details not found in response'));
             }
 
@@ -1241,7 +1232,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           }
         } else if (response.statusCode == 404) {
           Logger.error('[MARKETPLACE] Invoice not found with status code 404');
-          return Left(NotFoundFailure('Invoice not found'));
+          return const Left(NotFoundFailure('Invoice not found'));
         } else {
           Logger.error(
               '[MARKETPLACE] Server error with status code ${response.statusCode}');
@@ -1316,7 +1307,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
     if (user == null) {
       Logger.error('[INVOICE_API] [$correlationId] User not found in database');
-      return Left(
+      return const Left(
           AuthFailure(message: 'User not authenticated - user not found'));
     }
 
@@ -1355,7 +1346,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     if (paymentAccountId.isEmpty) {
       Logger.error(
           '[INVOICE_API] [$correlationId] No personal account found for invoice generation');
-      return Left(ValidationFailure(
+      return const Left(ValidationFailure(
           'Personal account required for invoice generation. Please set up a personal account first.'));
     }
 
@@ -1537,7 +1528,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             if (invoiceId.isEmpty) {
               Logger.error(
                   '[INVOICE_API] [$correlationId] Failed to extract invoice ID from response');
-              return Left(
+              return const Left(
                   ServerFailure('Failed to extract invoice ID from response'));
             }
 
@@ -1680,14 +1671,14 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }) async {
     // Empty implementation - API not yet available
     Logger.data('[MARKETPLACE] updateInvoice called with ID: $id');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
   Future<Either<Failure, AssetMarker>> getAssetMarker(String id) async {
     // Empty implementation - API not yet available
     Logger.data('[MARKETPLACE] getAssetMarker called with ID: $id');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1718,7 +1709,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }) async {
     // Empty implementation - API not yet available
     Logger.data('[MARKETPLACE] createAssetMarker called');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1731,7 +1722,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }) async {
     // Empty implementation - API not yet available
     Logger.data('[MARKETPLACE] updateAssetMarker called with ID: $id');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1742,7 +1733,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     // Empty implementation - API not yet available
     Logger.data(
         '[MARKETPLACE] transferAssetMarker called with ID: $id to owner ID: $newOwnerId');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -1761,7 +1752,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     final file = File(imagePath);
     if (!await file.exists()) {
       Logger.error('[PROFILE_IMAGE] Image file not found: $imagePath');
-      return Left(NotFoundFailure('Image file not found'));
+      return const Left(NotFoundFailure('Image file not found'));
     }
 
     // Log file details before reading
@@ -1776,7 +1767,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       // Changed from 160KB to 10MB (10240KB)
       Logger.error(
           '[PROFILE_IMAGE] Image file is too large: ${fileSizeKB.toStringAsFixed(2)} KB');
-      return Left(ServerFailure(
+      return const Left(ServerFailure(
           'Image file is too large. Please use an image smaller than 10MB.'));
     }
 
@@ -1792,7 +1783,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       // Changed from 100KB to ~13.3MB (allowing for ~33% increase from base64 encoding)
       Logger.error(
           '[PROFILE_IMAGE] Base64 encoded image is too large: ${base64SizeKB.toStringAsFixed(2)} KB');
-      return Left(ServerFailure(
+      return const Left(ServerFailure(
           'Encoded image is too large. Please use a smaller image (under 10MB).'));
     }
 
@@ -1899,7 +1890,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
               '[PROFILE_IMAGE] Request entity too large with status code 413');
           Logger.error(
               '[PROFILE_IMAGE] Original file size: ${fileSizeKB.toStringAsFixed(2)} KB, Base64 size: ${base64SizeKB.toStringAsFixed(2)} KB');
-          return Left(ServerFailure(
+          return const Left(ServerFailure(
               'The image file is too large. Please select a smaller image or use a lower resolution image.'));
         } else {
           Logger.error(
@@ -1986,7 +1977,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     // Empty implementation - API not yet available
     Logger.data(
         '[MARKETPLACE] createCredexOffer called with invoice ID: $invoiceId, account ID: $accountId, amount: $amount');
-    return Left(ServerFailure('API not yet implemented'));
+    return const Left(ServerFailure('API not yet implemented'));
   }
 
   @override
@@ -2122,7 +2113,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             return Right(data);
           } else {
             Logger.error('[STOREFRONT] Response does not contain data field');
-            return Left(ServerFailure('Response does not contain data field'));
+            return const Left(ServerFailure('Response does not contain data field'));
           }
         } else {
           Logger.error(
@@ -2178,7 +2169,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             return Right(data);
           } else {
             Logger.error('[ACCOUNT_DASHBOARD] Response does not contain data field');
-            return Left(ServerFailure('Response does not contain data field'));
+            return const Left(ServerFailure('Response does not contain data field'));
           }
         } else {
           Logger.error(

@@ -50,13 +50,13 @@ class AppUpdateService {
       // For API requests, strip the "-debug" suffix if present
       String apiVersionName = versionName;
       bool isDebugBuild = false;
-      if (versionName.contains("-debug")) {
+      if (versionName.contains('-debug')) {
         isDebugBuild = true;
-        apiVersionName = versionName.replaceAll("-debug", "");
+        apiVersionName = versionName.replaceAll('-debug', '');
         Logger.data('Debug build detected, using API version: $apiVersionName');
       }
       
-      final currentVersion = "$apiVersionName+$buildNumber";
+      final currentVersion = '$apiVersionName+$buildNumber';
       final packageName = packageInfo.packageName;
       stopwatch.stop();
       
@@ -306,7 +306,7 @@ class AppUpdateService {
       Logger.data('Deferred version key set: ${_prefs.getString(_deferredVersionKey)}');
     } catch (e, stackTrace) {
       Logger.error('Error deferring update', e, stackTrace);
-      throw e; // Re-throw to allow UI to handle the error
+      rethrow; // Re-throw to allow UI to handle the error
     }
   }
   
@@ -328,7 +328,7 @@ class AppUpdateService {
       Logger.data('Previous deferred version: $deferredVersion');
     } catch (e, stackTrace) {
       Logger.error('Error clearing deferred status', e, stackTrace);
-      throw e; // Re-throw to allow UI to handle the error
+      rethrow; // Re-throw to allow UI to handle the error
     }
   }
   
@@ -758,7 +758,7 @@ class AppUpdateService {
       final checksumFetchStopwatch = Stopwatch()..start();
       
       try {
-        final response = await _httpClient.get(Uri.parse(checksumUrl!));
+        final response = await _httpClient.get(Uri.parse(checksumUrl));
         checksumFetchStopwatch.stop();
         
         Logger.performance('Checksum fetched in ${checksumFetchStopwatch.elapsedMilliseconds}ms');

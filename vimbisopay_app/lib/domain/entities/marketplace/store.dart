@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 /// Each store has information like name, description, and location.
 class Store extends Entity {
   /// The unique identifier for the store.
+  @override
   final String id;
 
   /// The name of the store.

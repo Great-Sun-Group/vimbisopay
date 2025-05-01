@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
-import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/profile_settings_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/security_settings_screen.dart';
-import 'package:vimbisopay_app/presentation/screens/notifications_settings_screen.dart';
 import 'package:vimbisopay_app/application/usecases/upgrade_member_tier.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 

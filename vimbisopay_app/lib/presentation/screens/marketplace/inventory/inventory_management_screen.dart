@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
@@ -75,7 +74,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
       // Map internal accounts to products format for UI
       final mappedSkus = physicalAssetAccounts.map((account) {
         // Create image URLs list with profile picture thumbnail if available
-        List<String> imageUrls = [];
+        final List<String> imageUrls = [];
         if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
           imageUrls.add(account.profilePictureThumbnail!);
         }
@@ -379,7 +378,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                           ),
                           Text(
                             sku['accountId'] != null 
-                                ? sku['accountId'].toString().substring(0, 8) + '...'
+                                ? '${sku['accountId'].toString().substring(0, 8)}...'
                                 : 'Not assigned',
                             style: TextStyle(
                               fontSize: 16,
@@ -395,7 +394,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                   ],
                 ),
               ),
-              ButtonBar(
+              OverflowBar(
                 alignment: MainAxisAlignment.end,
                 children: [
                   TextButton.icon(

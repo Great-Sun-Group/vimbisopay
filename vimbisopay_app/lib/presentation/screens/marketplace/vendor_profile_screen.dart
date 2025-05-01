@@ -181,7 +181,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
             final storeOpen = store['storeOpen'] as bool?;
             
             // Extract profile picture URLs
-            Map<String, dynamic>? profilePictureUrls = store['profilePictureUrls'] as Map<String, dynamic>?;
+            final Map<String, dynamic>? profilePictureUrls = store['profilePictureUrls'] as Map<String, dynamic>?;
             String? profileImageUrl;
             if (profilePictureUrls != null) {
               // Prefer pic600 if available, then pic200, then thumbnail, then original
@@ -237,8 +237,8 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                 final productDescription = product['productDescription'] as String?;
                 
                 // Extract thumbnail URL
-                String? thumbnailUrl = product['thumbnailPicUrl'] as String?;
-                List<String> imageUrls = [];
+                final String? thumbnailUrl = product['thumbnailPicUrl'] as String?;
+                final List<String> imageUrls = [];
                 if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
                   imageUrls.add(thumbnailUrl);
                 }

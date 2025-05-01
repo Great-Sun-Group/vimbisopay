@@ -133,7 +133,7 @@ class CredexTypeSection extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(bottom: 16.0),
               child: Text(
-                "Issuing secured credex gradually improves your credit score.",
+                'Issuing secured credex gradually improves your credit score.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -170,14 +170,14 @@ class CredexTypeSection extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        "Secured Balance:",
+                        'Secured Balance:',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
                         ),
                       ),
                       Text(
-                        "$availableBalance $selectedDenomination",
+                        '$availableBalance $selectedDenomination',
                         style: const TextStyle(
                           color: AppColors.techAzure,
                           fontSize: 16,
@@ -195,7 +195,7 @@ class CredexTypeSection extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.only(bottom: 8.0),
                 child: Text(
-                  "COMING SOON",
+                  'COMING SOON',
                   style: TextStyle(
                     color: AppColors.darkRed,
                     fontSize: 16,
@@ -208,7 +208,7 @@ class CredexTypeSection extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(bottom: 16.0),
               child: Text(
-                "Issuing unsecured credex and providing the promised value by the agreed date immediately boosts your credit score.",
+                'Issuing unsecured credex and providing the promised value by the agreed date immediately boosts your credit score.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,

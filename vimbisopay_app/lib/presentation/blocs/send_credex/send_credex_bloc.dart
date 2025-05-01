@@ -277,25 +277,24 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         // Token expired, try to refresh it
         Logger.data('Token expired, attempting to refresh');
         
-        try {
-          // Get the current user to get phone and passwordHash
-          final user = await databaseHelper.getUser();
-          
-          if (user == null || user.passwordHash == null) {
-            Logger.error('No user or password hash found for token refresh');
-            emit(state.copyWith(
-              status: SendCredexStatus.error,
-              isLoading: false,
-              errorMessage: 'Authentication error. Please log in again.',
-              statusMessage: null,
-            ));
-            return;
-          }
-          
-          // Use the account repository to refresh the token with loginV2
-          final refreshResult = await accountRepository.loginV2(
+          try {
+            // Get the current user to get phone
+            final user = await databaseHelper.getUser();
+            
+            if (user == null) {
+              Logger.error('No user found for token refresh');
+              emit(state.copyWith(
+                status: SendCredexStatus.error,
+                isLoading: false,
+                errorMessage: 'Authentication error. Please log in again.',
+                statusMessage: null,
+              ));
+              return;
+            }
+            
+            // Use the account repository to refresh the token with v1 login
+          final refreshResult = await accountRepository.login(
             phone: user.phone,
-            passwordHash: user.passwordHash,
           );
           
           // Handle the refresh result
@@ -463,7 +462,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             statusMessage: null,
           ));
         } catch (e) {
-          final errorMessage = 'Failed to verify recipient account';
+          const errorMessage = 'Failed to verify recipient account';
           Logger.error('Error parsing response: $e');
           emit(state.copyWith(
             status: SendCredexStatus.error,
@@ -634,11 +633,11 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           Logger.data('Token expired during submit, attempting to refresh');
           
           try {
-            // Get the current user to get phone and passwordHash
+            // Get the current user to get phone
             final user = await databaseHelper.getUser();
             
-            if (user == null || user.passwordHash == null) {
-              Logger.error('No user or password hash found for token refresh');
+            if (user == null) {
+              Logger.error('No user found for token refresh');
               emit(state.copyWith(
                 status: SendCredexStatus.error,
                 isLoading: false,
@@ -649,10 +648,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
               return;
             }
             
-            // Use the account repository to refresh the token with loginV2
-            final refreshResult = await accountRepository.loginV2(
+            // Use the account repository to refresh the token with v1 login
+            final refreshResult = await accountRepository.login(
               phone: user.phone,
-              passwordHash: user.passwordHash,
             );
             
             // Handle the refresh result

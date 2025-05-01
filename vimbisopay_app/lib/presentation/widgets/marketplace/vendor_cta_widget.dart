@@ -101,22 +101,22 @@ class VendorCTAWidget extends StatelessWidget {
   Widget _buildVendorCTAContent(BuildContext context, bool canBecomeVendor) {
     if (!canBecomeVendor) {
       // If the user can't become a vendor, show a message
-      return Card(
-        margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+      return const Card(
+        margin: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Marketplace',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'Browse products and services from vendors in the marketplace.',
                 style: TextStyle(
                   fontSize: 14,

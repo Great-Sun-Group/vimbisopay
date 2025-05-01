@@ -5,7 +5,6 @@ import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/network_logger.dart';
@@ -137,10 +136,8 @@ abstract class BaseAccountRepository {
   }
   
   /// Abstract method that must be implemented by subclasses
-  Future<Either<Failure, User>> loginV2({
+  Future<Either<Failure, User>> login({
     required String phone,
-    String? password,
-    String? passwordHash,
   });
   
   /// Abstract method that must be implemented by subclasses
@@ -164,15 +161,11 @@ abstract class BaseAccountRepository {
           if (!isRetry &&
               failure.message?.toLowerCase().contains('token expired') ==
                   true) {
-            if (user.passwordHash == null) {
-              return const Left(InfrastructureFailure(
-                  'Authentication failed: No stored password hash'));
-            }
+            // No password check needed for v1 login
 
-            // Re-login with stored password hash
-            final loginResult = await loginV2(
+            // Re-login with phone number only
+            final loginResult = await login(
               phone: user.phone,
-              passwordHash: user.passwordHash,
             );
 
             return loginResult.fold(
@@ -185,44 +178,23 @@ abstract class BaseAccountRepository {
                 // Extract vendor status directly from the login response
                 bool isVendor = false;
                 
-                // Get the raw login response to extract vendor status
-                try {
-                  // We need to access the raw login response to get the vendor status
-                  // This is similar to how it's done in the loginV2 method
-                  final loginResponse = await loginV2(
-                    phone: user.phone,
-                    passwordHash: user.passwordHash,
-                  );
-                  
-                  // Extract vendor status from the login response
-                  loginResponse.fold(
-                    (failure) {
-                      Logger.error('[TOKEN_REFRESH] Failed to get vendor status from login response', failure);
-                    },
-                    (refreshedUser) {
-                      isVendor = refreshedUser.activateMarket;
-                      Logger.data('[TOKEN_REFRESH] Extracted vendor status from login response: $isVendor');
-                    }
-                  );
-                } catch (e) {
-                  Logger.error('[TOKEN_REFRESH] Error extracting vendor status from login response', e);
-                }
+                // Get vendor status from the new user
+                isVendor = newUser.activateMarket;
+                Logger.data('[TOKEN_REFRESH] Using vendor status from login response: $isVendor');
                 
                 // Use the extracted vendor status or fall back to previous values
                 final activateMarket = isVendor || newUser.activateMarket || user.activateMarket;
                 Logger.data('[TOKEN_REFRESH] Final activateMarket value: $activateMarket');
                 
-                final userWithPasswordHash = newUser.copyWith(
-                  passwordHash: user.passwordHash,
-                  passwordChanged: user.passwordChanged,
+                final updatedUser = newUser.copyWith(
                   activateMarket: activateMarket, // Set vendor status based on dashboard data
                   storeOpen: user.storeOpen, // Preserve the original storeOpen status
                   latitude: user.latitude, // Preserve the original latitude
                   longitude: user.longitude, // Preserve the original longitude
                 );
 
-                Logger.data('[TOKEN_REFRESH] Updated user activateMarket: ${userWithPasswordHash.activateMarket}');
-                final saveResult = await saveUser(userWithPasswordHash);
+                Logger.data('[TOKEN_REFRESH] Updated user activateMarket: ${updatedUser.activateMarket}');
+                final saveResult = await saveUser(updatedUser);
 
                 return saveResult.fold(
                   (saveFailure) => Left(saveFailure),

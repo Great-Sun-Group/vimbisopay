@@ -11,6 +11,7 @@ import 'package:vimbisopay_app/domain/entities/marketplace/vendor.dart';
 /// Each product is linked to an internal account of type PRODUCTION for inventory tracking.
 class Product extends Entity {
   /// The unique identifier for the product.
+  @override
   final String id;
 
   /// The vendor ID associated with this product.

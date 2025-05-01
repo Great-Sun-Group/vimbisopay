@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
-import 'package:http/http.dart' as http;
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';

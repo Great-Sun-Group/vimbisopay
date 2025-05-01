@@ -1,6 +1,5 @@
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 
 class UpgradeMemberTier {

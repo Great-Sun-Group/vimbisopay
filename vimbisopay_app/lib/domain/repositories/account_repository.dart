@@ -11,24 +11,14 @@ import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/domain/entities/verification_status.dart';
 
 abstract class AccountRepository {
-  Future<Either<Failure, User>> loginV2({
-    required String phone,
-    String? password,
-    String? passwordHash,
-  });
-
-  @Deprecated('Use loginV2 instead')
   Future<Either<Failure, User>> login({
     required String phone,
-    String? password,
-    String? passwordHash,
   });
 
   Future<Either<Failure, bool>> onboardMember({
     required String firstName,
     required String lastName,
     required String phone,
-    required String password,
   });
 
   Future<Either<Failure, User?>> getCurrentUser();
@@ -75,14 +65,7 @@ abstract class AccountRepository {
   /// [accountId] The account ID of the member to upgrade
   Future<Either<Failure, bool>> upgradeToHustler10k(String accountId);
 
-  /// Updates a member's password after validating their current password
-  /// 
-  /// [currentPassword] The current password
-  /// [newPassword] The new password that meets complexity requirements
-  Future<Either<Failure, bool>> updatePassword({
-    required String currentPassword,
-    required String newPassword,
-  });
+  // Password-related methods removed
 
   /// Request an OTP for a specific purpose
   /// 
@@ -121,32 +104,7 @@ abstract class AccountRepository {
     String? memberId,
   });
 
-  /// Set the initial password for a user
-  /// 
-  /// [token] The v1 token to use for authentication
-  /// [memberId] The member ID to set the password for
-  /// [phone] The phone number associated with the account
-  /// [password] The password to set
-  Future<Either<Failure, User>> setInitialPassword({
-    required String token,
-    required String memberId,
-    required String phone,
-    required String password,
-  });
-
-  /// Reset a member's password using a reset token
-  /// 
-  /// [resetToken] The token obtained from OTP verification
-  // /// [newPassword] The new password to set
-  // Future<Either<Failure, User>> resetPassword({
-  //   required String resetToken,
-  //   required String newPassword,
-  // });
-
-  Future<bool> resetPassword({
-    required String resetToken,
-    required String newPassword,
-  });
+  // Password-related methods removed
   
   /// Check if an OTP has been verified for a given phone number
   /// 

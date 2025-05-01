@@ -160,7 +160,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         updatedAt: DateTime.now(),
       );
       
-      List<Product> allProducts = [];
+      final List<Product> allProducts = [];
       
       // Load internal accounts of type PHYSICAL_ASSET from user's dashboard
       if (currentUser.dashboard != null) {
@@ -174,7 +174,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
         // Convert internal accounts to Product objects
         final internalProducts = physicalAsssetAccounts.map((account) {
           // Create image URLs list with profile picture thumbnail if available
-          List<String> imageUrls = [];
+          final List<String> imageUrls = [];
           if (account.profilePictureThumbnail != null && account.profilePictureThumbnail!.isNotEmpty) {
             Logger.data('[VENDOR_SALES] Adding profile picture thumbnail to product: ${account.profilePictureThumbnail}');
             imageUrls.add(account.profilePictureThumbnail!);
@@ -346,15 +346,15 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
   /// Also handles prices like "$12" and returns "$12.00".
   String _formatPriceWithTwoDecimals(String formattedPrice) {
     // Extract the currency symbol and numeric value
-    RegExp regex = RegExp(r'([^\d.]+)?([\d.]+)');
-    Match? match = regex.firstMatch(formattedPrice);
+    final RegExp regex = RegExp(r'([^\d.]+)?([\d.]+)');
+    final Match? match = regex.firstMatch(formattedPrice);
     
     if (match != null) {
-      String symbol = match.group(1) ?? '';
-      String numericPart = match.group(2) ?? '0';
+      final String symbol = match.group(1) ?? '';
+      final String numericPart = match.group(2) ?? '0';
       
       // Parse the numeric part and format to 2 decimal places
-      double value = double.tryParse(numericPart) ?? 0.0;
+      final double value = double.tryParse(numericPart) ?? 0.0;
       return '$symbol${value.toStringAsFixed(2)}';
     }
     
@@ -379,10 +379,10 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
     
     // Early return if basket is null or empty
     if (_basket == null || _basket!.isEmpty) {
-      return FloatingActionButton.extended(
+      return const FloatingActionButton.extended(
         onPressed: null, // Disabled when basket is empty
-        icon: const Icon(Icons.receipt_long),
-        label: const Text('Generate Invoice'),
+        icon: Icon(Icons.receipt_long),
+        label: Text('Generate Invoice'),
         backgroundColor: Colors.grey, // Use a muted color for disabled state
       );
     }
@@ -523,7 +523,7 @@ class _VendorSalesTabScreenState extends State<VendorSalesTabScreen> with Single
             const SizedBox(height: 16),
             Text(
               _searchQuery.isNotEmpty
-                  ? 'No products found matching "${_searchQuery}"'
+                  ? 'No products found matching "$_searchQuery"'
                   : 'No products available',
               textAlign: TextAlign.center,
               style: const TextStyle(

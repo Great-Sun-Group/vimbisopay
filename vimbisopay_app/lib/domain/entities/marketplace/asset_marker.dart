@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 /// It is used to track ownership and transfers of products in the marketplace.
 class AssetMarker extends Entity {
   /// The unique identifier for the asset marker.
+  @override
   final String id;
 
   /// The ID of the product associated with this asset marker.

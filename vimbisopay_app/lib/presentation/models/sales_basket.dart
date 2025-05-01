@@ -34,7 +34,7 @@ class SalesBasket {
     }
 
     // Use the currency of the first item for formatting
-    String currency = items.first.product.currency;
+    final String currency = items.first.product.currency;
     String symbol = '';
     switch (currency) {
       case 'USD':

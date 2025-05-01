@@ -31,13 +31,13 @@ class StyledCard extends StatelessWidget {
     bool showTitleOverlay = true,
   }) {
     return StyledCard(
-      child: child,
       title: title,
       borderColor: AppColors.yellowMain, // Organic gold
       borderWidth: 1.5,
       padding: padding,
       margin: margin,
       showTitleOverlay: showTitleOverlay,
+      child: child,
     );
   }
   
@@ -50,13 +50,13 @@ class StyledCard extends StatelessWidget {
     bool showTitleOverlay = true,
   }) {
     return StyledCard(
-      child: child,
       title: title,
       borderColor: AppColors.techAzure, // Tech azure
       borderWidth: 1.5,
       padding: padding,
       margin: margin,
       showTitleOverlay: showTitleOverlay,
+      child: child,
     );
   }
   
@@ -69,13 +69,13 @@ class StyledCard extends StatelessWidget {
     bool showTitleOverlay = true,
   }) {
     return StyledCard(
-      child: child,
       title: title,
       borderColor: AppColors.darkRed,
       borderWidth: 1.5,
       padding: padding,
       margin: margin,
       showTitleOverlay: showTitleOverlay,
+      child: child,
     );
   }
   

@@ -3,11 +3,9 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_filter.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:http/http.dart' as http;
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;

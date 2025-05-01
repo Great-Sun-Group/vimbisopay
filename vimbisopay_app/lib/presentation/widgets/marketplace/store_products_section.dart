@@ -248,7 +248,7 @@ class StoreProductsSection extends StatelessWidget {
       ),
       subtitle: Text(
         product.description,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           color: AppColors.textSecondary,
         ),
@@ -267,7 +267,7 @@ class StoreProductsSection extends StatelessWidget {
               color: AppColors.primary,
             ),
           ),
-          Text(
+          const Text(
             'Balance',
             style: TextStyle(
               fontSize: 12,

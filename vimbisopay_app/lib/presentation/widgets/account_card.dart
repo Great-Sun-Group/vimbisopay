@@ -160,8 +160,8 @@ class AccountCard extends StatelessWidget {
 
   Widget _buildPayablesSection() {
     // Gold border color
-    final borderColor = AppColors.yellowMain;
-    final borderWidth = 1.5;
+    const borderColor = AppColors.yellowMain;
+    const borderWidth = 1.5;
     
     // IMPORTANT: Removed ALL top padding here
     return Row(
@@ -228,7 +228,7 @@ class AccountCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     color: AppColors.surface,
-                    child: Text(
+                    child: const Text(
                       'Secured',
                       style: TextStyle(
                         color: borderColor,
@@ -274,11 +274,11 @@ class AccountCard extends StatelessWidget {
                         color: Colors.grey.withOpacity(0.3),
                       ),
                     ),
-                    children: [
+                    children: const [
                       TableRow(
                         children: [
                           // Receivable label - center aligned
-                          const Center(
+                          Center(
                             child: Text(
                               'Receivable',
                               style: TextStyle(
@@ -289,7 +289,7 @@ class AccountCard extends StatelessWidget {
                             ),
                           ),
                           // Payable label - center aligned
-                          const Center(
+                          Center(
                             child: Text(
                               'Payable',
                               style: TextStyle(
@@ -307,7 +307,7 @@ class AccountCard extends StatelessWidget {
                           Center(
                             child: Text(
                               '0.00 USD', // Placeholder value
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: HomeConstants.subheadingTextSize,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.techAzure,
@@ -320,7 +320,7 @@ class AccountCard extends StatelessWidget {
                           Center(
                             child: Text(
                               '0.00 USD', // Placeholder value
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: HomeConstants.subheadingTextSize,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.techAzure,
@@ -342,7 +342,7 @@ class AccountCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     color: AppColors.surface,
-                    child: Text(
+                    child: const Text(
                       'Unsecured',
                       style: TextStyle(
                         color: AppColors.techAzure, // Changed from borderColor to AppColors.techAzure

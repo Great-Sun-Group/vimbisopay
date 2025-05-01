@@ -27,7 +27,7 @@ class LocationPermissionHelper {
       Logger.data('[MARKETPLACE] Checking if location services are enabled');
       
       // Check if location services are enabled
-      bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
+      final bool servicesEnabled = await _locationService.checkLocationServicesEnabled();
       if (!servicesEnabled) {
         Logger.data('[MARKETPLACE] Location services are disabled');
         _isRequestingLocation = false;
@@ -36,7 +36,7 @@ class LocationPermissionHelper {
       }
       
       // Check if permission is already granted
-      bool hasPermission = await _locationService.checkLocationPermission();
+      final bool hasPermission = await _locationService.checkLocationPermission();
       if (hasPermission) {
         Logger.data('[MARKETPLACE] Location permission already granted');
         // Get current location
