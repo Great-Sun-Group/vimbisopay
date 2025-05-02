@@ -108,14 +108,34 @@ class SendCredexState extends Equatable {
   
   bool get isRecipientVerified => verifiedAccountDetails != null && recipientAccountId != null;
   
-  bool get canSubmit => 
-      !isLoading && 
-      isRecipientVerified && 
-      double.tryParse(amount) != null && 
-      double.parse(amount) > 0 && 
-      // Only check balance for secured Credex and disable for Unsecured (COMING SOON)
-      credexType == CredexType.SECURED && 
-      double.parse(amount) <= availableBalance;
+  bool get canSubmit {
+    // Basic validation checks
+    if (isLoading || 
+        !isRecipientVerified || 
+        double.tryParse(amount) == null || 
+        double.parse(amount) <= 0) {
+      return false;
+    }
+    
+    // TRUST accounts can only issue secured credexes
+    if (senderAccount?.accountType == 'TRUST') {
+      // TRUST accounts can't issue unsecured credexes
+      if (credexType == CredexType.UNSECURED) {
+        return false;
+      }
+      
+      // TRUST accounts can issue unlimited secured credexes (no balance check)
+      return true;
+    }
+    
+    // For non-TRUST accounts with unsecured credex, no balance check needed
+    if (credexType == CredexType.UNSECURED) {
+      return true;
+    }
+    
+    // For non-TRUST accounts with secured credex, check balance
+    return double.parse(amount) <= availableBalance;
+  }
   
   // Helper property to maintain backward compatibility
   bool get isSecuredCredex => credexType == CredexType.SECURED;

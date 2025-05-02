@@ -24,53 +24,152 @@ class VerifiedRecipientCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return StyledCard.gold(
-      title: '2. To Account',
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Account name and handle
-              Text(
-                '💳 ${accountDetails['accountName']}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Text(
-                '💳 ${accountDetails['accountHandle']}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              
-              // Add some space at the bottom to maintain height
-              const SizedBox(height: 12),
-            ],
-          ),
-          
-          // Only show Change button if not verifying
-          if (!isVerifying)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                onPressed: onChangeRecipient,
-                icon: const Icon(
-                  Icons.autorenew,
-                  color: AppColors.primary,
-                ),
-                tooltip: 'Change recipient',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                iconSize: 20,
+          // Main card container
+          Container(
+            margin: const EdgeInsets.only(top: 10), // Add margin to make space for the title
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: AppColors.darkBluePrimary,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: credexType == CredexType.SECURED 
+                    ? AppColors.primary // Gold for Secured
+                    : AppColors.techAzure, // Teal for Unsecured
+                width: 1
               ),
             ),
+            child: Stack(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Add some top padding to account for the title overlap
+                    const SizedBox(height: 4),
+                    
+                    // Account name and handle
+                    Text(
+                      '💳 ${accountDetails['accountName']}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '💳 ${accountDetails['accountHandle']}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    
+                    // Show credit rating bar with numbers for Unsecured credex
+                    if (credexType == CredexType.UNSECURED) ...[
+                      const SizedBox(height: 12),
+                      
+                      // Credit rating bar with text inside (established rating)
+                      Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          // Bar graph with fixed proportions
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              height: 18,
+                              width: double.infinity,
+                              child: Row(
+                                children: [
+                                  // 70% teal
+                                  Expanded(
+                                    flex: 70,
+                                    child: Container(
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 25,
+                                    child: Container(
+                                      color: AppColors.secondary,
+                                    ),
+                                  ),
+                                  // 5% red
+                                  Expanded(
+                                    flex: 5,
+                                    child: Container(
+                                      color: AppColors.darkRed,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          // Owner credit rating text inside the bar
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text(
+                              "Owner credit rating",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+                
+                // Only show Change button if not verifying
+                if (!isVerifying)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: IconButton(
+                      onPressed: onChangeRecipient,
+                      icon: Icon(
+                        Icons.autorenew,
+                        color: credexType == CredexType.SECURED 
+                            ? AppColors.primary // Gold for Secured
+                            : AppColors.techAzure, // Teal for Unsecured
+                      ),
+                      tooltip: 'Change recipient',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      iconSize: 20,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          // Title positioned at the top border
+          Positioned(
+            top: 0,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              color: AppColors.darkBlueDark1, // Match the background color
+              child: Text(
+                'To Account',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: credexType == CredexType.SECURED 
+                      ? AppColors.primary // Gold for Secured
+                      : AppColors.techAzure, // Teal for Unsecured
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -85,6 +184,7 @@ class RecipientInputCard extends StatelessWidget {
   final VoidCallback onVerify;
   final VoidCallback onScanQR;
   final String? Function(String?)? validator;
+  final CredexType? credexType;
   
   const RecipientInputCard({
     super.key,
@@ -94,120 +194,180 @@ class RecipientInputCard extends StatelessWidget {
     required this.onVerify,
     required this.onScanQR,
     this.validator,
+    this.credexType,
   });
   
   @override
   Widget build(BuildContext context) {
-    return StyledCard.gold(
-      title: '2. To Account',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // Handle input field - full width
-          TextFormField(
-            controller: recipientController,
-            focusNode: focusNode,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              labelText: '💳 Handle',
-              labelStyle: const TextStyle(color: AppColors.textSecondary),
-              hintText: 'Send to what account?',
-              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.techAzure, width: 1.5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              suffixIcon: isVerifying
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            validator: validator,
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // When verifying, don't show any buttons or helper text
-          if (isVerifying) ...[
-            // Empty space to maintain layout
-            const SizedBox(height: 24),
-          ] else ...[
-            // Helper text - only visible when not verifying
-            const Text(
-              'Verify account handle or scan QR code',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
+          // Main card container
+          Container(
+            margin: const EdgeInsets.only(top: 10), // Add margin to make space for the title
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: AppColors.darkBluePrimary,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: credexType == CredexType.SECURED 
+                    ? AppColors.primary // Gold for Secured
+                    : AppColors.techAzure, // Teal for Unsecured
+                width: 1
               ),
             ),
-            
-            const SizedBox(height: 12),
-            
-            // Action buttons row
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Verify button
-                Expanded(
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: recipientController,
-                    builder: (context, value, child) {
-                      return ElevatedButton(
-                        onPressed: value.text.length >= 6 ? onVerify : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.techAzure,
-                          foregroundColor: AppColors.textPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        child: const Text('Verify Handle'),
-                      );
-                    },
+                // Add some top padding to account for the title overlap
+                const SizedBox(height: 4),
+                
+                // Handle input field - full width
+                TextFormField(
+                  controller: recipientController,
+                  focusNode: focusNode,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: '💳 Handle',
+                    labelStyle: const TextStyle(color: AppColors.textSecondary),
+                    hintText: 'Send to what account?',
+                    hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: AppColors.textSecondary, 
+                        width: 1
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: credexType == CredexType.SECURED 
+                            ? AppColors.primary // Gold for Secured
+                            : AppColors.techAzure, // Teal for Unsecured
+                        width: 1.5
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    suffixIcon: isVerifying
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  credexType == CredexType.SECURED 
+                                      ? AppColors.primary // Gold for Secured
+                                      : AppColors.techAzure, // Teal for Unsecured
+                                ),
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
+                  validator: validator,
                 ),
                 
-                const SizedBox(width: 12),
+                const SizedBox(height: 12),
                 
-                // QR Scan button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onScanQR,
-                    icon: const Icon(Icons.qr_code_scanner, size: 18),
-                    label: const Text('Scan QR'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.techAzure,
-                      foregroundColor: AppColors.textPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                // When verifying, don't show any buttons or helper text
+                if (isVerifying) ...[
+                  // Empty space to maintain layout
+                  const SizedBox(height: 24),
+                ] else ...[
+                  // Helper text - only visible when not verifying
+                  const Text(
+                    'Verify account handle or scan QR code',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
                   ),
-                ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Action buttons row
+                  Row(
+                    children: [
+                      // Verify button
+                      Expanded(
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: recipientController,
+                          builder: (context, value, child) {
+                            return ElevatedButton(
+                              onPressed: value.text.length >= 6 ? onVerify : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: credexType == CredexType.SECURED 
+                                    ? AppColors.primary // Gold for Secured
+                                    : AppColors.techAzure, // Teal for Unsecured
+                                foregroundColor: AppColors.textPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              child: const Text('Verify Handle'),
+                            );
+                          },
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 12),
+                      
+                      // QR Scan button
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: onScanQR,
+                          icon: const Icon(Icons.qr_code_scanner, size: 18),
+                          label: const Text('Scan QR'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: credexType == CredexType.SECURED 
+                                ? AppColors.primary // Gold for Secured
+                                : AppColors.techAzure, // Teal for Unsecured
+                            foregroundColor: AppColors.textPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ],
+          ),
+          
+          // Title positioned at the top border
+          Positioned(
+            top: 0,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              color: AppColors.darkBlueDark1, // Match the background color
+              child: Text(
+                'To Account',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: credexType == CredexType.SECURED 
+                      ? AppColors.primary // Gold for Secured
+                      : AppColors.techAzure, // Teal for Unsecured
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

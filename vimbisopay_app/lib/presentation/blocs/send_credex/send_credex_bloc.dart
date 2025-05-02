@@ -56,9 +56,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     ));
   }
   
-  void _onInitialize(InitializeSendCredexEvent event, Emitter<SendCredexState> emit) {
-    // Extract available denominations from account balances
-    final availableDenominations = _getAvailableDenominations(event.senderAccount);
+  Future<void> _onInitialize(InitializeSendCredexEvent event, Emitter<SendCredexState> emit) async {
+    // Extract available denominations from account balances based on member tier
+    final availableDenominations = await _getAvailableDenominations(event.senderAccount);
     
     // Find default denomination
     final defaultDenomination = Denomination.values.firstWhere(
@@ -126,27 +126,22 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     }
   }
   
-  List<Denomination> _getAvailableDenominations(dashboard.DashboardAccount account) {
-    final Set<String> denomStrs = {};
+  Future<List<Denomination>> _getAvailableDenominations(dashboard.DashboardAccount account) async {
+    // Get the user to check the member tier
+    final user = await databaseHelper.getUser();
+    final memberTier = user?.dashboard?.member.memberTier ?? 0;
     
-    // Add denominations from securedNetBalancesByDenom
-    for (final balance in account.balanceData.securedNetBalancesByDenom) {
-      final parts = balance.split(' ');
-      if (parts.length >= 2) {
-        denomStrs.add(parts.last);
-      }
+    // If member tier >= 5, show USD, CXX, CAD
+    if (memberTier >= 5) {
+      return [
+        Denomination.USD,
+        Denomination.CXX,
+        Denomination.CAD,
+      ];
     }
     
-    // Add default denomination
-    denomStrs.add(account.defaultDenom);
-    
-    // Convert to Denomination enum values
-    return denomStrs.map((denomStr) {
-      return Denomination.values.firstWhere(
-        (d) => d.toString().split('.').last == denomStr,
-        orElse: () => Denomination.USD,
-      );
-    }).toList();
+    // Otherwise just show USD
+    return [Denomination.USD];
   }
   
   Future<void> _onVerifyRecipient(VerifyRecipientEvent event, Emitter<SendCredexState> emit) async {
