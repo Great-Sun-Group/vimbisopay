@@ -51,7 +51,7 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
     });
     
     // Show loading dialog
-    Logger.data("DEBUG: Showing loading dialog for invoice ${widget.invoiceId}");
+    Logger.data('DEBUG: Showing loading dialog for invoice ${widget.invoiceId}');
     
     // Use a separate method to show the dialog to avoid context issues
     if (mounted) {
@@ -78,7 +78,7 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
       final invoiceResult = await _marketplaceRepository.getInvoice(widget.invoiceId);
       
       // Dismiss the loading dialog
-      Logger.data("DEBUG: Finished fetching invoice ${widget.invoiceId}, dismissing dialog");
+      Logger.data('DEBUG: Finished fetching invoice ${widget.invoiceId}, dismissing dialog');
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -119,7 +119,7 @@ class _BuyerInvoiceDetailScreenState extends State<BuyerInvoiceDetailScreen> {
       );
     } catch (e) {
       // Dismiss the loading dialog in case of error
-      Logger.error("DEBUG: Error fetching invoice: $e, dismissing dialog");
+      Logger.error('DEBUG: Error fetching invoice: $e, dismissing dialog');
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }

@@ -7,8 +7,6 @@ import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:provider/provider.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
@@ -722,15 +720,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               if (!_hasSufficientBalance()) ...[
                 const SizedBox(height: 8),
-                Row(
+                const Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.warning,
                       size: 16,
                       color: AppColors.errorRed,
                     ),
-                    const SizedBox(width: 8),
-                    const Text(
+                    SizedBox(width: 8),
+                    Text(
                       'Insufficient balance',
                       style: TextStyle(
                         color: AppColors.errorRed,

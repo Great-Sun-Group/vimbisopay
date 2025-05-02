@@ -50,7 +50,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       Logger.data('[SEARCH_RESULTS] Getting current location');
       
       // Check if permission is already granted
-      bool hasPermission = await _locationService.checkLocationPermission();
+      final bool hasPermission = await _locationService.checkLocationPermission();
       if (!hasPermission) {
         Logger.data('[SEARCH_RESULTS] Location permission not granted');
         return;
@@ -202,7 +202,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     Flexible(
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.store,
                             size: 16,
                             color: AppColors.textSecondary,
@@ -211,7 +211,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           Expanded(
                             child: Text(
                               product.storeName ?? 'Unknown Store',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),
@@ -236,7 +236,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     if (product.imageUrls.isEmpty) {
       return Container(
         color: AppColors.textGray.withOpacity(0.3),
-        child: Center(
+        child: const Center(
           child: Icon(
             Icons.image,
             color: AppColors.textGray,
@@ -252,7 +252,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         Logger.error('Error loading product image', error);
         return Container(
           color: AppColors.textGray.withOpacity(0.3),
-          child: Center(
+          child: const Center(
             child: Icon(
               Icons.image_not_supported,
               color: AppColors.textGray,
@@ -310,7 +310,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.error_outline,
                             size: 48,
                             color: AppColors.error,
@@ -318,7 +318,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           const SizedBox(height: 16),
                           Text(
                             _errorMessage,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 16,
                               color: AppColors.error,
                             ),
@@ -354,18 +354,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               )
             // Empty state
             else
-              Expanded(
+              const Expanded(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.search_off,
                         size: 64,
                         color: AppColors.textSecondary,
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
+                      SizedBox(height: 16),
+                      Text(
                         'No products found',
                         style: TextStyle(
                           fontSize: 18,
@@ -373,8 +373,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
+                      SizedBox(height: 8),
+                      Text(
                         'Try a different search term',
                         style: TextStyle(
                           fontSize: 16,

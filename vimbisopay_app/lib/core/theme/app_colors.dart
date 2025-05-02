@@ -17,7 +17,7 @@ abstract class AppColors {
   static const Color yellowDark2 = Color(0xFFC1B81B);   // Dark shade 2
   static const Color yellowMain = Color(0xFFFBB016);    // Bright yellow
   static const Color yellowLight1 = Color(0xFFF4CD7E);  // Light shade 1
-  static const Color yellowLight2 = Color(0xFFFECC6);   // Light shade 2
+  static const Color yellowLight2 = Color(0x0fffecc6);   // Light shade 2
   
   // Shades - Dark Blue Palette
   static const Color darkBluePrimary = Color(0xFF04151F); // Main DARK BLUE color

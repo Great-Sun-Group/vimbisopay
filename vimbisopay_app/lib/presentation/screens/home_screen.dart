@@ -21,7 +21,6 @@ import 'package:vimbisopay_app/presentation/widgets/home_action_buttons.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/page_indicator.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
-import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/infrastructure/services/analytics_service.dart';
@@ -36,9 +35,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
-  final AccountRepository _accountRepository = AccountRepositoryImpl(
-    passwordService: ServiceLocator.passwordService,
-  );
+  final AccountRepository _accountRepository = AccountRepositoryImpl();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   late HomeBloc _homeBloc;
   bool _isDisposed = false;

@@ -12,7 +12,6 @@ import 'package:vimbisopay_app/infrastructure/services/analytics_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/app_update_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/config_manager.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
-import 'package:vimbisopay_app/infrastructure/services/password_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/remote_config_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/security_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/notification_service.dart';
@@ -46,15 +45,8 @@ class ServiceLocator {
   static ConfigManager? _configManager;
   static ConnectivityService? _connectivityService;
   
-  static final PasswordService _passwordService = PasswordService(
-    securityService: _securityService,
-    databaseHelper: _databaseHelper,
-    httpClient: _httpClient,
-  );
-
   // Repositories
   static final AccountRepositoryImpl accountRepository = AccountRepositoryImpl(
-    passwordService: _passwordService,
     databaseHelper: _databaseHelper,
     httpClient: _httpClient,
   );
@@ -77,7 +69,6 @@ class ServiceLocator {
 
   // Getters for services
   static SecurityService get securityService => _securityService;
-  static PasswordService get passwordService => _passwordService;
   static DatabaseHelper get databaseHelper => _databaseHelper;
   static http.Client get httpClient => _httpClient;
   static NotificationService get notificationService => _notificationService;

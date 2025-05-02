@@ -190,7 +190,7 @@ class AmountInputCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Daily Limit:",
+                    'Daily Limit:',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -199,7 +199,7 @@ class AmountInputCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        "10.0 $denom",
+                        '10.0 $denom',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -215,7 +215,7 @@ class AmountInputCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
-                            "Upgrade",
+                            'Upgrade',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,

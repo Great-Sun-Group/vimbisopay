@@ -13,7 +13,6 @@ class ForgotPINScreen extends StatefulWidget {
 class _ForgotPINScreenState extends State<ForgotPINScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
   final _repository = ServiceLocator.accountRepository;
@@ -82,7 +81,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
     }
   }
 
-  Future<void> _verifyWithPassword() async {
+  Future<void> _verifyWithPhone() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -94,13 +93,12 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
       final phoneNumber = '+${_phoneController.text}';
       final result = await _repository.login(
         phone: phoneNumber,
-        password: _passwordController.text,
       );
 
       result.fold(
         (failure) {
           setState(() {
-            _errorMessage = 'Invalid credentials. Please try again.';
+            _errorMessage = 'Invalid phone number. Please try again.';
           });
         },
         (user) {
@@ -312,27 +310,9 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock),
-                    ),
-                    obscureText: true,
-                    enabled: !_isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
-                  ),
                   const SizedBox(height: 24),
                   FilledButton(
-                    onPressed: _isLoading ? null : _verifyWithPassword,
+                    onPressed: _isLoading ? null : _verifyWithPhone,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       backgroundColor: AppColors.primary,
@@ -348,7 +328,7 @@ class _ForgotPINScreenState extends State<ForgotPINScreen> {
                               valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
                             ),
                           )
-                        : const Text('Verify Identity'),
+                        : const Text('Verify Phone Number'),
                   ),
                 ],
               ),

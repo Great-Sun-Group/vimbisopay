@@ -3,7 +3,6 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/common/section_header.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
 /// Widget to display sender account information

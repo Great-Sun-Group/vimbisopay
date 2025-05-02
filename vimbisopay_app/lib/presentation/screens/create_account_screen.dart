@@ -2,14 +2,12 @@ import 'dart:async' show Future, StreamController, StreamSubscription, unawaited
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
 import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
-import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
 
@@ -25,19 +23,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
   final _repository = ServiceLocator.accountRepository;
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _showPassword = false;
-  bool _showConfirmPassword = false;
   final Map<String, String?> _fieldErrors = {
     'firstName': null,
     'lastName': null,
     'phone': null,
-    'password': null,
-    'confirmPassword': null,
   };
   
   final Set<String> _touchedFields = {};
@@ -59,8 +51,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -68,8 +58,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     final firstName = _firstNameController.text;
     final lastName = _lastNameController.text;
     final phone = _phoneController.text;
-    final password = _passwordController.text;
-    final confirmPassword = _confirmPasswordController.text;
 
     Logger.data('[CreateAccount] Validating form fields');
     
@@ -79,30 +67,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       _fieldErrors['lastName'] = lastName.isEmpty ? 'Please enter your last name' : null;
       _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
 
-      final passwordValidation = PasswordValidator.validatePassword(password);
-      _fieldErrors['password'] = passwordValidation.error;
-
-      if (confirmPassword.isEmpty) {
-        _fieldErrors['confirmPassword'] = 'Please confirm your password';
-      } else if (confirmPassword != password) {
-        _fieldErrors['confirmPassword'] = 'Passwords do not match';
-      } else {
-        _fieldErrors['confirmPassword'] = null;
-      }
-
       // Check if all required fields have valid values
       final hasValidFirstName = firstName.isNotEmpty;
       final hasValidLastName = lastName.isNotEmpty;
       final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
-      final hasValidPassword = PasswordValidator.validatePassword(password).isValid;
-      final hasValidConfirmPassword = confirmPassword.isNotEmpty && confirmPassword == password;
 
       // Update form validity
       _isFormValid = hasValidFirstName &&
           hasValidLastName &&
-          hasValidPhone &&
-          hasValidPassword &&
-          hasValidConfirmPassword;
+          hasValidPhone;
           
       Logger.data('[CreateAccount] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
       if (!_isFormValid) {
@@ -147,9 +120,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       _touchedFields.addAll([
         'firstName',
         'lastName',
-        'phone',
-        'password',
-        'confirmPassword'
+        'phone'
       ]);
     });
     
@@ -210,7 +181,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       // The phone number is already in the correct format (digits only)
       // thanks to PlainPhoneNumberFormatter
       final phoneNumber = _phoneController.text;
-      final password = _passwordController.text;
       
       Logger.interaction('[CreateAccount] Starting account creation process');
       Logger.data('[CreateAccount] Preparing request - ' 
@@ -252,12 +222,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       Logger.interaction('[CreateAccount] Calling onboardMember API');
       Logger.performance('[CreateAccount] API call start: onboardMember');
       
-      // Create account with v2 endpoint
+      // Create account with v1 endpoint
       final result = await _repository.onboardMember(
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         phone: phoneNumber,
-        password: password,
       );
 
       if (!mounted) return;
@@ -279,12 +248,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           }
 
           Logger.interaction('[CreateAccount] Account created successfully');
-          Logger.interaction('[CreateAccount] Attempting v2 login');
+          Logger.interaction('[CreateAccount] Attempting login');
           
-          // Get v2 login response after successful onboarding
-          final loginResult = await _repository.loginV2(
+          // Get login response after successful onboarding
+          final loginResult = await _repository.login(
             phone: phoneNumber,
-            password: password,
           );
 
           if (!mounted) return;
@@ -300,11 +268,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               
               // Save complete user object with dashboard
               Logger.data('[CreateAccount] Saving complete user object with dashboard');
-              final hashedPassword = await ServiceLocator.passwordService.hashPassword(password);
-              final userToSave = user.copyWith(
-                passwordHash: hashedPassword,
-                passwordChanged: DateTime.now(),
-              );
+              final userToSave = user;
               
               final saveResult = await _repository.saveUser(userToSave);
               
@@ -338,7 +302,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       token: user.token,
                       phone: phoneNumber,
                       memberId: user.memberId,
-                      password: password,
                       isAccountCreation: true,
                       user: userToSave, // Pass the complete user object
                       onVerificationComplete: (verifiedUser) {
@@ -524,97 +487,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                               FocusScope.of(context).nextFocus();
                             },
                             validator: (_) => _getFieldError('phone'),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Semantics(
-                          label: 'Password input field',
-                          child: TextFormField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock),
-                              helperText: PasswordValidator.getRequirementsText(),
-                              helperMaxLines: 6,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _showPassword ? Icons.visibility_off : Icons.visibility,
-                                  color: AppColors.primary,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _showPassword = !_showPassword;
-                                  });
-                                },
-                                tooltip: _showPassword ? 'Hide password' : 'Show password',
-                              ),
-                            ),
-                            obscureText: !_showPassword,
-                            enabled: !_isLoading,
-                            onTap: () => _markFieldAsTouched('password'),
-                            onChanged: (_) {
-                              setState(() {
-                                _validateForm();
-                                _formKey.currentState?.validate();
-                              });
-                            },
-                            onEditingComplete: () {
-                              _markFieldAsTouched('password');
-                              setState(() {
-                                _validateForm();
-                                _formKey.currentState?.validate();
-                              });
-                            },
-                            onFieldSubmitted: (_) {
-                              FocusScope.of(context).nextFocus();
-                            },
-                            validator: (_) => _getFieldError('password'),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Semantics(
-                          label: 'Confirm password input field',
-                          child: TextFormField(
-                            controller: _confirmPasswordController,
-                            decoration: InputDecoration(
-                              labelText: 'Confirm Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              helperText: 'Re-enter your password',
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                                  color: AppColors.primary,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _showConfirmPassword = !_showConfirmPassword;
-                                  });
-                                },
-                                tooltip: _showConfirmPassword ? 'Hide password' : 'Show password',
-                              ),
-                            ),
-                            obscureText: !_showConfirmPassword,
-                            enabled: !_isLoading,
-                            onTap: () => _markFieldAsTouched('confirmPassword'),
-                            onChanged: (_) {
-                              setState(() {
-                                _validateForm();
-                                _formKey.currentState?.validate();
-                              });
-                            },
-                            onEditingComplete: () {
-                              _markFieldAsTouched('confirmPassword');
-                              setState(() {
-                                _validateForm();
-                                _formKey.currentState?.validate();
-                              });
-                            },
-                            onFieldSubmitted: (_) {
-                              if (_isFormValid && !_isLoading) {
-                                _handleCreateAccount();
-                              }
-                            },
-                            validator: (_) => _getFieldError('confirmPassword'),
                           ),
                         ),
                         const SizedBox(height: 24),

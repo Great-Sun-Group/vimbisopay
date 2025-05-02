@@ -15,7 +15,7 @@ class FeatureFlags {
   /// - Invoicing
   ///
   /// Default value: false (disabled)
-  static const String enableMarketplace = "enable_marketplace";
+  static const String enableMarketplace = 'enable_marketplace';
 
   /// Feature flag key for debug features.
   ///
@@ -24,7 +24,7 @@ class FeatureFlags {
   /// - Recent Activity in Security Settings screen
   ///
   /// Default value: false (disabled in release builds)
-  static const String enableDebugFeatures = "enable_debug_features";
+  static const String enableDebugFeatures = 'enable_debug_features';
 
   /// Default values for feature flags.
   ///

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/infrastructure/utils/database_checker.dart';

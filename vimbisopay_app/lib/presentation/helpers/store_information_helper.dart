@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/marketplace/index.dart';
 
 /// Helper class for store information screen
 class StoreInformationHelper {

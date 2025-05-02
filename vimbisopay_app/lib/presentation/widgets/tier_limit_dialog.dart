@@ -108,13 +108,13 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
 
   Widget _buildActionButtons() {
     if (_isUpgrading) {
-      return Column(
+      return const Column(
         children: [
-          const CircularProgressIndicator(
+          CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
-          const SizedBox(height: 16),
-          const Text(
+          SizedBox(height: 16),
+          Text(
             'Processing your upgrade...',
             textAlign: TextAlign.center,
             style: TextStyle(

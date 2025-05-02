@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 /// Each vendor has a profile with business information, ratings, and product listings.
 class Vendor extends Entity {
   /// The unique identifier for the vendor.
+  @override
   final String id;
 
   /// The member ID associated with this vendor.
@@ -103,7 +104,7 @@ class Vendor extends Entity {
   String get displayName => businessName;
 
   /// Returns a formatted rating string (e.g., "4.5 (42 reviews)").
-  String get ratingDisplay => '$rating (${ratingCount} reviews)';
+  String get ratingDisplay => '$rating ($ratingCount reviews)';
 
   /// Creates a copy of this [Vendor] with the given fields replaced.
   Vendor copyWith({

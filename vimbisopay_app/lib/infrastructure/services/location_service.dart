@@ -1,6 +1,5 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:flutter/services.dart';
 
 /// Service for handling location-related operations.
 class LocationService {
@@ -11,7 +10,7 @@ class LocationService {
   Future<Position?> getCurrentPosition() async {
     try {
       // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         Logger.error('[LOCATION] Location services are disabled');
         return null;
@@ -50,7 +49,7 @@ class LocationService {
   /// Returns true if location services are enabled, false otherwise.
   Future<bool> checkLocationServicesEnabled() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         Logger.error('[LOCATION] Location services are disabled');
       } else {
@@ -83,13 +82,13 @@ class LocationService {
   Future<bool> checkLocationPermission() async {
     try {
       // Check if location services are enabled
-      bool serviceEnabled = await checkLocationServicesEnabled();
+      final bool serviceEnabled = await checkLocationServicesEnabled();
       if (!serviceEnabled) {
         return false;
       }
 
       // Check location permission
-      LocationPermission permission = await Geolocator.checkPermission();
+      final LocationPermission permission = await Geolocator.checkPermission();
       return permission == LocationPermission.whileInUse || 
              permission == LocationPermission.always;
     } catch (e) {
@@ -103,7 +102,7 @@ class LocationService {
   /// Returns true if permission is granted, false otherwise.
   Future<bool> requestLocationPermission() async {
     try {
-      LocationPermission permission = await Geolocator.requestPermission();
+      final LocationPermission permission = await Geolocator.requestPermission();
       return permission == LocationPermission.whileInUse || 
              permission == LocationPermission.always;
     } catch (e) {

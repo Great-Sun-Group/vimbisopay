@@ -38,6 +38,7 @@ class ApplicationFailure extends Failure {
 
 /// Authentication failures
 class AuthFailure extends InfrastructureFailure {
+  @override
   final String? code;
   
   const AuthFailure({

@@ -7,6 +7,7 @@ import 'package:vimbisopay_app/domain/entities/base_entity.dart';
 /// and the parties involved.
 class Invoice extends Entity {
   /// The unique identifier for the invoice.
+  @override
   final String id;
 
   /// The ID of the buyer (member).

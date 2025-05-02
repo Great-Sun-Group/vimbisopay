@@ -1,8 +1,5 @@
-import 'dart:convert';
-import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logger/logger.dart';
-import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
@@ -144,20 +141,18 @@ Starting home refresh:
     try {
       // Get stored user first
       final storedUser = await databaseHelper.getUser();
-      if (storedUser == null || storedUser.passwordHash == null) {
+      if (storedUser == null) {
         emit(state.copyWith(
           status: HomeStatus.error,
-          error: 'No stored credentials found',
+          error: 'No stored user found',
         ));
         return;
       }
 
       _logger.i('Re-logging in to refresh token...');
-      // Re-login with stored password hash to refresh token
-      // Re-login with stored password hash to refresh token
-      final loginResult = await accountRepository.loginV2(
+      // Re-login to refresh token using v1 login
+      final loginResult = await accountRepository.login(
         phone: storedUser.phone,
-        passwordHash: storedUser.passwordHash,
       );
       _logger.i('Re-login completed');
       

@@ -7,8 +7,9 @@ class User {
   final bool otpVerified;  // Whether OTP verification is complete
   final String? version;  // API version (v1, v2)
   final String? authMethod;  // Authentication method (phone_only, etc)
-  final String? passwordHash;  // Hashed password
-  final DateTime? passwordChanged;  // When the password was last changed
+  // Deprecated: These fields are kept for backward compatibility but are no longer used
+  final String? passwordHash;  // Deprecated: Hashed password (no longer used)
+  final DateTime? passwordChanged;  // Deprecated: When the password was last changed (no longer used)
   final Dashboard? dashboard;  // Optional since it might not be available during local storage retrieval
   final bool activateMarket;  // Whether the user is already a vendor in the marketplace
   final bool storeOpen;  // Whether the vendor's store is currently open

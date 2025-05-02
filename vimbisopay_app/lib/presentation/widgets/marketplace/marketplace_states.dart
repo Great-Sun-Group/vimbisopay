@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/network_error_widget.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 
@@ -40,7 +39,7 @@ class MarketplaceStates {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.error_outline,
             size: 48,
             color: AppColors.error,
@@ -48,7 +47,7 @@ class MarketplaceStates {
           const SizedBox(height: 16),
           Text(
             errorMessage,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               color: AppColors.error,
             ),
@@ -67,17 +66,17 @@ class MarketplaceStates {
 
   /// Displays an empty state when no products are found.
   static Widget buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.search_off,
             size: 64,
             color: AppColors.textSecondary,
           ),
-          const SizedBox(height: 16),
-          const Text(
+          SizedBox(height: 16),
+          Text(
             'No products found',
             style: TextStyle(
               fontSize: 18,
@@ -85,8 +84,8 @@ class MarketplaceStates {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'Try a different search term',
             style: TextStyle(
               fontSize: 16,

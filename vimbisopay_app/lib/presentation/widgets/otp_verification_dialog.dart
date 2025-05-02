@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
@@ -9,14 +8,12 @@ class OTPVerificationDialog extends StatefulWidget {
   final String token;
   final String phone;
   final String memberId;
-  final String password;
 
   const OTPVerificationDialog({
     super.key,
     required this.token,
     required this.phone,
     required this.memberId,
-    required this.password,
   });
 
   @override
@@ -74,50 +71,38 @@ class _OTPVerificationDialogState extends State<OTPVerificationDialog> {
           });
         },
         (response) async {
-          // Set initial password if provided
-          if (widget.password.isNotEmpty) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => const LoadingDialog(
-                message: 'Setting up your password...',
-              ),
-            );
+          // Login with phone number
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const LoadingDialog(
+              message: 'Logging in...',
+            ),
+          );
 
-            final passwordResult = await _repository.setInitialPassword(
-              token: widget.token,
-              memberId: widget.memberId,
-              phone: widget.phone,
-              password: widget.password,
-            );
+          final loginResult = await _repository.login(
+            phone: widget.phone,
+          );
 
-            if (!mounted) return;
-            Navigator.of(context).pop(); // Pop loading dialog
+          if (!mounted) return;
+          Navigator.of(context).pop(); // Pop loading dialog
 
-            passwordResult.fold(
-              (failure) {
-                setState(() {
-                  _isLoading = false;
-                  _error = failure.message ?? ErrorTranslator.translateError(failure);
-                });
-              },
-              (user) {
-                // Navigate to auth screen
-                Navigator.pushReplacementNamed(
-                  context,
-                  '/auth',
-                  arguments: user,
-                );
-              },
-            );
-          } else {
-            // Navigate to auth screen
-            Navigator.pushReplacementNamed(
-              context,
-              '/auth',
-              arguments: response.details,
-            );
-          }
+          loginResult.fold(
+            (failure) {
+              setState(() {
+                _isLoading = false;
+                _error = failure.message ?? ErrorTranslator.translateError(failure);
+              });
+            },
+            (user) {
+              // Navigate to auth screen
+              Navigator.pushReplacementNamed(
+                context,
+                '/auth',
+                arguments: user,
+              );
+            },
+          );
         },
       );
     } catch (e) {

@@ -4,7 +4,6 @@ import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.
 import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/date_formatter.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/curved_text_painter.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/cards/counterparty_preview_card.dart';
 
 /// Widget to display contract terms for secured credex
 class SecuredContractCard extends StatelessWidget {
@@ -28,7 +27,7 @@ class SecuredContractCard extends StatelessWidget {
     return StyledCard.gold(
       title: 'Approve the Contract',
       child: Text(
-        "$memberName transfers $amount $denomination from their $senderAccountName account to $recipientAccountName, effective on acceptance of this offer.",
+        '$memberName transfers $amount $denomination from their $senderAccountName account to $recipientAccountName, effective on acceptance of this offer.',
         style: const TextStyle(
           color: AppColors.techAzure, // All teal text color
           fontSize: 14,
@@ -87,7 +86,7 @@ class InsufficientBalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return StyledCard.warning(
       child: Text(
-        "Insufficient secured $denomination balance",
+        'Insufficient secured $denomination balance',
         style: const TextStyle(
           color: AppColors.darkRed,
           fontSize: 14,
@@ -145,7 +144,7 @@ class ContractSection extends StatelessWidget {
             children: [
               // Contract text - all teal for secured
               Text(
-                "$memberName transfers $amount $denomination from the $senderAccountName account to the $recipientAccountName account, effective on acceptance of this offer.",
+                '$memberName transfers $amount $denomination from the $senderAccountName account to the $recipientAccountName account, effective on acceptance of this offer.',
                 style: const TextStyle(
                   color: AppColors.techAzure, // Teal text color
                   fontSize: 14,
@@ -184,13 +183,13 @@ class ContractSection extends StatelessWidget {
                             CustomPaint(
                               size: const Size(56, 56),
                               painter: CurvedTextPainter(
-                                text: "SECURED",
+                                text: 'SECURED',
                                 color: AppColors.yellowMain,
                                 fontSize: 8,
                               ),
                             ),
                             // Gold arrow icon
-                            Positioned(
+                            const Positioned(
                               bottom: 4,
                               child: Icon(
                                 Icons.arrow_downward,
@@ -228,7 +227,7 @@ class ContractSection extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              "$amount $denomination",
+                              '$amount $denomination',
                               style: const TextStyle(
                                 color: AppColors.yellowMain,
                                 fontWeight: FontWeight.bold,
@@ -269,7 +268,7 @@ class ContractSection extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 24.0),
               child: Text(
-                "COMING SOON",
+                'COMING SOON',
                 style: TextStyle(
                   color: AppColors.darkRed,
                   fontSize: 18,

@@ -70,7 +70,7 @@ class SecuredCounterpartyPreviewCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                "$amount $denomination",
+                '$amount $denomination',
                 style: const TextStyle(
                   color: AppColors.techAzure,
                   fontWeight: FontWeight.bold,
@@ -143,13 +143,13 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                   CustomPaint(
                     size: const Size(56, 56),
                     painter: CurvedTextPainter(
-                      text: "UNSECURED",
+                      text: 'UNSECURED',
                       color: AppColors.techAzure,
                       fontSize: 8,
                     ),
                   ),
                   // Teal arrow icon - larger and positioned lower
-                  Positioned(
+                  const Positioned(
                     bottom: 4, // Position closer to bottom of circle
                     child: Icon(
                       Icons.arrow_downward,
@@ -182,7 +182,7 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                     if (dueDate != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        "Promised by ${DateFormatter.formatShortDate(dueDate!)}",
+                        'Promised by ${DateFormatter.formatShortDate(dueDate!)}',
                         style: const TextStyle(
                           color: AppColors.techAzure,
                           fontSize: 12,
@@ -200,7 +200,7 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    "$amount $denomination",
+                    '$amount $denomination',
                     style: const TextStyle(
                       color: AppColors.techAzure, // Teal color
                       fontWeight: FontWeight.bold,
@@ -240,7 +240,7 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                   // Bar graph with fixed proportions
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: Container(
+                    child: SizedBox(
                       height: 18, // Taller to fit text
                       width: double.infinity,
                       child: Row(
@@ -272,11 +272,11 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                   ),
                   
                   // Owner credit rating text inside the bar, aligned left with black text
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8.0),
                     child: Text(
-                      "Owner credit rating",
-                      style: const TextStyle(
+                      'Owner credit rating',
+                      style: TextStyle(
                         color: Colors.black, // Changed to black
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -301,7 +301,7 @@ class UnsecuredCounterpartyPreviewCard extends StatelessWidget {
                 ),
                 child: const Center(
                   child: Text(
-                    "Owner credit rating not yet established",
+                    'Owner credit rating not yet established',
                     style: TextStyle(
                       color: AppColors.techAzure, // Teal text
                       fontSize: 11,

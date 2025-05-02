@@ -354,7 +354,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return Container(
         height: 300,
         color: AppColors.textGray.withOpacity(0.3),
-        child: Center(
+        child: const Center(
           child: Icon(
             Icons.image,
             size: 64,
@@ -384,7 +384,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Logger.error('Error loading product image', error);
                   return Container(
                     color: AppColors.textGray.withOpacity(0.3),
-                    child: Center(
+                    child: const Center(
                       child: Icon(
                         Icons.image_not_supported,
                         size: 64,
@@ -474,7 +474,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               color: AppColors.primary,
                             ),
                             const SizedBox(width: 4),
-                            Text(
+                            const Text(
                               'Store',
                               style: TextStyle(
                                 fontSize: 12,
@@ -547,14 +547,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Store section
-                Row(
+                const Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.store,
                       size: 16,
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       'Store Information',
                       style: TextStyle(
@@ -569,7 +569,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 if (_storeDescription != null && _storeDescription!.isNotEmpty)
                   Text(
                     _storeDescription!,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -579,7 +579,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 else if (_vendor!.description.isNotEmpty)
                   Text(
                     _vendor!.description,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -590,7 +590,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Store Handle: $_storeHandle',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -600,7 +600,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.location_on,
                         size: 14,
                         color: AppColors.textSecondary,
@@ -608,7 +608,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(width: 4),
                       Text(
                         'Location: ${_storeLatitude!.toStringAsFixed(4)}, ${_storeLongitude!.toStringAsFixed(4)}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
@@ -619,14 +619,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(height: 16),
 
                 // Vendor section
-                Row(
+                const Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.person,
                       size: 16,
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       'Vendor Information',
                       style: TextStyle(
@@ -641,13 +641,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 if (_vendorFirstName != null && _vendorLastName != null)
                   Text(
                     'Name: $_vendorFirstName $_vendorLastName',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
                   ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Davidzo Chikosi',
                   style: TextStyle(
                     fontSize: 14,
@@ -655,7 +655,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Member since 2025',
                   style: TextStyle(
                     fontSize: 14,
@@ -794,7 +794,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   color: AppColors.textGray.withOpacity(0.3),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.image_not_supported,
                                     color: AppColors.textGray,
                                   ),
@@ -803,7 +803,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             )
                           : Container(
                               color: AppColors.textGray.withOpacity(0.3),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.image,
                                 color: AppColors.textGray,
                               ),
@@ -839,13 +839,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// Builds a custom Davidzo's Produce logo widget
   Widget _buildDavidzosProduceLogo() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF8BC34A), // Light green
-            const Color(0xFF4CAF50), // Medium green
+            Color(0xFF8BC34A), // Light green
+            Color(0xFF4CAF50), // Medium green
           ],
         ),
       ),
@@ -921,7 +921,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 size: 48,
                 color: AppColors.error,
@@ -929,7 +929,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(height: 16),
               Text(
                 _errorMessage,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.error,
                 ),
@@ -971,6 +971,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           // Content
           SliverToBoxAdapter(
             child: SafeArea(
+              bottom: true,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1005,8 +1006,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(height: 48),  // Increased from 32 to 48
                 ],
               ),
-              // Add bottom padding to ensure content doesn't overflow
-              bottom: true,
             ),
           ),
         ],

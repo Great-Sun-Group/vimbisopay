@@ -5,7 +5,6 @@ import 'package:vimbisopay_app/core/utils/otp_utils.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/core/utils/deep_link_handler.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/domain/entities/verification_status.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 
@@ -18,7 +17,6 @@ class WhatsAppOTPVerification extends StatefulWidget {
   final String phone;
   final String memberId;
   final User? user; // Optional user object for v2 flow
-  final String? password; // Optional password for v1->v2 migration
   final bool isAccountCreation; // Flag to indicate if this is for account creation
   final Function(User) onVerificationComplete;
 
@@ -29,7 +27,6 @@ class WhatsAppOTPVerification extends StatefulWidget {
     required this.memberId,
     required this.onVerificationComplete,
     this.user,
-    this.password,
     this.isAccountCreation = false,
   });
 
@@ -102,7 +99,7 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => LoadingDialog(
+          builder: (context) => const LoadingDialog(
             message: 'Preparing verification...',
           ),
         );
@@ -203,7 +200,7 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => LoadingDialog(
+          builder: (context) => const LoadingDialog(
             message: 'Checking verification status...',
           ),
         );
@@ -228,7 +225,7 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
         },
         (status) {
           // Explicitly cast status to VerificationStatus
-          final verificationStatus = status as VerificationStatus;
+          final verificationStatus = status;
           setState(() {
             _verificationComplete = verificationStatus.verified;
             _isCheckingStatus = false;
@@ -505,15 +502,15 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                             color: AppColors.success.withOpacity(0.3),
                           ),
                         ),
-                        child: Column(
+                        child: const Column(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.check_circle,
                               color: AppColors.success,
                               size: 48,
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
+                            SizedBox(height: 8),
+                            Text(
                               'Verification Successful!',
                               style: TextStyle(
                                 color: AppColors.success,
@@ -522,8 +519,8 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
+                            SizedBox(height: 8),
+                            Text(
                               'Your phone number has been verified. You can now continue with the process.',
                               style: TextStyle(
                                 color: AppColors.textSecondary,

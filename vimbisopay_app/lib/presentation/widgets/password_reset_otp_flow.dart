@@ -29,7 +29,7 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
   final _otpController = TextEditingController();
   final _messageController = StreamController<String>.broadcast();
   final _repository = ServiceLocator.accountRepository;
-  bool _isResending = false;
+  final bool _isResending = false;
   String? _error;
 
   @override
@@ -101,7 +101,23 @@ class _PasswordResetOTPFlowState extends State<PasswordResetOTPFlow> {
         token: '',
         phone: widget.phone,
         memberId: widget.memberId,
-        onVerificationComplete: widget.onVerificationComplete,
+        onVerificationComplete: (user) {
+          // Create an OtpVerificationResponse from the User object
+          final response = OtpVerificationResponse(
+            id: 'whatsapp_verification_${DateTime.now().millisecondsSinceEpoch}',
+            type: 'OTP_VERIFICATION',
+            timestamp: DateTime.now().toIso8601String(),
+            actor: user.memberId,
+            details: OtpVerificationDetails(
+              memberId: user.memberId,
+              otpVerified: true,
+              resetToken: user.token,
+              purpose: 'PASSWORD_RESET',
+              expiresIn: 3600, // 1 hour expiry
+            ),
+          );
+          widget.onVerificationComplete(response);
+        },
       ),
     );
   }

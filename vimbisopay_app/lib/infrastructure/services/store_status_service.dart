@@ -1,8 +1,4 @@
-import 'package:dartz/dartz.dart';
-import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/domain/entities/dashboard.dart';
-import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/services/location_service.dart';
@@ -100,14 +96,14 @@ class StoreStatusService {
     Logger.data('[STORE_STATUS] Requesting location permission');
     
     // First check if location services are enabled
-    bool servicesEnabled = await checkLocationServicesEnabled(context);
+    final bool servicesEnabled = await checkLocationServicesEnabled(context);
     if (!servicesEnabled) {
       Logger.data('[STORE_STATUS] Location services are disabled, cannot proceed with permission request');
       return false;
     }
     
     // Check if permission is already granted
-    bool hasPermission = await _locationService.checkLocationPermission();
+    final bool hasPermission = await _locationService.checkLocationPermission();
     if (hasPermission) {
       Logger.data('[STORE_STATUS] Location permission already granted');
       return true;

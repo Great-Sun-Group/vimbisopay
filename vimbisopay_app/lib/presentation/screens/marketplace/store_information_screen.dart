@@ -12,9 +12,7 @@ import 'package:vimbisopay_app/infrastructure/services/store_status_service.dart
 import 'package:vimbisopay_app/infrastructure/utils/database_checker.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/edit_vendor_profile_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/add_edit_sku_screen.dart';
-import 'package:vimbisopay_app/presentation/screens/marketplace/inventory/inventory_management_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
-import 'package:vimbisopay_app/presentation/helpers/store_information_helper.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
 import 'package:flutter/rendering.dart'; // For ScrollDirection
 
@@ -390,7 +388,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                     product['profilePictureThumbnail'] as String?;
 
                 // Create image URLs list with profile picture thumbnail if available
-                List<String> imageUrls = [];
+                final List<String> imageUrls = [];
                 if (profilePictureThumbnail != null &&
                     profilePictureThumbnail.isNotEmpty) {
                   Logger.data(
@@ -435,7 +433,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 storeId: vendorObj.id,
                 vendor: vendorObj,
                 products: vendorProducts,
-                profileImageUrl: "", // No profile image in the new API response
+                profileImageUrl: '', // No profile image in the new API response
               );
               Logger.data(
                   '[STORE_INFO] Successfully cached store data in database with ID: ${vendorObj.id}');
@@ -463,7 +461,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                 _vendor = vendorObj;
                 _products = vendorProducts;
                 _profileThumbnailUrl =
-                    ""; // No profile image in the new API response
+                    ''; // No profile image in the new API response
               });
             }
 
@@ -1371,13 +1369,13 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   /// Builds a custom Davidzo's Produce logo widget
   Widget _buildDavidzosProduceLogo() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF8BC34A), // Light green
-            const Color(0xFF4CAF50), // Medium green
+            Color(0xFF8BC34A), // Light green
+            Color(0xFF4CAF50), // Medium green
           ],
         ),
       ),
@@ -1508,7 +1506,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       ),
       subtitle: Text(
         product.description,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           color: AppColors.textSecondary,
         ),
@@ -1528,7 +1526,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                   color: AppColors.primary,
                 ),
               ),
-              Text(
+              const Text(
                 'Balance',
                 style: TextStyle(
                   fontSize: 12,

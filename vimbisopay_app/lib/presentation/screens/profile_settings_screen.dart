@@ -3,11 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
-import 'package:vimbisopay_app/domain/repositories/marketplace/marketplace_repository.dart';
-import 'package:vimbisopay_app/infrastructure/services/feature_flag_service.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
-import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_profile_screen.dart';
-import 'package:vimbisopay_app/presentation/screens/marketplace/vendor_registration_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/initials_avatar.dart';
 import 'package:vimbisopay_app/presentation/widgets/settings_container.dart';
 import 'package:vimbisopay_app/presentation/widgets/member_tier_badge.dart';
@@ -641,7 +637,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       color: AppColors.textGray.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.info_outline,
                       color: AppColors.textGray,
                     ),

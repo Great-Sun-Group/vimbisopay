@@ -62,7 +62,7 @@ class ProductCard extends StatelessWidget {
                     Flexible(
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.store,
                             size: 16,
                             color: AppColors.textSecondary,
@@ -71,7 +71,7 @@ class ProductCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               product.storeName ?? 'Unknown Store',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),
@@ -98,7 +98,7 @@ class ProductCard extends StatelessWidget {
       // Show placeholder if no image
       return Container(
         color: AppColors.textGray.withOpacity(0.3),
-        child: Center(
+        child: const Center(
           child: Icon(
             Icons.image,
             color: AppColors.textGray,
@@ -119,7 +119,7 @@ class ProductCard extends StatelessWidget {
           Logger.error('Error loading local image: $filePath', error);
           return Container(
             color: AppColors.textGray.withOpacity(0.3),
-            child: Center(
+            child: const Center(
               child: Icon(
                 Icons.image_not_supported,
                 color: AppColors.textGray,
@@ -141,7 +141,7 @@ class ProductCard extends StatelessWidget {
         ),
         errorWidget: (context, url, error) => Container(
           color: AppColors.textGray.withOpacity(0.3),
-          child: Center(
+          child: const Center(
             child: Icon(
               Icons.image_not_supported,
               color: AppColors.textGray,

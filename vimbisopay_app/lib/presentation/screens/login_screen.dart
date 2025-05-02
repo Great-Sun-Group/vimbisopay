@@ -1,22 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
-import 'package:vimbisopay_app/presentation/screens/forgot_password_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/forgot_pin_screen.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
-import 'package:vimbisopay_app/core/utils/password_validator.dart';
 import 'package:vimbisopay_app/core/utils/phone_validator.dart';
-import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
 import 'package:vimbisopay_app/core/utils/plain_phone_formatter.dart';
 import 'package:vimbisopay_app/core/utils/screen_tracker.dart';
 import 'package:vimbisopay_app/core/utils/button_tracker.dart';
 import 'package:vimbisopay_app/core/theme/input_decoration_theme.dart';
-import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart' show LoadingDialog;
-import 'package:vimbisopay_app/presentation/widgets/setup_password_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/otp_verification_dialog.dart';
-import 'package:vimbisopay_app/presentation/widgets/whatsapp_otp_verification.dart';
-import 'package:vimbisopay_app/presentation/widgets/success_dialog.dart';
 import 'dart:async' show unawaited;
 
 class LoginScreen extends StatefulWidget {
@@ -34,15 +27,12 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
   Map<String, dynamic> get screenParameters => {};
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _repository = ServiceLocator.accountRepository;
   final _databaseHelper = ServiceLocator.databaseHelper;
   bool _isFormValid = false;
   bool _isLoading = false;
-  bool _showPassword = false;
   final Map<String, String?> _fieldErrors = {
     'phone': null,
-    'password': null,
   };
   final Set<String> _touchedFields = {};
 
@@ -79,28 +69,22 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
   void _validateForm() {
     final phone = _phoneController.text;
-    final password = _passwordController.text;
 
     Logger.data('[Login] Validating form fields');
     
     setState(() {
       _fieldErrors['phone'] = PhoneValidator.validatePhone(phone);
 
-      final passwordValidation = PasswordValidator.validatePassword(password);
-      _fieldErrors['password'] = passwordValidation.error;
-
-      // Check if all required fields have valid values
+      // Check if phone number is valid
       final hasValidPhone = phone.isNotEmpty && PhoneValidator.validatePhone(phone) == null;
-      final hasValidPassword = PasswordValidator.validatePassword(password).isValid;
 
       // Update form validity
-      _isFormValid = hasValidPhone && hasValidPassword;
+      _isFormValid = hasValidPhone;
           
       Logger.data('[Login] Form validation result: ${_isFormValid ? 'valid' : 'invalid'}');
       if (!_isFormValid) {
@@ -254,54 +238,7 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     );
   }
 
-  Future<void> _doV1Login(String phoneNumber) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: AppColors.barrierColor,
-      builder: (context) => LoadingDialog(
-        message: 'Verifying phone number...',
-      ),
-    );
-
-    final v1Result = await _repository.login(
-      phone: phoneNumber,
-    );
-
-    if (!mounted) return;
-    Navigator.pop(context); // Pop loading dialog
-
-    v1Result.fold(
-      (v1Failure) {
-        _showErrorDialog(
-          'Failed to initialize verification. Please try again.',
-        );
-      },
-      (v1User) {
-        // Show success dialog for phone verification
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => SuccessDialog(
-            title: 'Phone Verified',
-            message: 'Your phone number has been verified. Please set up your password.',
-            onDismiss: () {
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => SetupPasswordDialog(
-                  token: v1User.token,
-                  memberId: v1User.memberId,
-                  phone: phoneNumber,
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+  // _doV1Login method removed as we're no longer using passwords
 
   Future<void> _handleLogin() async {
     Logger.interaction('[Login] Login button pressed');
@@ -317,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     
     // Validate form first
     setState(() {
-      _touchedFields.addAll(['phone', 'password']);
+      _touchedFields.addAll(['phone']);
     });
     
     _validateForm();
@@ -345,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
       routeSettings: const RouteSettings(name: 'loading_dialog'),
       builder: (context) {
         Logger.interaction('[Login] Building loading dialog');
-        return LoadingDialog(
+        return const LoadingDialog(
           message: 'Logging you in...',
         );
       },
@@ -354,16 +291,12 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
     // The phone number is already in the correct format (digits only)
     // thanks to PlainPhoneNumberFormatter
     final phoneNumber = _phoneController.text;
-    final password = _passwordController.text;
     
     Logger.interaction('[Login] Calling login API');
     Logger.performance('[Login] API call start: login');
     
-    Logger.data('[Login] Password: $password'); // Log the password for debugging
-    
-    final result = await _repository.loginV2(
+    final result = await _repository.login(
       phone: phoneNumber,
-      password: password,
     );
 
     if (!mounted) return;
@@ -465,52 +398,6 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
                           validator: (_) => _getFieldError('phone'),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Semantics(
-                        label: 'Password input field',
-                        child: TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock),
-                            helperText: PasswordValidator.getRequirementsText(),
-                            helperMaxLines: 6,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _showPassword ? Icons.visibility_off : Icons.visibility,
-                                color: AppColors.primary,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _showPassword = !_showPassword;
-                                });
-                              },
-                            ),
-                          ),
-                          obscureText: !_showPassword,
-                          enabled: !_isLoading,
-                          onTap: () => _markFieldAsTouched('password'),
-                          onChanged: (_) {
-                            setState(() {
-                              _validateForm();
-                              _formKey.currentState?.validate();
-                            });
-                          },
-                          onEditingComplete: () {
-                            _markFieldAsTouched('password');
-                            setState(() {
-                              _validateForm();
-                              _formKey.currentState?.validate();
-                            });
-                          },
-                          onFieldSubmitted: (_) {
-                            if (_isFormValid && !_isLoading) {
-                              _handleLogin();
-                            }
-                          },
-                          validator: (_) => _getFieldError('password'),
-                        ),
-                      ),
                       const SizedBox(height: 24),
                       FilledButton(
                         onPressed: _isFormValid && !_isLoading ? _handleLogin : null,
@@ -542,15 +429,15 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
                         onPressed: _isLoading 
                             ? null 
                             : () {
-                                // Track forgot password button tap
+                                // Track forgot PIN button tap
                                 ButtonTracker.trackButtonTap(
-                                  'forgot_password_button',
+                                  'forgot_pin_button',
                                   screenName: screenName,
                                 );
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const ForgotPasswordScreen(),
+                                    builder: (context) => const ForgotPINScreen(),
                                   ),
                                 );
                               },
@@ -560,7 +447,7 @@ class _LoginScreenState extends State<LoginScreen> with ScreenViewTrackerMixin {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         ),
                         child: const Text(
-                          'Forgot Password?',
+                          'Forgot PIN?',
                           style: TextStyle(fontSize: 14),
                         ),
                       ),

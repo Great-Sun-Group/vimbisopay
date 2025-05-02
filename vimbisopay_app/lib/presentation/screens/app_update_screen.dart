@@ -102,9 +102,9 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                     ),
                     const SizedBox(height: 8),
                     
-                    Text(
+                    const Text(
                       'A new version of VimbisoPay is available',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         color: AppColors.textSecondary,
                       ),
@@ -333,9 +333,9 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                 
                     // Integrity Verification Status - Simplified
                     if (_verifyingIntegrity) ...[
-                      Row(
+                      const Row(
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
@@ -343,8 +343,8 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                               valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
                               'Verifying file integrity...',
                               style: TextStyle(
@@ -357,15 +357,15 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                       ),
                       const SizedBox(height: 16),
                     ] else if (_integrityVerified) ...[
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.verified_user,
                             color: AppColors.success,
                             size: 16,
                           ),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
                               'File verified as authentic',
                               style: TextStyle(
@@ -447,16 +447,16 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Row(
+                            const Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.info_outline,
                                   color: AppColors.textSecondary,
                                   size: 16,
                                 ),
-                                const SizedBox(width: 8),
-                                const Expanded(
+                                SizedBox(width: 8),
+                                Expanded(
                                   child: Text(
                                     'Tap "INSTALL" when prompted',
                                     style: TextStyle(
@@ -468,16 +468,16 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Row(
+                            const Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.help_outline,
                                   color: AppColors.yellowPrimary,
                                   size: 16,
                                 ),
-                                const SizedBox(width: 8),
-                                const Expanded(
+                                SizedBox(width: 8),
+                                Expanded(
                                   child: Text(
                                     'If redirected to settings, enable "Allow from this source"',
                                     style: TextStyle(

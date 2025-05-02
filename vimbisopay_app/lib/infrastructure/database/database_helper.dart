@@ -237,8 +237,8 @@ class DatabaseHelper {
       Logger.data('Starting database upgrade to version 12');
       
       // Check if memberHandle column exists
-      var tableInfo = await db.rawQuery("PRAGMA table_info('users')");
-      bool hasMemberHandle = tableInfo.any((column) => column['name'] == 'memberHandle');
+      final tableInfo = await db.rawQuery("PRAGMA table_info('users')");
+      final bool hasMemberHandle = tableInfo.any((column) => column['name'] == 'memberHandle');
       
       if (!hasMemberHandle) {
         Logger.data('memberHandle column not found, attempting to add it');
