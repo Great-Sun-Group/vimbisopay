@@ -6,11 +6,15 @@ import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/date_forma
 class DueDateSelector extends StatelessWidget {
   final DateTime? selectedDate;
   final Function(DateTime?) onDateChanged;
+  final String amount;
+  final String denomination;
   
   const DueDateSelector({
     super.key,
     this.selectedDate,
     required this.onDateChanged,
+    this.amount = "0.00",
+    this.denomination = "USD",
   });
 
   @override
@@ -21,14 +25,15 @@ class DueDateSelector extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
-            'Due Date (Optional)',
-            style: TextStyle(
+          Text(
+            'I promise to provide $amount $denomination worth of value by',
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -49,7 +54,7 @@ class DueDateSelector extends StatelessWidget {
                   Expanded(
                     child: Text(
                       selectedDate == null 
-                          ? "Recommended for business" 
+                          ? "No due date" 
                           : DateFormatter.formatLongDate(selectedDate!),
                       style: TextStyle(
                         color: selectedDate == null
@@ -92,6 +97,7 @@ class DueDateSelector extends StatelessWidget {
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ),
         ],

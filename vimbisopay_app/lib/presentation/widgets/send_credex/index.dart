@@ -7,7 +7,6 @@ export 'common/status_message_widgets.dart';
 export 'common/styled_card.dart';
 
 // Card widgets
-export 'cards/contract_card.dart';
 export 'cards/counterparty_preview_card.dart';
 export 'cards/recipient_card.dart';
 export 'cards/sender_card.dart';

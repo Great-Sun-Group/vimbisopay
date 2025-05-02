@@ -54,10 +54,14 @@ class CredexTypeSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.techAzure : AppColors.surface,
+          color: isSelected 
+              ? (title == 'Secured' ? AppColors.yellowMain : AppColors.techAzure) 
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
-            color: isSelected ? AppColors.techAzure : AppColors.textSecondary,
+            color: isSelected 
+                ? (title == 'Secured' ? AppColors.yellowMain : AppColors.techAzure) 
+                : AppColors.textSecondary,
             width: 1,
           ),
         ),
@@ -85,6 +89,7 @@ class CredexTypeSection extends StatelessWidget {
   final String accountName;
   final bool isEnabled;
   final bool showFullContent;
+  final String amount;
   
   const CredexTypeSection({
     super.key,
@@ -97,134 +102,52 @@ class CredexTypeSection extends StatelessWidget {
     required this.accountName,
     this.isEnabled = true,
     this.showFullContent = false,
+    this.amount = "0.00",
   });
   
   @override
   Widget build(BuildContext context) {
-    // If not showing full content, just show an empty card with title
+    // If not showing full content, just show an empty container
     if (!showFullContent) {
-      return StyledCard.gold(
-        title: '4. Type',
-        child: Container(
-          height: 10,
-        ),
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
       );
     }
     
-    // Otherwise show the full card content
-    return StyledCard.gold(
-      title: '4. Type',
+    // Otherwise show the full content without a card or title
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch, // Changed to stretch to center the text
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Credex Type Selector
-          Opacity(
-            opacity: isEnabled ? 1.0 : 0.6,
-            child: CredexTypeSelector(
-              credexType: credexType,
-              onCredexTypeChanged: isEnabled ? onCredexTypeChanged : (_) {},
-            ),
+          CredexTypeSelector(
+            credexType: credexType,
+            onCredexTypeChanged: onCredexTypeChanged,
           ),
           
-          const SizedBox(height: 16),
-          
-          // Informational text based on selected credex type
+          // Show appropriate content based on credex type
           if (credexType == CredexType.SECURED) ...[
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16.0),
+            // Show amount and denomination with "transferred immediately" text for Secured
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Text(
-                "Issuing secured credex gradually improves your credit score.",
+                "$amount $selectedDenomination will be transferred immediately from your Secured Balance",
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                 ),
                 textAlign: TextAlign.center,
-              ),
-            ),
-            
-            // Secured balance display with improved formatting
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: AppColors.techAzure.withOpacity(0.5),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    accountName,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Secured Balance:",
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        "$availableBalance $selectedDenomination",
-                        style: const TextStyle(
-                          color: AppColors.techAzure,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
           ] else if (credexType == CredexType.UNSECURED) ...[
-            // COMING SOON text with prominent styling - centered
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 8.0),
-                child: Text(
-                  "COMING SOON",
-                  style: TextStyle(
-                    color: AppColors.darkRed,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16.0),
-              child: Text(
-                "Issuing unsecured credex and providing the promised value by the agreed date immediately boosts your credit score.",
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            
-            // Due Date Selector
-            Opacity(
-              opacity: isEnabled ? 1.0 : 0.6,
-              child: DueDateSelector(
-                selectedDate: dueDate,
-                onDateChanged: isEnabled ? onDueDateChanged : (_) {},
-              ),
+            // Due Date Selector for Unsecured
+            DueDateSelector(
+              selectedDate: dueDate,
+              onDateChanged: onDueDateChanged,
+              amount: amount,
+              denomination: selectedDenomination,
             ),
           ],
         ],
