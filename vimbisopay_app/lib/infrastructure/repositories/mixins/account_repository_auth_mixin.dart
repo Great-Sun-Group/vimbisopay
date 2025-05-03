@@ -82,6 +82,8 @@ mixin AccountRepositoryAuthMixin on BaseAccountRepository {
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
             'profilePictureThumbnail': profileThumbnailUrl,
+            'remainingAvailableUSD': dashboardData['member']['remainingAvailableUSD'],
+            'creditRating': dashboardData['member']['creditRating'],
           },
           'accounts': dashboardData['accounts']
               .map((accountData) => {

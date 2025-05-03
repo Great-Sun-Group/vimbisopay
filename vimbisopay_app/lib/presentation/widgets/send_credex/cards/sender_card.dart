@@ -14,6 +14,7 @@ class SenderAccountCard extends StatelessWidget {
   final String? profileImageUrl;
   final String? memberName;
   final bool showSecuredBalance;
+  final dashboard.CreditRating? creditRating;
   
   const SenderAccountCard({
     super.key,
@@ -24,6 +25,7 @@ class SenderAccountCard extends StatelessWidget {
     this.profileImageUrl,
     this.memberName,
     this.showSecuredBalance = false,
+    this.creditRating,
   });
   
   @override
@@ -83,33 +85,41 @@ class SenderAccountCard extends StatelessWidget {
                   ),
                 ],
                 
-                // Show only the "not yet established" credit rating bar for Unsecured credex
+                // Show credit rating bar for Unsecured credex
                 if (credexType == CredexType.UNSECURED) ...[
                   const SizedBox(height: 12),
                   
-                  // Credit rating bar for unestablished rating
-                  Container(
-                    height: 18,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: AppColors.techAzure,
-                        width: 1.0,
-                      ),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        "Owner credit rating not yet established",
-                        style: TextStyle(
+                  // Credit rating bar based on creditRating data
+                  if (creditRating == null || 
+                      (creditRating!.redeemedTotalUSD == 0 && 
+                       creditRating!.outstandingTotalUSD == 0 && 
+                       creditRating!.defaultedTotalUSD == 0 && 
+                       creditRating!.writtenOffTotalUSD == 0)) 
+                    // Show "not yet established" for no credit history
+                    Container(
+                      height: 18,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
                           color: AppColors.techAzure,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                          width: 1.0,
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ),
+                      child: const Center(
+                        child: Text(
+                          "Owner credit rating not yet established",
+                          style: TextStyle(
+                            color: AppColors.techAzure,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  else
+                    _buildCreditRatingBar(creditRating!),
                 ],
               ],
             ),
@@ -136,6 +146,122 @@ class SenderAccountCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+  
+  Widget _buildCreditRatingBar(dashboard.CreditRating rating) {
+    // Calculate percentages for the credit rating bar
+    double total = rating.redeemedTotalUSD + 
+                 rating.outstandingTotalUSD + 
+                 rating.defaultedTotalUSD + 
+                 rating.writtenOffTotalUSD;
+    
+    // Calculate percentages of each component
+    int redeemedPercent = total > 0 ? ((rating.redeemedTotalUSD / total) * 100).round() : 0;
+    int outstandingPercent = total > 0 ? ((rating.outstandingTotalUSD / total) * 100).round() : 0;
+    int defaultedPercent = total > 0 ? ((rating.defaultedTotalUSD / total) * 100).round() : 0;
+    int writtenOffPercent = total > 0 ? ((rating.writtenOffTotalUSD / total) * 100).round() : 0;
+    
+    // Ensure minimum visibility for non-zero values
+    if (rating.redeemedTotalUSD > 0 && redeemedPercent == 0) redeemedPercent = 1;
+    if (rating.outstandingTotalUSD > 0 && outstandingPercent == 0) outstandingPercent = 1;
+    if (rating.defaultedTotalUSD > 0 && defaultedPercent == 0) defaultedPercent = 1;
+    if (rating.writtenOffTotalUSD > 0 && writtenOffPercent == 0) writtenOffPercent = 1;
+    
+    // Adjust percentages to ensure they sum to 100%
+    int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
+    if (sum != 100) {
+      // Find the largest component to adjust
+      int largest = redeemedPercent;
+      String largestType = "redeemed";
+      
+      if (outstandingPercent > largest) {
+        largest = outstandingPercent;
+        largestType = "outstanding";
+      }
+      if (defaultedPercent > largest) {
+        largest = defaultedPercent;
+        largestType = "defaulted";
+      }
+      if (writtenOffPercent > largest) {
+        largest = writtenOffPercent;
+        largestType = "writtenOff";
+      }
+      
+      // Adjust the largest component
+      if (largestType == "redeemed") {
+        redeemedPercent += (100 - sum);
+      } else if (largestType == "outstanding") {
+        outstandingPercent += (100 - sum);
+      } else if (largestType == "defaulted") {
+        defaultedPercent += (100 - sum);
+      } else {
+        writtenOffPercent += (100 - sum);
+      }
+    }
+    
+    // Return credit rating bar with calculated percentages
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        // Bar graph with calculated proportions
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            height: 18,
+            width: double.infinity,
+            child: Row(
+              children: [
+                // Redeemed (green)
+                if (redeemedPercent > 0)
+                  Expanded(
+                    flex: redeemedPercent,
+                    child: Container(
+                      color: AppColors.green,
+                    ),
+                  ),
+                // Outstanding (blue)
+                if (outstandingPercent > 0)
+                  Expanded(
+                    flex: outstandingPercent,
+                    child: Container(
+                      color: AppColors.techAzure,
+                    ),
+                  ),
+                // Defaulted (yellowPrimary)
+                if (defaultedPercent > 0)
+                  Expanded(
+                    flex: defaultedPercent,
+                    child: Container(
+                      color: AppColors.yellowPrimary,
+                    ),
+                  ),
+                // Written off (red)
+                if (writtenOffPercent > 0)
+                  Expanded(
+                    flex: writtenOffPercent,
+                    child: Container(
+                      color: AppColors.darkRed,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Owner credit rating text inside the bar
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Text(
+            "Owner credit rating",
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

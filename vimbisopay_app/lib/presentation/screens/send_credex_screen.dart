@@ -262,6 +262,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                   memberName: memberName,
                                   // Show secured balance in the sender account card
                                   showSecuredBalance: state.credexType == CredexType.SECURED,
+                                  // Pass credit rating data
+                                  creditRating: snapshot.data?.dashboard?.member.creditRating,
                                 );
                               },
                             ),
@@ -322,6 +324,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                 profileImageUrl: profileImageUrl,
                                 memberName: memberName,
                                 isVerifying: state.status == SendCredexStatus.verifyingRecipient,
+                                // Pass credit rating data
+                                creditRating: snapshot.data?.dashboard?.member.creditRating,
                               );
                             },
                           ),
@@ -342,8 +346,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                     snapshot.data!.dashboard != null) {
                                   memberTier = snapshot.data!.dashboard!.member.memberTier;
                                   
-                                  // Temporarily removed remainingAvailableUSD reference
-                                  dailyLimit = 10;
+                                  // Use remainingAvailableUSD from the dashboard
+                                  dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
                                 }
                                 
                                 return AmountInputCard(
