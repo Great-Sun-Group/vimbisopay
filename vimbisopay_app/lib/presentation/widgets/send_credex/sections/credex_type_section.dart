@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/inputs/due_date_input.dart';
 
 /// Widget for Credex type selection
@@ -102,7 +101,7 @@ class CredexTypeSection extends StatelessWidget {
     required this.accountName,
     this.isEnabled = true,
     this.showFullContent = false,
-    this.amount = "0.00",
+    this.amount = '0.00',
   });
   
   @override
@@ -132,8 +131,8 @@ class CredexTypeSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Text(
-                "$amount $selectedDenomination will be transferred immediately from your Secured Balance",
-                style: TextStyle(
+                '$amount $selectedDenomination will be transferred immediately from your Secured Balance',
+                style: const TextStyle(
                   color: AppColors.primary,
                   fontSize: 14,
                   fontStyle: FontStyle.italic,

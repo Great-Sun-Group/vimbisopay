@@ -47,6 +47,7 @@ dependencies:
   geolocator: ^13.0.3
   connectivity_plus: ^5.0.2  # For monitoring network connectivity
   flutter_dotenv: ^5.1.0     # For loading environment variables
+  shared_preferences: any
   meta: any
 dev_dependencies:
   flutter_test:

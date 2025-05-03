@@ -13,8 +13,8 @@ class DueDateSelector extends StatelessWidget {
     super.key,
     this.selectedDate,
     required this.onDateChanged,
-    this.amount = "0.00",
-    this.denomination = "USD",
+    this.amount = '0.00',
+    this.denomination = 'USD',
   });
 
   @override
@@ -54,7 +54,7 @@ class DueDateSelector extends StatelessWidget {
                   Expanded(
                     child: Text(
                       selectedDate == null 
-                          ? "No due date" 
+                          ? 'No due date' 
                           : DateFormatter.formatLongDate(selectedDate!),
                       style: TextStyle(
                         color: selectedDate == null

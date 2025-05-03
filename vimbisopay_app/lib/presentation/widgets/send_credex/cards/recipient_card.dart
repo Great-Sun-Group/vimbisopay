@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
 /// Widget to display verified recipient information
 class VerifiedRecipientCard extends StatelessWidget {
@@ -95,7 +94,7 @@ class VerifiedRecipientCard extends StatelessWidget {
                           ),
                           child: const Center(
                             child: Text(
-                              "Credit rating not yet established",
+                              'Credit rating not yet established',
                               style: TextStyle(
                                 color: AppColors.techAzure,
                                 fontSize: 11,
@@ -160,7 +159,7 @@ class VerifiedRecipientCard extends StatelessWidget {
   
   Widget _buildCreditRatingBar(dashboard.CreditRating rating) {
     // Calculate percentages for the credit rating bar
-    double total = rating.redeemedTotalUSD + 
+    final double total = rating.redeemedTotalUSD + 
                  rating.outstandingTotalUSD + 
                  rating.defaultedTotalUSD + 
                  rating.writtenOffTotalUSD;
@@ -178,31 +177,31 @@ class VerifiedRecipientCard extends StatelessWidget {
     if (rating.writtenOffTotalUSD > 0 && writtenOffPercent == 0) writtenOffPercent = 1;
     
     // Adjust percentages to ensure they sum to 100%
-    int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
+    final int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
     if (sum != 100) {
       // Find the largest component to adjust
       int largest = redeemedPercent;
-      String largestType = "redeemed";
+      String largestType = 'redeemed';
       
       if (outstandingPercent > largest) {
         largest = outstandingPercent;
-        largestType = "outstanding";
+        largestType = 'outstanding';
       }
       if (defaultedPercent > largest) {
         largest = defaultedPercent;
-        largestType = "defaulted";
+        largestType = 'defaulted';
       }
       if (writtenOffPercent > largest) {
         largest = writtenOffPercent;
-        largestType = "writtenOff";
+        largestType = 'writtenOff';
       }
       
       // Adjust the largest component
-      if (largestType == "redeemed") {
+      if (largestType == 'redeemed') {
         redeemedPercent += (100 - sum);
-      } else if (largestType == "outstanding") {
+      } else if (largestType == 'outstanding') {
         outstandingPercent += (100 - sum);
-      } else if (largestType == "defaulted") {
+      } else if (largestType == 'defaulted') {
         defaultedPercent += (100 - sum);
       } else {
         writtenOffPercent += (100 - sum);
@@ -216,7 +215,7 @@ class VerifiedRecipientCard extends StatelessWidget {
         // Bar graph with calculated proportions
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: Container(
+          child: SizedBox(
             height: 18,
             width: double.infinity,
             child: Row(
@@ -259,11 +258,11 @@ class VerifiedRecipientCard extends StatelessWidget {
         ),
         
         // Credit rating text inside the bar
-        Padding(
-          padding: const EdgeInsets.only(left: 8.0),
+        const Padding(
+          padding: EdgeInsets.only(left: 8.0),
           child: Text(
-            "Credit rating",
-            style: const TextStyle(
+            'Credit rating',
+            style: TextStyle(
               color: Colors.black,
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -347,7 +346,7 @@ class RecipientInputCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
+                      borderSide: const BorderSide(
                         color: AppColors.textSecondary, 
                         width: 1
                       ),

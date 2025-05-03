@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
 /// Widget for amount input and denomination selection
 class AmountInputSection extends StatelessWidget {

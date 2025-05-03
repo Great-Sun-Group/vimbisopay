@@ -45,7 +45,7 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
             // Display Free Tier and remaining daily limit if provided
             if (widget.remainingDailyLimit != null && widget.denomination != null) ...[
               const Text(
-                "Free Tier",
+                'Free Tier',
                 style: TextStyle(
                   color: AppColors.darkRed,
                   fontSize: 20,
@@ -54,7 +54,7 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "Remaining Daily Limit:",
+                'Remaining Daily Limit:',
                 style: TextStyle(
                   color: AppColors.darkRed,
                   fontSize: 16,
@@ -63,7 +63,7 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                "${widget.remainingDailyLimit!.toStringAsFixed(2)} ${widget.denomination}",
+                '${widget.remainingDailyLimit!.toStringAsFixed(2)} ${widget.denomination}',
                 style: const TextStyle(
                   color: AppColors.darkRed,
                   fontSize: 16,

@@ -112,8 +112,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
       final user = await _userFuture;
       if (user != null && 
           user.dashboard != null && 
-          user.dashboard!.member.memberTier != null && 
-          user.dashboard!.member.memberTier! < 3) {
+          user.dashboard!.member.memberTier < 3) {
         
         // Wait for the bloc state to be fully initialized
         await Future.delayed(const Duration(milliseconds: 500));
@@ -127,7 +126,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           showDialog(
             context: context,
             builder: (context) => TierLimitDialog(
-              message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+              message: 'Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.',
               accountId: widget.senderAccount.accountID,
               homeBloc: widget.homeBloc,
               remainingDailyLimit: user.dashboard!.member.remainingAvailableUSD,
@@ -374,7 +373,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         ],
                         
                         // Amount section - always visible but disabled until recipient is verified
-                        Container(
+                        SizedBox(
                             width: double.infinity,
                             child: FutureBuilder<User?>(
                               future: _userFuture,
@@ -409,7 +408,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                     showDialog(
                                       context: context,
                                       builder: (context) => TierLimitDialog(
-                                        message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+                                        message: 'Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.',
                                         accountId: widget.senderAccount.accountID,
                                         homeBloc: widget.homeBloc,
                                       ),
@@ -450,7 +449,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         
                         // Credex Type Section - moved below the amount section as requested
                         if (state.senderAccount != null)
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: FutureBuilder<User?>(
                             future: _userFuture,
@@ -498,18 +497,18 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             final denom = state.selectedDenomination.toString().split('.').last;
                             
                             // Create a list to store warning messages
-                            List<String> warningMessages = [];
+                            final List<String> warningMessages = [];
                             
                             // Check for daily limit exceeded for memberTier < 3 (applies to both secured and unsecured)
                             if (memberTier != null && memberTier < 3 && dailyLimit != null && amount > dailyLimit) {
-                              warningMessages.add("Amount exceeds your daily limit of ${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom");
+                              warningMessages.add('Amount exceeds your daily limit of ${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom');
                             } 
                             
                             // Check for insufficient secured balance (only applies to secured transactions)
                             if (state.credexType == CredexType.SECURED && 
                                     state.senderAccount?.accountType != 'TRUST' && 
                                     amount > state.availableBalance) {
-                              warningMessages.add("Amount exceeds your available secured balance of ${state.availableBalance.toStringAsFixed(state.decimalPlaces)} $denom");
+                              warningMessages.add('Amount exceeds your available secured balance of ${state.availableBalance.toStringAsFixed(state.decimalPlaces)} $denom');
                             }
                             
                             // Display warning messages if needed
@@ -567,14 +566,13 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             if (canSubmit && 
                                 snapshot.hasData && 
                                 snapshot.data != null && 
-                                snapshot.data!.dashboard != null &&
-                                snapshot.data!.dashboard!.member.memberTier != null && 
-                                snapshot.data!.dashboard!.member.memberTier! < 3) {
+                                snapshot.data!.dashboard != null && 
+                                snapshot.data!.dashboard!.member.memberTier < 3) {
                               
                               final dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
                               final amount = double.tryParse(state.amount) ?? 0.0;
                               
-                              if (dailyLimit != null && amount > dailyLimit) {
+                              if (amount > dailyLimit) {
                                 canSubmit = false; // Amount exceeds daily limit
                               }
                             }
@@ -630,7 +628,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         const Text(
-                                          "Remaining Daily Limit:",
+                                          'Remaining Daily Limit:',
                                           style: TextStyle(
                                             color: AppColors.darkRed, // Red text for daily limit
                                             fontSize: 14,
@@ -638,7 +636,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                           ),
                                         ),
                                         Text(
-                                          "${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom",
+                                          '${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom',
                                           style: const TextStyle(
                                             color: AppColors.darkRed, // Red text for daily limit
                                             fontSize: 14,
@@ -652,7 +650,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                       width: double.infinity,
                                       alignment: Alignment.center,
                                       child: const Text(
-                                        "Unlimited transactions: \$1/month",
+                                        'Unlimited transactions: \$1/month',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: AppColors.textSecondary,
@@ -665,7 +663,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                       width: double.infinity,
                                       alignment: Alignment.center,
                                       child: const Text(
-                                        "Upgrade now and get a full year for \$1 USD",
+                                        'Upgrade now and get a full year for \$1 USD',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: AppColors.green,
@@ -679,7 +677,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                         showDialog(
                                           context: context,
                                           builder: (context) => TierLimitDialog(
-                                            message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+                                            message: 'Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.',
                                             accountId: widget.senderAccount.accountID,
                                             homeBloc: widget.homeBloc,
                                             remainingDailyLimit: dailyLimit,
@@ -696,7 +694,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                         ),
                                         alignment: Alignment.center,
                                         child: const Text(
-                                          "UPGRADE",
+                                          'UPGRADE',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 14,

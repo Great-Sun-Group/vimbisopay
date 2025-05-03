@@ -87,7 +87,7 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog> wit
                 ),
               ),
               const SizedBox(height: 24),
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: Text(
                   widget.response.data.action.details.securedCredex 

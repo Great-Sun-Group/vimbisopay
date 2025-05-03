@@ -247,7 +247,7 @@ class _TransactionsListState extends State<TransactionsList> {
     
     // Determine colors based on secured status
     final Color accentColor = offer.secured ? AppColors.yellowMain : AppColors.techAzure;
-    final String securedText = offer.secured ? "SECURED" : "UNSECURED";
+    final String securedText = offer.secured ? 'SECURED' : 'UNSECURED';
     
     final Widget transactionCard = Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
@@ -344,7 +344,7 @@ class _TransactionsListState extends State<TransactionsList> {
                                 isProcessing)
                             ? null
                             : () => _declineTransaction(context, offer.credexID),
-                        child: Text(
+                        child: const Text(
                           'Decline',
                           style: TextStyle(
                             color: AppColors.error,
@@ -375,8 +375,8 @@ class _TransactionsListState extends State<TransactionsList> {
                     if (offer.dueDate != null || !offer.secured) 
                       Text(
                         offer.dueDate != null 
-                            ? "Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}"
-                            : "No due date",
+                            ? 'Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}'
+                            : 'No due date',
                         style: TextStyle(
                           color: accentColor,
                           fontSize: 12,
@@ -599,7 +599,7 @@ class _TransactionsListState extends State<TransactionsList> {
 
   Widget _buildCreditRatingBar(CreditRating rating) {
     // Calculate percentages for the credit rating bar
-    double total = rating.redeemedTotalUSD + 
+    final double total = rating.redeemedTotalUSD + 
                  rating.outstandingTotalUSD + 
                  rating.defaultedTotalUSD + 
                  rating.writtenOffTotalUSD;
@@ -617,31 +617,31 @@ class _TransactionsListState extends State<TransactionsList> {
     if (rating.writtenOffTotalUSD > 0 && writtenOffPercent == 0) writtenOffPercent = 1;
     
     // Adjust percentages to ensure they sum to 100%
-    int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
+    final int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
     if (sum != 100 && sum > 0) {
       // Find the largest component to adjust
       int largest = redeemedPercent;
-      String largestType = "redeemed";
+      String largestType = 'redeemed';
       
       if (outstandingPercent > largest) {
         largest = outstandingPercent;
-        largestType = "outstanding";
+        largestType = 'outstanding';
       }
       if (defaultedPercent > largest) {
         largest = defaultedPercent;
-        largestType = "defaulted";
+        largestType = 'defaulted';
       }
       if (writtenOffPercent > largest) {
         largest = writtenOffPercent;
-        largestType = "writtenOff";
+        largestType = 'writtenOff';
       }
       
       // Adjust the largest component
-      if (largestType == "redeemed") {
+      if (largestType == 'redeemed') {
         redeemedPercent += (100 - sum);
-      } else if (largestType == "outstanding") {
+      } else if (largestType == 'outstanding') {
         outstandingPercent += (100 - sum);
-      } else if (largestType == "defaulted") {
+      } else if (largestType == 'defaulted') {
         defaultedPercent += (100 - sum);
       } else {
         writtenOffPercent += (100 - sum);
@@ -662,7 +662,7 @@ class _TransactionsListState extends State<TransactionsList> {
         ),
         child: const Center(
           child: Text(
-            "Counterparty credit rating not yet established",
+            'Counterparty credit rating not yet established',
             style: TextStyle(
               color: AppColors.techAzure,
               fontSize: 11,
@@ -681,7 +681,7 @@ class _TransactionsListState extends State<TransactionsList> {
         // Bar graph with calculated proportions
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: Container(
+          child: SizedBox(
             height: 18,
             width: double.infinity,
             child: Row(
@@ -724,11 +724,11 @@ class _TransactionsListState extends State<TransactionsList> {
         ),
         
         // Counterparty credit rating text inside the bar
-        Padding(
-          padding: const EdgeInsets.only(left: 8.0),
+        const Padding(
+          padding: EdgeInsets.only(left: 8.0),
           child: Text(
-            "Counterparty credit rating",
-            style: const TextStyle(
+            'Counterparty credit rating',
+            style: TextStyle(
               color: Colors.black,
               fontSize: 11,
               fontWeight: FontWeight.bold,

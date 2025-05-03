@@ -140,7 +140,7 @@ class _DueDateSelectorState extends State<DueDateSelector> {
                   Expanded(
                     child: Text(
                       widget.selectedDate == null 
-                          ? "No due date" 
+                          ? 'No due date' 
                           : _formatDate(_effectiveDate!),
                       style: TextStyle(
                         color: widget.selectedDate == null
