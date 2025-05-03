@@ -79,8 +79,8 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
                     denomination: action['details']['denomination'],
                     securedCredex: action['details']['securedCredex'],
                     receiverAccountID: action['details']['receiverAccountID'],
-                    receiverAccountName: action['details']
-                        ['receiverAccountName'],
+                    receiverAccountName: action['details']['receiverAccountName'],
+                    dueDate: action['details']['dueDate'] as String?,
                   ),
                 ),
                 dashboard: credex.CredexDashboard(

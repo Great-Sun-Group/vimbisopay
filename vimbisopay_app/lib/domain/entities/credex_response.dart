@@ -40,6 +40,7 @@ class CredexActionDetails {
   final bool securedCredex;
   final String receiverAccountID;
   final String receiverAccountName;
+  final String? dueDate;
 
   CredexActionDetails({
     required this.amount,
@@ -47,6 +48,7 @@ class CredexActionDetails {
     required this.securedCredex,
     required this.receiverAccountID,
     required this.receiverAccountName,
+    this.dueDate,
   });
 }
 
@@ -222,6 +224,7 @@ class PendingOffer {
   final String formattedInitialAmount;
   final String counterpartyAccountName;
   final bool secured;
+  final DateTime? dueDate;
 
   // Computed unique identifier that combines multiple fields
   String get uniqueIdentifier {
@@ -236,6 +239,7 @@ class PendingOffer {
     required this.formattedInitialAmount,
     required this.counterpartyAccountName,
     required this.secured,
+    this.dueDate,
   });
 
   Map<String, dynamic> toMap() => {
@@ -243,6 +247,7 @@ class PendingOffer {
     'formattedInitialAmount': formattedInitialAmount,
     'counterpartyAccountName': counterpartyAccountName,
     'secured': secured,
+    'dueDate': dueDate?.toIso8601String(),
   };
 
   factory PendingOffer.fromMap(Map<String, dynamic> map) {
@@ -280,11 +285,34 @@ class PendingOffer {
       formattedAmount = '0.00 CXX'; // Fallback in case of any parsing errors
     }
 
+    // Parse due date if available
+    DateTime? dueDate;
+    if (map.containsKey('dueDate') && map['dueDate'] != null) {
+      try {
+        if (map['dueDate'] is String) {
+          dueDate = DateTime.parse(map['dueDate'] as String);
+        }
+      } catch (e) {
+        // Ignore parsing errors and leave dueDate as null
+      }
+    }
+
+    // Determine if the credex is secured
+    // If the secured field is missing but dueDate is present, it's unsecured
+    // If both are missing, default to secured for backward compatibility
+    bool isSecured = true;
+    if (map.containsKey('secured')) {
+      isSecured = map['secured'] as bool;
+    } else if (map.containsKey('dueDate') && map['dueDate'] != null) {
+      isSecured = false; // If it has a due date but no secured field, it's unsecured
+    }
+
     return PendingOffer(
       credexID: map['credexID'] as String,
       formattedInitialAmount: formattedAmount,
       counterpartyAccountName: map['counterpartyAccountName'] as String,
-      secured: map['secured'] as bool,
+      secured: isSecured,
+      dueDate: dueDate,
     );
   }
 }

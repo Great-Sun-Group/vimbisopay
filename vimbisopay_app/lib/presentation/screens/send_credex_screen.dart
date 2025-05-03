@@ -46,6 +46,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   final _recipientFocusNode = FocusNode();
   late final SendCredexBloc _bloc;
   bool _isAmountFirstEdit = true;
+  bool _hasShownUpgradeDialog = false; // Track if we've shown the upgrade dialog
   
   // Cache the user data to avoid multiple database queries
   Future<User?>? _userFuture;
@@ -79,6 +80,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     
     // Cache the user data to avoid multiple database queries
     _userFuture = widget.databaseHelper.getUser();
+    
+    // Check if we need to show the upgrade dialog automatically
+    _checkAndShowUpgradeDialog();
   }
   
   void _setupAmountFocusListener() {
@@ -97,6 +101,39 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           final amount = double.tryParse(_amountController.text) ?? 0.0;
           _amountController.text = amount.toStringAsFixed(_bloc.state.decimalPlaces);
           _bloc.add(UpdateAmountEvent(_amountController.text));
+        }
+      }
+    });
+  }
+  
+  // Check if we need to show the upgrade dialog automatically for members with memberTier < 3
+  void _checkAndShowUpgradeDialog() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = await _userFuture;
+      if (user != null && 
+          user.dashboard != null && 
+          user.dashboard!.member.memberTier != null && 
+          user.dashboard!.member.memberTier! < 3) {
+        
+        // Wait for the bloc state to be fully initialized
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Get the denomination from the bloc state
+        final denom = _bloc.state.selectedDenomination.toString().split('.').last;
+        
+        // Show the upgrade dialog with the remaining daily limit
+        if (mounted && !_hasShownUpgradeDialog) {
+          _hasShownUpgradeDialog = true; // Prevent showing multiple times
+          showDialog(
+            context: context,
+            builder: (context) => TierLimitDialog(
+              message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+              accountId: widget.senderAccount.accountID,
+              homeBloc: widget.homeBloc,
+              remainingDailyLimit: user.dashboard!.member.remainingAvailableUSD,
+              denomination: denom,
+            ),
+          );
         }
       }
     });
@@ -314,6 +351,14 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                 memberName = '${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}';
                               }
                               
+                              // Convert credit rating data from verifiedAccountDetails if available
+                              dashboard.CreditRating? recipientCreditRating;
+                              if (state.verifiedAccountDetails!.containsKey('creditRating') && 
+                                  state.verifiedAccountDetails!['creditRating'] != null) {
+                                final creditRatingData = state.verifiedAccountDetails!['creditRating'] as Map<String, dynamic>;
+                                recipientCreditRating = dashboard.CreditRating.fromMap(creditRatingData);
+                              }
+                              
                               return VerifiedRecipientCard(
                                 accountDetails: state.verifiedAccountDetails!,
                                 onChangeRecipient: () => _bloc.add(const ChangeRecipientEvent()),
@@ -321,8 +366,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                 profileImageUrl: profileImageUrl,
                                 memberName: memberName,
                                 isVerifying: state.status == SendCredexStatus.verifyingRecipient,
-                                // Pass credit rating data
-                                creditRating: snapshot.data?.dashboard?.member.creditRating,
+                                // Pass recipient's credit rating data from verifiedAccountDetails
+                                creditRating: recipientCreditRating,
                               );
                             },
                           ),
@@ -434,16 +479,239 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // Add spacing above the Sign Offer button
                         const SizedBox(height: 16),
                         
+                        // Display warning message if button is disabled
+                        FutureBuilder<User?>(
+                          future: _userFuture,
+                          builder: (context, snapshot) {
+                            // Get member tier and daily limit from user data
+                            int? memberTier;
+                            double? dailyLimit;
+                            
+                            if (snapshot.hasData && 
+                                snapshot.data != null && 
+                                snapshot.data!.dashboard != null) {
+                              memberTier = snapshot.data!.dashboard!.member.memberTier;
+                              dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
+                            }
+                            
+                            final amount = double.tryParse(state.amount) ?? 0.0;
+                            final denom = state.selectedDenomination.toString().split('.').last;
+                            
+                            // Create a list to store warning messages
+                            List<String> warningMessages = [];
+                            
+                            // Check for daily limit exceeded for memberTier < 3 (applies to both secured and unsecured)
+                            if (memberTier != null && memberTier < 3 && dailyLimit != null && amount > dailyLimit) {
+                              warningMessages.add("Amount exceeds your daily limit of ${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom");
+                            } 
+                            
+                            // Check for insufficient secured balance (only applies to secured transactions)
+                            if (state.credexType == CredexType.SECURED && 
+                                    state.senderAccount?.accountType != 'TRUST' && 
+                                    amount > state.availableBalance) {
+                              warningMessages.add("Amount exceeds your available secured balance of ${state.availableBalance.toStringAsFixed(state.decimalPlaces)} $denom");
+                            }
+                            
+                            // Display warning messages if needed
+                            if (warningMessages.isNotEmpty) {
+                              return Column(
+                                children: warningMessages.map((message) {
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8.0),
+                                    padding: const EdgeInsets.all(8.0),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: AppColors.darkRed,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: AppColors.darkRed,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            message,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: AppColors.darkRed,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            }
+                            
+                            return const SizedBox.shrink(); // Return empty widget if no warning needed
+                          },
+                        ),
+                        
                         // Submit button - always visible but disabled until all conditions are met
-                        ActionButton(
-                          label: 'Sign Offer',
-                          onPressed: _canSubmitCredex(state) ? _handleSubmit : null,
-                          isLoading: state.isLoading,
-                          backgroundColor: _shouldShowWarningColor(state) 
-                              ? AppColors.darkRed 
-                              : (state.credexType == CredexType.SECURED 
-                                  ? AppColors.primary // Gold for Secured
-                                  : AppColors.techAzure), // Teal for Unsecured
+                        FutureBuilder<User?>(
+                          future: _userFuture,
+                          builder: (context, snapshot) {
+                            // Check if we need to disable the button due to daily limit
+                            bool canSubmit = _canSubmitCredex(state);
+                            
+                            // Additional check for daily limit for memberTier < 3
+                            if (canSubmit && 
+                                snapshot.hasData && 
+                                snapshot.data != null && 
+                                snapshot.data!.dashboard != null &&
+                                snapshot.data!.dashboard!.member.memberTier != null && 
+                                snapshot.data!.dashboard!.member.memberTier! < 3) {
+                              
+                              final dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
+                              final amount = double.tryParse(state.amount) ?? 0.0;
+                              
+                              if (dailyLimit != null && amount > dailyLimit) {
+                                canSubmit = false; // Amount exceeds daily limit
+                              }
+                            }
+                            
+                            return ActionButton(
+                              label: 'Sign Offer',
+                              onPressed: canSubmit ? _handleSubmit : null,
+                              isLoading: state.isLoading,
+                              backgroundColor: _shouldShowWarningColor(state) 
+                                  ? AppColors.darkRed 
+                                  : (state.credexType == CredexType.SECURED 
+                                      ? AppColors.primary // Gold for Secured
+                                      : AppColors.techAzure), // Teal for Unsecured
+                            );
+                          },
+                        ),
+                        
+                        // Daily Limit display - moved here from AmountInputCard
+                        FutureBuilder<User?>(
+                          future: _userFuture,
+                          builder: (context, snapshot) {
+                            // Get member tier and daily limit from user data
+                            int? memberTier;
+                            double? dailyLimit;
+                            
+                            if (snapshot.hasData && 
+                                snapshot.data != null && 
+                                snapshot.data!.dashboard != null) {
+                              memberTier = snapshot.data!.dashboard!.member.memberTier;
+                              
+                              // Use remainingAvailableUSD from the dashboard
+                              dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
+                            }
+                            
+                            // Only show for memberTier < 3
+                            if (memberTier != null && memberTier < 3 && dailyLimit != null) {
+                              final denom = state.selectedDenomination.toString().split('.').last;
+                              
+                              return Container(
+                                margin: const EdgeInsets.only(top: 16.0),
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: AppColors.darkRed, // Red color for daily limit
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          "Remaining Daily Limit:",
+                                          style: TextStyle(
+                                            color: AppColors.darkRed, // Red text for daily limit
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          "${dailyLimit.toStringAsFixed(state.decimalPlaces)} $denom",
+                                          style: const TextStyle(
+                                            color: AppColors.darkRed, // Red text for daily limit
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: double.infinity,
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                        "Unlimited transactions: \$1/month",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: double.infinity,
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                        "Upgrade now and get a full year for \$1 USD",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: AppColors.green,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    InkWell(
+                                      onTap: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => TierLimitDialog(
+                                            message: "Upgrade to Hustler10k to increase your daily transaction limit and unlock additional features.",
+                                            accountId: widget.senderAccount.accountID,
+                                            homeBloc: widget.homeBloc,
+                                            remainingDailyLimit: dailyLimit,
+                                            denomination: denom,
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.green, // Green color for upgrade button
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const Text(
+                                          "UPGRADE",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            
+                            return const SizedBox.shrink(); // Return empty widget if conditions not met
+                          },
                         ),
                       ],
                     ),
@@ -464,10 +732,19 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     _bloc.add(const SendCredexSubmitEvent());
   }
   
-  // Determines if the credex can be submitted based on all conditions
+  // Determines if the credex can be submitted based on basic conditions
   bool _canSubmitCredex(SendCredexState state) {
-    // Use the state's canSubmit property which now correctly handles all business rules
-    return state.canSubmit;
+    if (!state.canSubmit) return false;
+    
+    // Check for insufficient secured balance
+    final amount = double.tryParse(state.amount) ?? 0.0;
+    if (state.credexType == CredexType.SECURED && 
+        state.senderAccount?.accountType != 'TRUST' && 
+        amount > state.availableBalance) {
+      return false;
+    }
+    
+    return true;
   }
   
   // Determines if the button should show a warning color
@@ -480,19 +757,12 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     }
     
     // For non-TRUST accounts, check if there's insufficient balance for secured credex
-    return _hasInsufficientBalance(state);
-  }
-  
-  // Helper method to check if there's insufficient balance for secured Credex
-  bool _hasInsufficientBalance(SendCredexState state) {
-    // Only check balance for secured Credex on non-TRUST accounts
-    if (state.credexType != CredexType.SECURED || 
-        state.senderAccount == null || 
-        state.senderAccount!.accountType == 'TRUST') {
-      return false;
+    if (state.credexType == CredexType.SECURED && 
+        state.senderAccount?.accountType != 'TRUST') {
+      final amount = double.tryParse(state.amount) ?? 0.0;
+      return amount > 0 && amount > state.availableBalance;
     }
     
-    final amount = double.tryParse(state.amount) ?? 0.0;
-    return amount > 0 && amount > state.availableBalance;
+    return false;
   }
 }

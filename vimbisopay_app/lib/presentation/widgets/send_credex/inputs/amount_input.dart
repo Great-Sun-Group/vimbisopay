@@ -160,8 +160,6 @@ class AmountInputCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final denom = selectedDenomination.toString().split('.').last;
-    
     // If not showing full content, just show an empty container
     if (!showFullContent) {
       return Container(
@@ -193,89 +191,7 @@ class AmountInputCard extends StatelessWidget {
               
               const SizedBox(height: 12),
               
-              // Daily Limit display - only show for memberTier < 3
-              if (memberTier != null && memberTier! < 3) ...[
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: AppColors.darkRed, // Red color for daily limit
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Daily Limit:",
-                            style: TextStyle(
-                              color: AppColors.darkRed, // Red text for daily limit
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Builder(
-                                builder: (context) {
-                                  // Force the value to be displayed as is, without any null coalescing
-                                  final displayValue = dailyLimit != null ? dailyLimit!.toStringAsFixed(decimalPlaces) : '0.00';
-                                  return Text(
-                                    "$displayValue $denom",
-                                    style: const TextStyle(
-                                      color: AppColors.darkRed, // Red text for daily limit
-                                      fontSize: 14,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: onUpgradePressed,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.green, // Green color for upgrade button
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    "Upgrade",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "Unlimited transactions: \$1/month",
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        "Upgrade now and get a full year for \$1",
-                        style: TextStyle(
-                          color: AppColors.green,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              // Daily limit box has been moved to under the Sign Offer button in send_credex_screen.dart
             ],
         ),
       ),

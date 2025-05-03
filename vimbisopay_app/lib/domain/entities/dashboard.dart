@@ -590,11 +590,21 @@ class PendingOffer {
       }
     }
 
+    // Determine if the credex is secured
+    // If the secured field is missing but dueDate is present, it's unsecured
+    // If both are missing, default to secured for backward compatibility
+    bool isSecured = true;
+    if (map.containsKey('secured') && map['secured'] != null) {
+      isSecured = map['secured'] as bool;
+    } else if (map.containsKey('dueDate') && map['dueDate'] != null) {
+      isSecured = false; // If it has a due date but no secured field, it's unsecured
+    }
+
     return PendingOffer(
       credexID: map['credexID'] as String,
       formattedInitialAmount: formattedAmount,
       counterpartyAccountName: map['counterpartyAccountName'] as String,
-      secured: map['secured'] as bool,
+      secured: isSecured,
       dueDate: dueDate,
     );
   }
