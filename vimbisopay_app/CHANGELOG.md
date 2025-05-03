@@ -250,3 +250,27 @@ Example entry format:
 -e 
 ## [4.5.3+06] - 2025-05-04
 - fsfsfs
+-e 
+## [4.5.3+07] - 2025-05-04
+- Unsecured credex and minor bug fixes and enhancements
+-e 
+## [4.5.3+08] - 2025-05-04
+- Unsecured credex and minor bug fixes and enhancements 
+-e 
+## [4.5.3+09] - 2025-05-04
+- Unsecured credexes and minor bug fixes and enhancements 
+-e 
+## [4.5.3+10] - 2025-05-04
+- Unsecured credex and minor bug fixes
+-e 
+## [4.5.3+11] - 2025-05-04
+- Unsecured credexes and minor bug fixes
+-e 
+## [4.5.3+12] - 2025-05-04
+- daad
+-e 
+## [4.5.3+12] - 2025-05-04
+- hdhdhd
+-e 
+## [4.5.3+13] - 2025-05-04
+- Unsecured credexes and minor bug fixes
