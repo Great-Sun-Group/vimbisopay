@@ -205,52 +205,72 @@ class AmountInputCard extends StatelessWidget {
                       width: 1,
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
                     children: [
-                      const Text(
-                        "Daily Limit:",
-                        style: TextStyle(
-                          color: AppColors.darkRed, // Red text for daily limit
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Builder(
-                            builder: (context) {
-                              // Force the value to be displayed as is, without any null coalescing
-                              final displayValue = dailyLimit != null ? dailyLimit!.toStringAsFixed(decimalPlaces) : '0.00';
-                              return Text(
-                                "$displayValue $denom",
-                                style: const TextStyle(
-                                  color: AppColors.darkRed, // Red text for daily limit
-                                  fontSize: 14,
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: onUpgradePressed,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.green, // Green color for upgrade button
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                "Upgrade",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                          const Text(
+                            "Daily Limit:",
+                            style: TextStyle(
+                              color: AppColors.darkRed, // Red text for daily limit
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
+                          Row(
+                            children: [
+                              Builder(
+                                builder: (context) {
+                                  // Force the value to be displayed as is, without any null coalescing
+                                  final displayValue = dailyLimit != null ? dailyLimit!.toStringAsFixed(decimalPlaces) : '0.00';
+                                  return Text(
+                                    "$displayValue $denom",
+                                    style: const TextStyle(
+                                      color: AppColors.darkRed, // Red text for daily limit
+                                      fontSize: 14,
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: onUpgradePressed,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.green, // Green color for upgrade button
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    "Upgrade",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Unlimited transactions: \$1/month",
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        "Upgrade now and get a full year for \$1",
+                        style: TextStyle(
+                          color: AppColors.green,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),

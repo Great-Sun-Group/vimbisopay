@@ -348,7 +348,26 @@ class DashboardMember {
       memberHandle: map['memberHandle'] as String?,
       defaultDenom: map['defaultDenom'] as String,
       profilePictureThumbnail: map['profilePictureThumbnail'] as String?,
-      remainingAvailableUSD: (map['remainingAvailableUSD'] as num?)?.toDouble() ?? 0.0,
+      // Handle remainingAvailableUSD with special care for integer values
+      remainingAvailableUSD: (() {
+        final rawValue = map['remainingAvailableUSD'];
+        if (rawValue == null) return 0.0;
+        
+        if (rawValue is int) {
+          return rawValue.toDouble();
+        } else if (rawValue is double) {
+          return rawValue;
+        } else if (rawValue is String) {
+          return double.tryParse(rawValue) ?? 0.0;
+        } else {
+          // For any other type, try to convert to string first then parse
+          try {
+            return double.tryParse(rawValue.toString()) ?? 0.0;
+          } catch (_) {
+            return 0.0;
+          }
+        }
+      })(),
       creditRating: creditRating,
     );
   }

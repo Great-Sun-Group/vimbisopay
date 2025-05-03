@@ -329,6 +329,12 @@ class RecipientInputCard extends StatelessWidget {
                   controller: recipientController,
                   focusNode: focusNode,
                   style: const TextStyle(color: AppColors.textPrimary),
+                  cursorColor: credexType == CredexType.SECURED 
+                      ? AppColors.primary // Gold for Secured
+                      : AppColors.techAzure, // Teal for Unsecured
+                  cursorWidth: 2.0, // Make cursor wider and more visible
+                  cursorRadius: const Radius.circular(1.0),
+                  showCursor: true, // Explicitly show cursor
                   decoration: InputDecoration(
                     labelText: '💳 Handle',
                     labelStyle: const TextStyle(color: AppColors.textSecondary),
@@ -375,6 +381,8 @@ class RecipientInputCard extends StatelessWidget {
                         : null,
                   ),
                   validator: validator,
+                  // Ensure text field is enabled and can receive input
+                  enabled: !isVerifying,
                 ),
                 
                 const SizedBox(height: 12),

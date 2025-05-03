@@ -134,7 +134,7 @@ class CredexTypeSection extends StatelessWidget {
               child: Text(
                 "$amount $selectedDenomination will be transferred immediately from your Secured Balance",
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: AppColors.primary,
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                 ),

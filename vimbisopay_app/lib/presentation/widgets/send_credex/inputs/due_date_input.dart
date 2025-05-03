@@ -30,7 +30,7 @@ class DueDateSelector extends StatelessWidget {
           Text(
             'I promise to provide $amount $denomination worth of value by',
             style: const TextStyle(
-              color: AppColors.textSecondary,
+              color: AppColors.primary,
               fontSize: 14,
             ),
             textAlign: TextAlign.center,

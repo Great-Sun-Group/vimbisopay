@@ -82,7 +82,11 @@ mixin AccountRepositoryAuthMixin on BaseAccountRepository {
             'memberHandle': dashboardData['member']['memberHandle'] as String?,
             'defaultDenom': dashboardData['member']['defaultDenom'],
             'profilePictureThumbnail': profileThumbnailUrl,
-            'remainingAvailableUSD': dashboardData['member']['remainingAvailableUSD'],
+            'remainingAvailableUSD': (() {
+              final rawValue = dashboardData['member']['remainingAvailableUSD'];
+              Logger.data('[LOGIN] Raw remainingAvailableUSD from API: $rawValue (type: ${rawValue?.runtimeType})');
+              return rawValue;
+            })(),
             'creditRating': dashboardData['member']['creditRating'],
           },
           'accounts': dashboardData['accounts']
