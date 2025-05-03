@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
@@ -11,6 +12,7 @@ class VerifiedRecipientCard extends StatelessWidget {
   final String? profileImageUrl;
   final String? memberName;
   final bool isVerifying;
+  final dashboard.CreditRating? creditRating;
   
   const VerifiedRecipientCard({
     super.key,
@@ -20,6 +22,7 @@ class VerifiedRecipientCard extends StatelessWidget {
     this.profileImageUrl,
     this.memberName,
     this.isVerifying = false,
+    this.creditRating,
   });
   
   @override
@@ -69,61 +72,41 @@ class VerifiedRecipientCard extends StatelessWidget {
                       ),
                     ),
                     
-                    // Show credit rating bar with numbers for Unsecured credex
+                    // Show credit rating bar for Unsecured credex
                     if (credexType == CredexType.UNSECURED) ...[
                       const SizedBox(height: 12),
                       
-                      // Credit rating bar with text inside (established rating)
-                      Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [
-                          // Bar graph with fixed proportions
-                          ClipRRect(
+                      // Credit rating bar based on creditRating data
+                      if (creditRating == null || 
+                          (creditRating!.redeemedTotalUSD == 0 && 
+                           creditRating!.outstandingTotalUSD == 0 && 
+                           creditRating!.defaultedTotalUSD == 0 && 
+                           creditRating!.writtenOffTotalUSD == 0)) 
+                        // Show "not yet established" for no credit history
+                        Container(
+                          height: 18,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            child: Container(
-                              height: 18,
-                              width: double.infinity,
-                              child: Row(
-                                children: [
-                                  // 70% teal
-                                  Expanded(
-                                    flex: 70,
-                                    child: Container(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 25,
-                                    child: Container(
-                                      color: AppColors.secondary,
-                                    ),
-                                  ),
-                                  // 5% red
-                                  Expanded(
-                                    flex: 5,
-                                    child: Container(
-                                      color: AppColors.darkRed,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            border: Border.all(
+                              color: AppColors.techAzure,
+                              width: 1.0,
                             ),
                           ),
-                          
-                          // Owner credit rating text inside the bar
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0),
+                          child: const Center(
                             child: Text(
-                              "Owner credit rating",
-                              style: const TextStyle(
-                                color: Colors.black,
+                              "Owner credit rating not yet established",
+                              style: TextStyle(
+                                color: AppColors.techAzure,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                        ],
-                      ),
+                        )
+                      else
+                        _buildCreditRatingBar(creditRating!),
                     ],
                   ],
                 ),
@@ -172,6 +155,122 @@ class VerifiedRecipientCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+  
+  Widget _buildCreditRatingBar(dashboard.CreditRating rating) {
+    // Calculate percentages for the credit rating bar
+    double total = rating.redeemedTotalUSD + 
+                 rating.outstandingTotalUSD + 
+                 rating.defaultedTotalUSD + 
+                 rating.writtenOffTotalUSD;
+    
+    // Calculate percentages of each component
+    int redeemedPercent = total > 0 ? ((rating.redeemedTotalUSD / total) * 100).round() : 0;
+    int outstandingPercent = total > 0 ? ((rating.outstandingTotalUSD / total) * 100).round() : 0;
+    int defaultedPercent = total > 0 ? ((rating.defaultedTotalUSD / total) * 100).round() : 0;
+    int writtenOffPercent = total > 0 ? ((rating.writtenOffTotalUSD / total) * 100).round() : 0;
+    
+    // Ensure minimum visibility for non-zero values
+    if (rating.redeemedTotalUSD > 0 && redeemedPercent == 0) redeemedPercent = 1;
+    if (rating.outstandingTotalUSD > 0 && outstandingPercent == 0) outstandingPercent = 1;
+    if (rating.defaultedTotalUSD > 0 && defaultedPercent == 0) defaultedPercent = 1;
+    if (rating.writtenOffTotalUSD > 0 && writtenOffPercent == 0) writtenOffPercent = 1;
+    
+    // Adjust percentages to ensure they sum to 100%
+    int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
+    if (sum != 100) {
+      // Find the largest component to adjust
+      int largest = redeemedPercent;
+      String largestType = "redeemed";
+      
+      if (outstandingPercent > largest) {
+        largest = outstandingPercent;
+        largestType = "outstanding";
+      }
+      if (defaultedPercent > largest) {
+        largest = defaultedPercent;
+        largestType = "defaulted";
+      }
+      if (writtenOffPercent > largest) {
+        largest = writtenOffPercent;
+        largestType = "writtenOff";
+      }
+      
+      // Adjust the largest component
+      if (largestType == "redeemed") {
+        redeemedPercent += (100 - sum);
+      } else if (largestType == "outstanding") {
+        outstandingPercent += (100 - sum);
+      } else if (largestType == "defaulted") {
+        defaultedPercent += (100 - sum);
+      } else {
+        writtenOffPercent += (100 - sum);
+      }
+    }
+    
+    // Return credit rating bar with calculated percentages
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        // Bar graph with calculated proportions
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            height: 18,
+            width: double.infinity,
+            child: Row(
+              children: [
+                // Redeemed (green)
+                if (redeemedPercent > 0)
+                  Expanded(
+                    flex: redeemedPercent,
+                    child: Container(
+                      color: AppColors.green,
+                    ),
+                  ),
+                // Outstanding (blue)
+                if (outstandingPercent > 0)
+                  Expanded(
+                    flex: outstandingPercent,
+                    child: Container(
+                      color: AppColors.techAzure,
+                    ),
+                  ),
+                // Defaulted (amber)
+                if (defaultedPercent > 0)
+                  Expanded(
+                    flex: defaultedPercent,
+                    child: Container(
+                      color: AppColors.yellowPrimary,
+                    ),
+                  ),
+                // Written off (red)
+                if (writtenOffPercent > 0)
+                  Expanded(
+                    flex: writtenOffPercent,
+                    child: Container(
+                      color: AppColors.darkRed,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Owner credit rating text inside the bar
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Text(
+            "Owner credit rating",
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
