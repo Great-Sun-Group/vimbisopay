@@ -238,3 +238,15 @@ Example entry format:
 -e 
 ## [4.5.2+02] - 2025-04-30
 - Updated Whatsapp verification flow
+-e 
+## [4.5.3+03] - 2025-05-04
+- Added unsecured credex and minor bug fixes and enhancements
+-e 
+## [4.5.3+04] - 2025-05-04
+- Unsecured credexes and minor bug fixes and enhancements
+-e 
+## [4.5.3+05] - 2025-05-04
+- asdada
+-e 
+## [4.5.3+06] - 2025-05-04
+- fsfsfs
