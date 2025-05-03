@@ -124,6 +124,10 @@ class _TransactionsListState extends State<TransactionsList> {
   void _cancelTransaction(BuildContext context, String credexId) {
     context.read<HomeBloc>().add(HomeCancelCredexStarted(credexId));
   }
+  
+  void _declineTransaction(BuildContext context, String credexId) {
+    context.read<HomeBloc>().add(HomeDeclineCredexStarted(credexId));
+  }
 
   Widget _buildPendingTransactionsSection(
     List<PendingOffer> pendingIn,
@@ -135,40 +139,7 @@ class _TransactionsListState extends State<TransactionsList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Pending Credex',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              if (pendingIn.isNotEmpty &&
-                  state.status != HomeStatus.acceptingCredex) ...[
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _selectionMode = !_selectionMode;
-                      if (!_selectionMode) {
-                        _selectedTransactions.clear();
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    _selectionMode ? Icons.close : Icons.checklist,
-                    size: 20,
-                  ),
-                  label: Text(_selectionMode ? 'Cancel' : 'Select'),
-                ),
-              ],
-            ],
-          ),
-        ),
+        // No title needed here
         if (_selectionMode && _selectedTransactions.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -193,34 +164,75 @@ class _TransactionsListState extends State<TransactionsList> {
             ),
           ),
         if (pendingIn.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              'Incoming',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
+          Container(
+            color: const Color(0xFF0A1F15), // Very dull green background (dark blue with green tint)
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Pending Incoming',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (pendingIn.isNotEmpty &&
+                          state.status != HomeStatus.acceptingCredex) ...[
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _selectionMode = !_selectionMode;
+                              if (!_selectionMode) {
+                                _selectedTransactions.clear();
+                              }
+                            });
+                          },
+                          icon: Icon(
+                            _selectionMode ? Icons.close : Icons.checklist,
+                            size: 20,
+                          ),
+                          label: Text(_selectionMode ? 'Cancel' : 'Select'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                ...pendingIn
+                    .map((offer) => _buildPendingTransactionTile(offer, true, state)),
+              ],
             ),
           ),
-          ...pendingIn
-              .map((offer) => _buildPendingTransactionTile(offer, true, state)),
         ],
         if (pendingOut.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              'Outgoing',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
+          Container(
+            color: const Color(0xFF1F0A0A), // Very dull red background (dark blue with red tint)
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Text(
+                    'Pending Outgoing',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                ...pendingOut.map(
+                    (offer) => _buildPendingTransactionTile(offer, false, state)),
+              ],
             ),
           ),
-          ...pendingOut.map(
-              (offer) => _buildPendingTransactionTile(offer, false, state)),
         ],
       ],
     );
@@ -237,13 +249,6 @@ class _TransactionsListState extends State<TransactionsList> {
     final Color accentColor = offer.secured ? AppColors.yellowMain : AppColors.techAzure;
     final String securedText = offer.secured ? "SECURED" : "UNSECURED";
     
-    // Log the offer details for debugging
-    Logger.data('Rendering pending offer: ${offer.credexID}');
-    Logger.data('- Secured: ${offer.secured}');
-    Logger.data('- Due Date: ${offer.dueDate}');
-    Logger.data('- Amount: ${offer.formattedInitialAmount}');
-    Logger.data('- Counterparty: ${offer.counterpartyAccountName}');
-
     final Widget transactionCard = Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
       decoration: BoxDecoration(
@@ -295,37 +300,60 @@ class _TransactionsListState extends State<TransactionsList> {
                     activeColor: AppColors.primary,
                   ),
                 ),
-              // Styled icon with curved text
-              Stack(
-                alignment: Alignment.center,
+              Column(
                 children: [
-                  // Background circle
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
+                  // Styled icon with curved text
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Background circle
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      // Curved text
+                      CustomPaint(
+                        size: const Size(56, 56),
+                        painter: CurvedTextPainter(
+                          text: securedText,
+                          color: accentColor,
+                          fontSize: 8,
+                        ),
+                      ),
+                      // Arrow icon
+                      Positioned(
+                        bottom: 4,
+                        child: Icon(
+                          isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
+                          color: isIncoming ? AppColors.green : AppColors.error,
+                          size: 36,
+                        ),
+                      ),
+                    ],
                   ),
-                  // Curved text
-                  CustomPaint(
-                    size: const Size(56, 56),
-                    painter: CurvedTextPainter(
-                      text: securedText,
-                      color: accentColor,
-                      fontSize: 8,
+                  // Add Decline button for incoming transactions
+                  if (isIncoming && !_selectionMode)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: GestureDetector(
+                        onTap: (state.status == HomeStatus.acceptingCredex ||
+                                isProcessing)
+                            ? null
+                            : () => _declineTransaction(context, offer.credexID),
+                        child: Text(
+                          'Decline',
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  // Arrow icon
-                  Positioned(
-                    bottom: 4,
-                    child: Icon(
-                      isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
-                      color: accentColor,
-                      size: 36,
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(width: 16),
@@ -343,16 +371,23 @@ class _TransactionsListState extends State<TransactionsList> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (offer.dueDate != null) ...[
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                    if (offer.dueDate != null || !offer.secured) 
                       Text(
-                        "Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}",
+                        offer.dueDate != null 
+                            ? "Promised by ${DateFormatter.formatShortDate(offer.dueDate!)}"
+                            : "No due date",
                         style: TextStyle(
                           color: accentColor,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                    
+                    // Display credit rating bar for unsecured transactions
+                    if (!offer.secured && offer.counterpartyCreditRating != null) ...[
+                      const SizedBox(height: 8),
+                      _buildCreditRatingBar(offer.counterpartyCreditRating!),
                     ],
                   ],
                 ),
@@ -376,7 +411,7 @@ class _TransactionsListState extends State<TransactionsList> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isProcessing ? accentColor.withOpacity(0.6) : accentColor,
+                          color: isProcessing ? AppColors.green.withOpacity(0.6) : AppColors.green,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: GestureDetector(
@@ -486,12 +521,13 @@ class _TransactionsListState extends State<TransactionsList> {
         // Determine if transaction is incoming or outgoing
         final bool isIncoming = transaction.amount >= 0;
         
-        // All transactions are SECURED with gold color
-        final Color accentColor = AppColors.yellowMain;
+        // Determine if transaction is secured or unsecured based on type
+        final bool isSecured = transaction.type.toLowerCase() == 'secured';
+        final Color accentColor = isSecured ? AppColors.primary : AppColors.techAzure;
         
         // Text color for amount - red for negative numbers
         final Color amountColor = isIncoming ? accentColor : AppColors.error;
-
+        
         return Semantics(
           label: _getTransactionSemanticLabel(transaction),
           child: Padding(
@@ -558,6 +594,148 @@ class _TransactionsListState extends State<TransactionsList> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildCreditRatingBar(CreditRating rating) {
+    // Calculate percentages for the credit rating bar
+    double total = rating.redeemedTotalUSD + 
+                 rating.outstandingTotalUSD + 
+                 rating.defaultedTotalUSD + 
+                 rating.writtenOffTotalUSD;
+    
+    // Calculate percentages of each component
+    int redeemedPercent = total > 0 ? ((rating.redeemedTotalUSD / total) * 100).round() : 0;
+    int outstandingPercent = total > 0 ? ((rating.outstandingTotalUSD / total) * 100).round() : 0;
+    int defaultedPercent = total > 0 ? ((rating.defaultedTotalUSD / total) * 100).round() : 0;
+    int writtenOffPercent = total > 0 ? ((rating.writtenOffTotalUSD / total) * 100).round() : 0;
+    
+    // Ensure minimum visibility for non-zero values
+    if (rating.redeemedTotalUSD > 0 && redeemedPercent == 0) redeemedPercent = 1;
+    if (rating.outstandingTotalUSD > 0 && outstandingPercent == 0) outstandingPercent = 1;
+    if (rating.defaultedTotalUSD > 0 && defaultedPercent == 0) defaultedPercent = 1;
+    if (rating.writtenOffTotalUSD > 0 && writtenOffPercent == 0) writtenOffPercent = 1;
+    
+    // Adjust percentages to ensure they sum to 100%
+    int sum = redeemedPercent + outstandingPercent + defaultedPercent + writtenOffPercent;
+    if (sum != 100 && sum > 0) {
+      // Find the largest component to adjust
+      int largest = redeemedPercent;
+      String largestType = "redeemed";
+      
+      if (outstandingPercent > largest) {
+        largest = outstandingPercent;
+        largestType = "outstanding";
+      }
+      if (defaultedPercent > largest) {
+        largest = defaultedPercent;
+        largestType = "defaulted";
+      }
+      if (writtenOffPercent > largest) {
+        largest = writtenOffPercent;
+        largestType = "writtenOff";
+      }
+      
+      // Adjust the largest component
+      if (largestType == "redeemed") {
+        redeemedPercent += (100 - sum);
+      } else if (largestType == "outstanding") {
+        outstandingPercent += (100 - sum);
+      } else if (largestType == "defaulted") {
+        defaultedPercent += (100 - sum);
+      } else {
+        writtenOffPercent += (100 - sum);
+      }
+    }
+    
+    // If all values are zero, show "not yet established" message
+    if (total == 0) {
+      return Container(
+        height: 18,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: AppColors.techAzure,
+            width: 1.0,
+          ),
+        ),
+        child: const Center(
+          child: Text(
+            "Counterparty credit rating not yet established",
+            style: TextStyle(
+              color: AppColors.techAzure,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    
+    // Return credit rating bar with calculated percentages
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        // Bar graph with calculated proportions
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            height: 18,
+            width: double.infinity,
+            child: Row(
+              children: [
+                // Redeemed (primary)
+                if (redeemedPercent > 0)
+                  Expanded(
+                    flex: redeemedPercent,
+                    child: Container(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                // Outstanding (blue)
+                if (outstandingPercent > 0)
+                  Expanded(
+                    flex: outstandingPercent,
+                    child: Container(
+                      color: AppColors.techAzure,
+                    ),
+                  ),
+                // Defaulted (amber)
+                if (defaultedPercent > 0)
+                  Expanded(
+                    flex: defaultedPercent,
+                    child: Container(
+                      color: AppColors.yellowPrimary,
+                    ),
+                  ),
+                // Written off (red)
+                if (writtenOffPercent > 0)
+                  Expanded(
+                    flex: writtenOffPercent,
+                    child: Container(
+                      color: AppColors.darkRed,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Counterparty credit rating text inside the bar
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Text(
+            "Counterparty credit rating",
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

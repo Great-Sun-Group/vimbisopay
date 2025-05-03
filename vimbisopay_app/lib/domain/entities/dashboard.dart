@@ -521,6 +521,7 @@ class PendingOffer {
   final String counterpartyAccountName;
   final bool secured;
   final DateTime? dueDate;
+  final CreditRating? counterpartyCreditRating;
 
   String get uniqueIdentifier {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -535,6 +536,7 @@ class PendingOffer {
     required this.counterpartyAccountName,
     required this.secured,
     this.dueDate,
+    this.counterpartyCreditRating,
   });
 
   Map<String, dynamic> toMap() => {
@@ -543,6 +545,7 @@ class PendingOffer {
     'counterpartyAccountName': counterpartyAccountName,
     'secured': secured,
     'dueDate': dueDate?.toIso8601String(),
+    'counterpartyCreditRating': counterpartyCreditRating?.toMap(),
   };
 
   factory PendingOffer.fromMap(Map<String, dynamic> map) {
@@ -600,12 +603,19 @@ class PendingOffer {
       isSecured = false; // If it has a due date but no secured field, it's unsecured
     }
 
+    // Parse counterpartyCreditRating if available
+    CreditRating? counterpartyCreditRating;
+    if (map.containsKey('counterpartyCreditRating') && map['counterpartyCreditRating'] != null) {
+      counterpartyCreditRating = CreditRating.fromMap(map['counterpartyCreditRating'] as Map<String, dynamic>);
+    }
+
     return PendingOffer(
       credexID: map['credexID'] as String,
       formattedInitialAmount: formattedAmount,
       counterpartyAccountName: map['counterpartyAccountName'] as String,
       secured: isSecured,
       dueDate: dueDate,
+      counterpartyCreditRating: counterpartyCreditRating,
     );
   }
 }

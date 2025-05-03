@@ -127,6 +127,19 @@ class HomeCancelCredexCompleted extends HomeEvent {
   const HomeCancelCredexCompleted();
 }
 
+class HomeDeclineCredexStarted extends HomeEvent {
+  final String credexId;
+
+  const HomeDeclineCredexStarted(this.credexId);
+
+  @override
+  List<Object> get props => [credexId];
+}
+
+class HomeDeclineCredexCompleted extends HomeEvent {
+  const HomeDeclineCredexCompleted();
+}
+
 class CreateCredexEvent extends HomeEvent {
   final CredexRequest request;
 

@@ -65,6 +65,8 @@ abstract class AccountRepository {
   Future<Either<Failure, bool>> acceptCredex(String credexId);
 
   Future<Either<Failure, bool>> cancelCredex(String credexId);
+  
+  Future<Either<Failure, bool>> declineCredex(String credexId);
 
   Future<Either<Failure, bool>> registerNotificationToken(String token);
 
