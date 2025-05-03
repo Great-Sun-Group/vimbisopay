@@ -92,7 +92,7 @@ class FirebaseAnalyticsProvider implements AnalyticsProvider {
   Future<void> logError(dynamic exception, StackTrace stackTrace) async {
     try {
       await _analytics.logEvent(
-        name: 'app_exception',
+        name: 'custom_app_exception',
         parameters: {
           'exception': exception.toString(),
           'stack_trace': stackTrace.toString(),
