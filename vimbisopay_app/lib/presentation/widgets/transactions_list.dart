@@ -553,7 +553,7 @@ class _TransactionsListState extends State<TransactionsList> {
                         children: [
                           Text(
                             transaction.counterpartyAccountName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: accentColor,
                               fontWeight: FontWeight.w500,
                               fontSize: 16,
