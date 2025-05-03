@@ -108,7 +108,7 @@ class SenderAccountCard extends StatelessWidget {
                       ),
                       child: const Center(
                         child: Text(
-                          "Owner credit rating not yet established",
+                          "Credit rating not yet established",
                           style: TextStyle(
                             color: AppColors.techAzure,
                             fontSize: 11,
@@ -212,12 +212,12 @@ class SenderAccountCard extends StatelessWidget {
             width: double.infinity,
             child: Row(
               children: [
-                // Redeemed (green)
+                // Redeemed (primary)
                 if (redeemedPercent > 0)
                   Expanded(
                     flex: redeemedPercent,
                     child: Container(
-                      color: AppColors.green,
+                      color: AppColors.primary,
                     ),
                   ),
                 // Outstanding (blue)
@@ -249,11 +249,11 @@ class SenderAccountCard extends StatelessWidget {
           ),
         ),
         
-        // Owner credit rating text inside the bar
+        // Credit rating text inside the bar
         Padding(
           padding: const EdgeInsets.only(left: 8.0),
           child: Text(
-            "Owner credit rating",
+            "Credit rating",
             style: const TextStyle(
               color: Colors.black,
               fontSize: 11,

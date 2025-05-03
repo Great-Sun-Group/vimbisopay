@@ -41,6 +41,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeAcceptCredexStarted>(_onHomeAcceptCredexStarted);
     on<HomeAcceptCredexBulkStarted>(_onHomeAcceptCredexBulkStarted);
     on<HomeCancelCredexStarted>(_onHomeCancelCredexStarted);
+    on<HomeDeclineCredexStarted>(_onHomeDeclineCredexStarted);
     on<HomeSearchStarted>(_onHomeSearchStarted);
     on<HomeUpgradeTierStarted>(_onHomeUpgradeTierStarted);
     on<HomeUpgradeTierCompleted>(_onHomeUpgradeTierCompleted);
@@ -478,6 +479,35 @@ Dashboard refresh stats:
           status: HomeStatus.success,
           processingCredexIds: const [],
           message: 'Transaction cancelled successfully',
+        ));
+        // Trigger refresh to update dashboard and transactions
+        add(const HomeRefreshStarted());
+      },
+    );
+  }
+  
+  Future<void> _onHomeDeclineCredexStarted(HomeDeclineCredexStarted event, Emitter<HomeState> emit) async {
+    // Check if update screen is showing - if so, don't proceed with declining credex
+    if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
+      _logger.i('Decline credex prevented while update screen is showing');
+      return;
+    }
+    
+    emit(state.copyWith(
+      status: HomeStatus.cancellingCredex, // Reuse the cancelling status for UI feedback
+      processingCredexIds: [...state.processingCredexIds, event.credexId],
+    ));
+    final result = await accountRepository.declineCredex(event.credexId);
+    result.fold(
+      (failure) {
+        final userFriendlyMessage = ErrorTranslator.translateError(failure);
+        add(HomeErrorOccurred('Failed to decline Credex: $userFriendlyMessage'));
+      },
+      (_) {
+        emit(state.copyWith(
+          status: HomeStatus.success,
+          processingCredexIds: const [],
+          message: 'Transaction declined successfully',
         ));
         // Trigger refresh to update dashboard and transactions
         add(const HomeRefreshStarted());
