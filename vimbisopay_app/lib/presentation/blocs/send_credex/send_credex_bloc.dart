@@ -258,6 +258,13 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           return;
         }
         
+        // Extract credit rating if available in the response
+        Map<String, dynamic>? creditRatingData;
+        if (details.containsKey('creditRating') && details['creditRating'] != null) {
+          creditRatingData = details['creditRating'] as Map<String, dynamic>;
+          Logger.data('Credit rating found in response: $creditRatingData');
+        }
+        
         Logger.data('Recipient verified successfully: $accountHandle ($accountID)');
         emit(state.copyWith(
           status: SendCredexStatus.recipientVerified,
@@ -267,6 +274,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           verifiedAccountDetails: {
             'accountName': accountName,
             'accountHandle': accountHandle,
+            'creditRating': creditRatingData,
           },
           statusMessage: null,
           showFullUI: true, // Show the full UI after successful verification
@@ -408,6 +416,13 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             return;
           }
           
+          // Extract credit rating if available in the response
+          Map<String, dynamic>? creditRatingData;
+          if (details.containsKey('creditRating') && details['creditRating'] != null) {
+            creditRatingData = details['creditRating'] as Map<String, dynamic>;
+            Logger.data('Credit rating found in response after token refresh: $creditRatingData');
+          }
+          
           Logger.data('Recipient verified successfully after token refresh: $accountHandle ($accountID)');
           emit(state.copyWith(
             status: SendCredexStatus.recipientVerified,
@@ -417,6 +432,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             verifiedAccountDetails: {
               'accountName': accountName,
               'accountHandle': accountHandle,
+              'creditRating': creditRatingData,
             },
             statusMessage: null,
             showFullUI: true, // Show the full UI after successful verification
@@ -609,6 +625,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       isLoading: true,
       errorMessage: null,
       statusMessage: state.credexType == CredexType.SECURED ? 'Offering Secured Credex...' : 'Offering Unsecured Credex...',
+      dueDate: state.dueDate, // Preserve the due date
     ));
     
     try {
@@ -620,7 +637,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
         securedCredex: state.credexType == CredexType.SECURED,
-        dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate?.toIso8601String(),
+        dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate != null ? "${state.dueDate!.year}-${state.dueDate!.month.toString().padLeft(2, '0')}-${state.dueDate!.day.toString().padLeft(2, '0')}" : null,
       );
       
       final result = await accountRepository.createCredex(credexRequest);

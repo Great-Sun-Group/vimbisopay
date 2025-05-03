@@ -234,8 +234,15 @@ class _TransactionsListState extends State<TransactionsList> {
     final bool isCancelling = state.status == HomeStatus.cancellingCredex;
     
     // Determine colors based on secured status
-    final Color accentColor = offer.secured ? AppColors.techAzure : AppColors.yellowMain;
+    final Color accentColor = offer.secured ? AppColors.yellowMain : AppColors.techAzure;
     final String securedText = offer.secured ? "SECURED" : "UNSECURED";
+    
+    // Log the offer details for debugging
+    Logger.data('Rendering pending offer: ${offer.credexID}');
+    Logger.data('- Secured: ${offer.secured}');
+    Logger.data('- Due Date: ${offer.dueDate}');
+    Logger.data('- Amount: ${offer.formattedInitialAmount}');
+    Logger.data('- Counterparty: ${offer.counterpartyAccountName}');
 
     final Widget transactionCard = Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
