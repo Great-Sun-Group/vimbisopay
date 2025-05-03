@@ -47,6 +47,10 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     emit(state.copyWith(
       credexType: event.credexType,
       dueDate: newDueDate,
+      // Preserve recipient information
+      recipientHandle: state.recipientHandle,
+      recipientAccountId: state.recipientAccountId,
+      verifiedAccountDetails: state.verifiedAccountDetails,
     ));
   }
   
@@ -176,6 +180,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       statusMessage: 'Verifying recipient account...',
       recipientHandle: event.handle,
       showFullUI: true, // Show the full UI immediately when verification starts
+      // Explicitly preserve the current credexType and dueDate
+      credexType: state.credexType,
+      dueDate: state.dueDate,
     ));
     
     try {
@@ -517,7 +524,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   }
   
   void _onChangeRecipient(ChangeRecipientEvent event, Emitter<SendCredexState> emit) {
-    // Create a new state with cleared recipient information and reset to secured credex type
+    // Create a new state with cleared recipient information but preserve credex type
     final newState = SendCredexState(
       status: SendCredexStatus.initial,
       senderAccount: state.senderAccount,
@@ -525,8 +532,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       availableDenominations: state.availableDenominations,
       amount: state.amount,
       isAmountFirstEdit: state.isAmountFirstEdit,
-      credexType: CredexType.SECURED, // Reset to secured state
-      dueDate: state.dueDate,
+      credexType: state.credexType, // Preserve current credex type
+      dueDate: state.dueDate, // Preserve due date
       showFullUI: true, // Keep showing the full UI
       // Explicitly clear recipient information
       recipientHandle: '',

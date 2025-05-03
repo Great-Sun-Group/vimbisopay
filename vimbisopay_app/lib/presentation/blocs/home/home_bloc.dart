@@ -108,7 +108,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             keepLoading: true,
           ));
           
-          // Load ledger data after dashboard is initialized
           await _loadLedgerData(user.dashboard!);
         },
       );
@@ -207,7 +206,6 @@ Dashboard refresh stats:
               processingCredexIds: state.processingCredexIds, // Preserve processing state
             ));
             
-            // Load ledger data with refreshed dashboard
             _logger.i('Loading ledger data for refreshed dashboard...');
             await _loadLedgerData(user.dashboard!);
             _logger.i('Refresh complete');

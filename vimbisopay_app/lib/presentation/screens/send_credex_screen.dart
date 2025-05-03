@@ -47,6 +47,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
   final _recipientFocusNode = FocusNode();
   late final SendCredexBloc _bloc;
   bool _isAmountFirstEdit = true;
+  
+  // Cache the user data to avoid multiple database queries
+  Future<User?>? _userFuture;
 
   @override
   void initState() {
@@ -73,6 +76,10 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     if (widget.recipientHandle != null) {
       _recipientController.text = widget.recipientHandle!;
     }
+    // No automatic focus request - let the user control focus naturally
+    
+    // Cache the user data to avoid multiple database queries
+    _userFuture = widget.databaseHelper.getUser();
   }
   
   void _setupAmountFocusListener() {
@@ -164,8 +171,10 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           }
           
           // Update recipient controller when handle changes or is cleared
-          if (state.recipientHandle != _recipientController.text) {
-            _recipientController.text = state.recipientHandle ?? '';
+          // Only update if the handle is not empty to preserve partial typing
+          if (state.recipientHandle != _recipientController.text && 
+              (state.recipientHandle != null && state.recipientHandle!.isNotEmpty)) {
+            _recipientController.text = state.recipientHandle!;
           }
           
           // Automatically focus on amount field when verification starts
@@ -243,7 +252,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: FutureBuilder<User?>(
-                              future: widget.databaseHelper.getUser(),
+                              future: _userFuture,
                               builder: (context, snapshot) {
                                 String? profileImageUrl;
                                 String? memberName;
@@ -278,36 +287,24 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         // No extra spacing needed here since the previous card already has margin
                         
                         if (state.verifiedAccountDetails == null) ...[
-                          // Only request focus for the recipient field when the screen first loads
-                          // and not when the user is interacting with other fields
-                          Builder(builder: (context) {
-                            // Only request focus if we're not already focused on another field
-                            // and we're not in the verification process
-                            if (state.status != SendCredexStatus.verifyingRecipient && 
-                                !_amountFocusNode.hasFocus) {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _recipientFocusNode.requestFocus();
-                              });
-                            }
-                            
-                            return RecipientInputCard(
-                              recipientController: _recipientController,
-                              focusNode: _recipientFocusNode,
-                              isVerifying: state.status == SendCredexStatus.verifyingRecipient,
-                              onVerify: () => _bloc.add(VerifyRecipientEvent(_recipientController.text)),
-                              onScanQR: _scanQRCode,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter recipient handle';
-                                }
-                                return null;
-                              },
-                              credexType: state.credexType,
-                            );
-                          }),
+                          // Simplified focus management - no automatic focus requests in the builder
+                          RecipientInputCard(
+                            recipientController: _recipientController,
+                            focusNode: _recipientFocusNode,
+                            isVerifying: state.status == SendCredexStatus.verifyingRecipient,
+                            onVerify: () => _bloc.add(VerifyRecipientEvent(_recipientController.text)),
+                            onScanQR: _scanQRCode,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter recipient handle';
+                              }
+                              return null;
+                            },
+                            credexType: state.credexType,
+                          ),
                         ] else ...[
                           FutureBuilder<User?>(
-                            future: widget.databaseHelper.getUser(),
+                            future: _userFuture,
                             builder: (context, snapshot) {
                               String? profileImageUrl;
                               String? memberName;
@@ -336,7 +333,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         Container(
                             width: double.infinity,
                             child: FutureBuilder<User?>(
-                              future: widget.databaseHelper.getUser(),
+                              future: _userFuture,
                               builder: (context, snapshot) {
                                 // Get member tier and daily limit from user data
                                 int? memberTier;
@@ -412,7 +409,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                         Container(
                           width: double.infinity,
                           child: FutureBuilder<User?>(
-                            future: widget.databaseHelper.getUser(),
+                            future: _userFuture,
                             builder: (context, snapshot) {
                               return CredexTypeSection(
                                 credexType: state.credexType,
@@ -434,7 +431,7 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             },
                           ),
                         ),
-                                                
+                        
                         // Add spacing above the Sign Offer button
                         const SizedBox(height: 16),
                         
