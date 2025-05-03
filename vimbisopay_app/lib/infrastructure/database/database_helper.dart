@@ -38,7 +38,7 @@ class DatabaseHelper {
   Future<Database> initDatabase() async {
     return await openDatabase(
       'vimbisopay.db',
-      version: 20,
+      version: 22,
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -53,6 +53,46 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 22) {
+      Logger.data('Starting database upgrade to version 22');
+      
+      // Add dueDate and counterpartyCreditRating fields to pending_transactions table
+      try {
+        await db.execute('ALTER TABLE pending_transactions ADD COLUMN dueDate TEXT');
+        await db.execute('ALTER TABLE pending_transactions ADD COLUMN counterpartyCreditRating_redeemedTotalUSD REAL');
+        await db.execute('ALTER TABLE pending_transactions ADD COLUMN counterpartyCreditRating_outstandingTotalUSD REAL');
+        await db.execute('ALTER TABLE pending_transactions ADD COLUMN counterpartyCreditRating_defaultedTotalUSD REAL');
+        await db.execute('ALTER TABLE pending_transactions ADD COLUMN counterpartyCreditRating_writtenOffTotalUSD REAL');
+        Logger.data('Added dueDate and counterpartyCreditRating fields to pending_transactions table');
+      } catch (e) {
+        Logger.error('Failed to add fields to pending_transactions table', e);
+        // Don't throw here as the columns might already exist
+      }
+    }
+    
+    if (oldVersion < 21) {
+      Logger.data('Starting database upgrade to version 21');
+      
+      // Create member_data table to store remainingAvailableUSD and creditRating
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS member_data(
+            memberId TEXT PRIMARY KEY,
+            remainingAvailableUSD REAL,
+            redeemedTotalUSD REAL,
+            outstandingTotalUSD REAL,
+            defaultedTotalUSD REAL,
+            writtenOffTotalUSD REAL,
+            FOREIGN KEY (memberId) REFERENCES users (memberId)
+          )
+        ''');
+        Logger.data('Created member_data table');
+      } catch (e) {
+        Logger.error('Failed to create member_data table', e);
+        // Don't throw here as the table might already exist
+      }
+    }
+    
     if (oldVersion < 20) {
       Logger.data('Starting database upgrade to version 20');
       
@@ -431,6 +471,11 @@ class DatabaseHelper {
         counterpartyName TEXT NOT NULL,
         isSecured INTEGER NOT NULL,
         direction TEXT NOT NULL,
+        dueDate TEXT,
+        counterpartyCreditRating_redeemedTotalUSD REAL,
+        counterpartyCreditRating_outstandingTotalUSD REAL,
+        counterpartyCreditRating_defaultedTotalUSD REAL,
+        counterpartyCreditRating_writtenOffTotalUSD REAL,
         FOREIGN KEY (accountId) REFERENCES accounts (accountId)
       )
     ''');
@@ -469,7 +514,6 @@ class DatabaseHelper {
         counterpartyName TEXT NOT NULL,
         isSecured INTEGER NOT NULL,
         direction TEXT NOT NULL,
-        dueDate TEXT,
         FOREIGN KEY (accountId) REFERENCES internal_accounts (accountId)
       )
     ''');
@@ -493,6 +537,19 @@ class DatabaseHelper {
         products TEXT NOT NULL,
         profileImageUrl TEXT,
         lastUpdated INTEGER NOT NULL
+      )
+    ''');
+    
+    // Add member_data table for remainingAvailableUSD and creditRating
+    await db.execute('''
+      CREATE TABLE member_data(
+        memberId TEXT PRIMARY KEY,
+        remainingAvailableUSD REAL,
+        redeemedTotalUSD REAL,
+        outstandingTotalUSD REAL,
+        defaultedTotalUSD REAL,
+        writtenOffTotalUSD REAL,
+        FOREIGN KEY (memberId) REFERENCES users (memberId)
       )
     ''');
   }
@@ -551,6 +608,22 @@ class DatabaseHelper {
             'profilePictureThumbnail': dashboard.member.profilePictureThumbnail,
           });
           
+          // Save member data including remainingAvailableUSD and creditRating
+          await txn.delete('member_data', where: 'memberId = ?', whereArgs: [user.memberId]);
+          
+          // Log the remainingAvailableUSD value for debugging
+          Logger.data('[DATABASE] Saving remainingAvailableUSD: ${dashboard.member.remainingAvailableUSD}');
+          
+          // Insert member data
+          await txn.insert('member_data', {
+            'memberId': user.memberId,
+            'remainingAvailableUSD': dashboard.member.remainingAvailableUSD,
+            'redeemedTotalUSD': dashboard.member.creditRating?.redeemedTotalUSD ?? 0,
+            'outstandingTotalUSD': dashboard.member.creditRating?.outstandingTotalUSD ?? 0,
+            'defaultedTotalUSD': dashboard.member.creditRating?.defaultedTotalUSD ?? 0,
+            'writtenOffTotalUSD': dashboard.member.creditRating?.writtenOffTotalUSD ?? 0,
+          });
+          
           // Log the profile thumbnail URL for debugging
           Logger.data('[DATABASE] Saving profile thumbnail URL: ${dashboard.member.profilePictureThumbnail}');
           
@@ -592,18 +665,17 @@ class DatabaseHelper {
               // Insert pending in transactions if available
               if (internalAccount.pendingInData != null && internalAccount.pendingInData!.data.isNotEmpty) {
                 for (final pending in internalAccount.pendingInData!.data) {
-                  if (!processedCredexIds.contains(pending.credexID)) {
-                    await txn.insert('internal_account_pending_transactions', {
-                      'credexId': pending.credexID,
-                      'accountId': internalAccount.accountID,
-                      'amount': pending.formattedInitialAmount,
-                      'counterpartyName': pending.counterpartyAccountName,
-                      'isSecured': pending.secured ? 1 : 0,
-                      'direction': 'in',
-                      'dueDate': pending.dueDate?.toIso8601String(),
-                    });
-                    processedCredexIds.add(pending.credexID);
-                  }
+              if (!processedCredexIds.contains(pending.credexID)) {
+                await txn.insert('internal_account_pending_transactions', {
+                  'credexId': pending.credexID,
+                  'accountId': internalAccount.accountID,
+                  'amount': pending.formattedInitialAmount,
+                  'counterpartyName': pending.counterpartyAccountName,
+                  'isSecured': pending.secured ? 1 : 0,
+                  'direction': 'in',
+                });
+                processedCredexIds.add(pending.credexID);
+              }
                 }
               }
               
@@ -618,7 +690,6 @@ class DatabaseHelper {
                       'counterpartyName': pending.counterpartyAccountName,
                       'isSecured': pending.secured ? 1 : 0,
                       'direction': 'out',
-                      'dueDate': pending.dueDate?.toIso8601String(),
                     });
                     processedCredexIds.add(pending.credexID);
                   }
@@ -660,6 +731,11 @@ class DatabaseHelper {
                   'counterpartyName': pending.counterpartyAccountName ?? '',
                   'isSecured': pending.secured ? 1 : 0,
                   'direction': 'in',
+                  'dueDate': pending.dueDate?.toIso8601String(),
+                  'counterpartyCreditRating_redeemedTotalUSD': pending.counterpartyCreditRating?.redeemedTotalUSD,
+                  'counterpartyCreditRating_outstandingTotalUSD': pending.counterpartyCreditRating?.outstandingTotalUSD,
+                  'counterpartyCreditRating_defaultedTotalUSD': pending.counterpartyCreditRating?.defaultedTotalUSD,
+                  'counterpartyCreditRating_writtenOffTotalUSD': pending.counterpartyCreditRating?.writtenOffTotalUSD,
                 });
                 processedCredexIds.add(pending.credexID);
               }
@@ -674,6 +750,11 @@ class DatabaseHelper {
                   'counterpartyName': pending.counterpartyAccountName ?? '',
                   'isSecured': pending.secured ? 1 : 0,
                   'direction': 'out',
+                  'dueDate': pending.dueDate?.toIso8601String(),
+                  'counterpartyCreditRating_redeemedTotalUSD': pending.counterpartyCreditRating?.redeemedTotalUSD,
+                  'counterpartyCreditRating_outstandingTotalUSD': pending.counterpartyCreditRating?.outstandingTotalUSD,
+                  'counterpartyCreditRating_defaultedTotalUSD': pending.counterpartyCreditRating?.defaultedTotalUSD,
+                  'counterpartyCreditRating_writtenOffTotalUSD': pending.counterpartyCreditRating?.writtenOffTotalUSD,
                 });
                 processedCredexIds.add(pending.credexID);
               }
@@ -771,22 +852,86 @@ class DatabaseHelper {
             ),
             pendingInData: dash.PendingData(
               success: true,
-              data: pendingIn.map((tx) => dash.PendingOffer(
-                credexID: tx['credexId'] as String,
-                formattedInitialAmount: tx['amount'] as String,
-                counterpartyAccountName: tx['counterpartyName'] as String,
-                secured: tx['isSecured'] == 1,
-              )).toList(),
+              data: pendingIn.map((tx) {
+                // Parse due date if available
+                DateTime? dueDate;
+                if (tx['dueDate'] != null) {
+                  try {
+                    dueDate = DateTime.parse(tx['dueDate'] as String);
+                  } catch (e) {
+                    // Ignore parsing errors
+                  }
+                }
+                
+                // Create credit rating if available
+                dash.CreditRating? creditRating;
+                if (tx['counterpartyCreditRating_redeemedTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_outstandingTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_defaultedTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_writtenOffTotalUSD'] != null) {
+                  creditRating = dash.CreditRating(
+                    redeemedTotalUSD: tx['counterpartyCreditRating_redeemedTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_redeemedTotalUSD'] as num).toDouble() : 0.0,
+                    outstandingTotalUSD: tx['counterpartyCreditRating_outstandingTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_outstandingTotalUSD'] as num).toDouble() : 0.0,
+                    defaultedTotalUSD: tx['counterpartyCreditRating_defaultedTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_defaultedTotalUSD'] as num).toDouble() : 0.0,
+                    writtenOffTotalUSD: tx['counterpartyCreditRating_writtenOffTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_writtenOffTotalUSD'] as num).toDouble() : 0.0,
+                  );
+                }
+                
+                return dash.PendingOffer(
+                  credexID: tx['credexId'] as String,
+                  formattedInitialAmount: tx['amount'] as String,
+                  counterpartyAccountName: tx['counterpartyName'] as String,
+                  secured: tx['isSecured'] == 1,
+                  dueDate: dueDate,
+                  counterpartyCreditRating: creditRating,
+                );
+              }).toList(),
               message: pendingIn.isEmpty ? 'No pending offers found' : 'Retrieved ${pendingIn.length} pending offers',
             ),
             pendingOutData: dash.PendingData(
               success: true,
-              data: pendingOut.map((tx) => dash.PendingOffer(
-                credexID: tx['credexId'] as String,
-                formattedInitialAmount: tx['amount'] as String,
-                counterpartyAccountName: tx['counterpartyName'] as String,
-                secured: tx['isSecured'] == 1,
-              )).toList(),
+              data: pendingOut.map((tx) {
+                // Parse due date if available
+                DateTime? dueDate;
+                if (tx['dueDate'] != null) {
+                  try {
+                    dueDate = DateTime.parse(tx['dueDate'] as String);
+                  } catch (e) {
+                    // Ignore parsing errors
+                  }
+                }
+                
+                // Create credit rating if available
+                dash.CreditRating? creditRating;
+                if (tx['counterpartyCreditRating_redeemedTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_outstandingTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_defaultedTotalUSD'] != null ||
+                    tx['counterpartyCreditRating_writtenOffTotalUSD'] != null) {
+                  creditRating = dash.CreditRating(
+                    redeemedTotalUSD: tx['counterpartyCreditRating_redeemedTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_redeemedTotalUSD'] as num).toDouble() : 0.0,
+                    outstandingTotalUSD: tx['counterpartyCreditRating_outstandingTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_outstandingTotalUSD'] as num).toDouble() : 0.0,
+                    defaultedTotalUSD: tx['counterpartyCreditRating_defaultedTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_defaultedTotalUSD'] as num).toDouble() : 0.0,
+                    writtenOffTotalUSD: tx['counterpartyCreditRating_writtenOffTotalUSD'] != null ? 
+                        (tx['counterpartyCreditRating_writtenOffTotalUSD'] as num).toDouble() : 0.0,
+                  );
+                }
+                
+                return dash.PendingOffer(
+                  credexID: tx['credexId'] as String,
+                  formattedInitialAmount: tx['amount'] as String,
+                  counterpartyAccountName: tx['counterpartyName'] as String,
+                  secured: tx['isSecured'] == 1,
+                  dueDate: dueDate,
+                  counterpartyCreditRating: creditRating,
+                );
+              }).toList(),
               message: pendingOut.isEmpty ? 'No pending outgoing offers found' : 'Retrieved ${pendingOut.length} pending outgoing offers',
             ),
             sendOffersTo: dash.SendOffersTo(
@@ -952,17 +1097,60 @@ class DatabaseHelper {
         final String? profilePictureThumbnail = tierData['profilePictureThumbnail'] as String?;
         Logger.data('[DATABASE] Retrieved profile thumbnail URL: $profilePictureThumbnail');
         
+        // Query member_data table for remainingAvailableUSD and creditRating
+        final List<Map<String, dynamic>> memberDataList = await db.query(
+          'member_data',
+          where: 'memberId = ?',
+          whereArgs: [memberId],
+        );
+        
+        // Default values
+        double remainingAvailableUSD = 0.0;
+        dash.CreditRating? creditRating;
+        
+        if (memberDataList.isNotEmpty) {
+          final memberData = memberDataList.first;
+          
+          // Get remainingAvailableUSD
+          if (memberData['remainingAvailableUSD'] != null) {
+            remainingAvailableUSD = (memberData['remainingAvailableUSD'] as num).toDouble();
+            Logger.data('[DATABASE] Retrieved remainingAvailableUSD: $remainingAvailableUSD');
+          }
+          
+          // Create credit rating object
+          creditRating = dash.CreditRating(
+            redeemedTotalUSD: memberData['redeemedTotalUSD'] != null ? 
+                (memberData['redeemedTotalUSD'] as num).toDouble() : 0.0,
+            outstandingTotalUSD: memberData['outstandingTotalUSD'] != null ? 
+                (memberData['outstandingTotalUSD'] as num).toDouble() : 0.0,
+            defaultedTotalUSD: memberData['defaultedTotalUSD'] != null ? 
+                (memberData['defaultedTotalUSD'] as num).toDouble() : 0.0,
+            writtenOffTotalUSD: memberData['writtenOffTotalUSD'] != null ? 
+                (memberData['writtenOffTotalUSD'] as num).toDouble() : 0.0,
+          );
+          
+          Logger.data('[DATABASE] Retrieved credit rating data');
+        } else {
+          Logger.data('[DATABASE] No member_data found, using default values');
+        }
+        
+        // Create the dashboard member with retrieved values
+        final dashboardMember = dash.DashboardMember(
+          memberID: memberId,
+          memberTier: tierData['high'] as int,
+          firstname: tierData['firstname'] as String,
+          lastname: tierData['lastname'] as String,
+          memberHandle: userData['memberHandle'] as String?,
+          defaultDenom: tierData['defaultDenom'] as String,
+          profilePictureThumbnail: profilePictureThumbnail,
+          remainingAvailableUSD: remainingAvailableUSD,
+          creditRating: creditRating,
+        );
+        
+        // Create the dashboard with the member
         dashboardData = dash.Dashboard(
           id: memberId,
-          member: dash.DashboardMember(
-            memberID: memberId,
-            memberTier: tierData['high'] as int,
-            firstname: tierData['firstname'] as String,
-            lastname: tierData['lastname'] as String,
-            memberHandle: userData['memberHandle'] as String?,
-            defaultDenom: tierData['defaultDenom'] as String,
-            profilePictureThumbnail: profilePictureThumbnail,
-          ),
+          member: dashboardMember,
           accounts: dashboardAccounts,
           accountsInternal: internalAccounts,
         );
@@ -1010,6 +1198,15 @@ class DatabaseHelper {
     Logger.data('Clearing all database tables');
     final Database db = await database;
     await db.transaction((txn) async {
+      // Explicitly delete member_data table first to avoid foreign key constraints
+      try {
+        await txn.delete('member_data');
+        Logger.data('Cleared member_data table');
+      } catch (e) {
+        Logger.error('Error clearing member_data table', e);
+        // Continue with other tables even if this fails
+      }
+      
       final tables = await txn.query(
         'sqlite_master',
         where: 'type = ?',
@@ -1019,7 +1216,7 @@ class DatabaseHelper {
       
       for (var table in tables) {
         final tableName = table['name'] as String;
-        if (tableName != 'sqlite_sequence') {
+        if (tableName != 'sqlite_sequence' && tableName != 'member_data') {
           Logger.data('Clearing table: $tableName');
           await txn.delete(tableName);
         }
@@ -1057,6 +1254,11 @@ class DatabaseHelper {
             'counterpartyName': offer.counterpartyAccountName ?? '',
             'isSecured': offer.secured ? 1 : 0,
             'direction': 'in',
+            'dueDate': offer.dueDate?.toIso8601String(),
+            'counterpartyCreditRating_redeemedTotalUSD': offer.counterpartyCreditRating?.redeemedTotalUSD,
+            'counterpartyCreditRating_outstandingTotalUSD': offer.counterpartyCreditRating?.outstandingTotalUSD,
+            'counterpartyCreditRating_defaultedTotalUSD': offer.counterpartyCreditRating?.defaultedTotalUSD,
+            'counterpartyCreditRating_writtenOffTotalUSD': offer.counterpartyCreditRating?.writtenOffTotalUSD,
           });
         }
         
@@ -1068,6 +1270,11 @@ class DatabaseHelper {
             'counterpartyName': offer.counterpartyAccountName ?? '',
             'isSecured': offer.secured ? 1 : 0,
             'direction': 'out',
+            'dueDate': offer.dueDate?.toIso8601String(),
+            'counterpartyCreditRating_redeemedTotalUSD': offer.counterpartyCreditRating?.redeemedTotalUSD,
+            'counterpartyCreditRating_outstandingTotalUSD': offer.counterpartyCreditRating?.outstandingTotalUSD,
+            'counterpartyCreditRating_defaultedTotalUSD': offer.counterpartyCreditRating?.defaultedTotalUSD,
+            'counterpartyCreditRating_writtenOffTotalUSD': offer.counterpartyCreditRating?.writtenOffTotalUSD,
           });
         }
       });

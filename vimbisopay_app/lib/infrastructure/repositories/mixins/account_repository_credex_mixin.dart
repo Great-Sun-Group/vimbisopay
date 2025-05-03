@@ -79,8 +79,8 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
                     denomination: action['details']['denomination'],
                     securedCredex: action['details']['securedCredex'],
                     receiverAccountID: action['details']['receiverAccountID'],
-                    receiverAccountName: action['details']
-                        ['receiverAccountName'],
+                    receiverAccountName: action['details']['receiverAccountName'],
+                    dueDate: action['details']['dueDate'] as String?,
                   ),
                 ),
                 dashboard: credex.CredexDashboard(
@@ -221,6 +221,37 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
         } else {
           final errorMessage = json.decode(response.body)['message'] ??
               'Failed to cancel Credex transaction';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+  
+  @override
+  Future<Either<Failure, bool>> declineCredex(String credexId) async {
+    return executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/declineCredex';
+        final headers = authHeaders(token);
+        final body = {'credexID': credexId};
+
+        final response = await loggedRequest(
+          () => httpClient.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          return const Right(true);
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ??
+              'Failed to decline Credex transaction';
           return Left(InfrastructureFailure(errorMessage));
         }
       },

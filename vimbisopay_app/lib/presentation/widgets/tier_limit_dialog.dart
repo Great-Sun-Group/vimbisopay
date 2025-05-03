@@ -9,12 +9,16 @@ class TierLimitDialog extends StatefulWidget {
   final String message; // Kept for backward compatibility
   final String accountId;
   final HomeBloc homeBloc;
+  final double? remainingDailyLimit; // Added parameter for remaining daily limit
+  final String? denomination; // Added parameter for denomination
 
   const TierLimitDialog({
     super.key,
     required this.message,
     required this.accountId,
     required this.homeBloc,
+    this.remainingDailyLimit, // Optional parameter
+    this.denomination, // Optional parameter
   });
 
   @override
@@ -38,6 +42,37 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Display Free Tier and remaining daily limit if provided
+            if (widget.remainingDailyLimit != null && widget.denomination != null) ...[
+              const Text(
+                'Free Tier',
+                style: TextStyle(
+                  color: AppColors.darkRed,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Remaining Daily Limit:',
+                style: TextStyle(
+                  color: AppColors.darkRed,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${widget.remainingDailyLimit!.toStringAsFixed(2)} ${widget.denomination}',
+                style: const TextStyle(
+                  color: AppColors.darkRed,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
             const Icon(
               Icons.star,
               color: AppColors.primary,
@@ -47,12 +82,13 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
             const Text(
               'Hustler Tier',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.primary,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            
             const Text(
               'Upgrade to the Hustler tier for \$1/month and get unlimited transactions.',
               textAlign: TextAlign.center,
@@ -63,10 +99,10 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'The first 10,000 Hustlers get a full year for \$1.',
+              'The first 10,000 Hustlers get a full year for \$1.00 USD',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.primary,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -126,39 +162,53 @@ class _TierLimitDialogState extends State<TierLimitDialog> {
       );
     }
 
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-            ),
-            child: const Text('Maybe Later'),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () {
-              // Don't pop the dialog immediately
-              setState(() {
-                _isUpgrading = true;
-              });
-              widget.homeBloc.add(HomeUpgradeTierStarted(widget.accountId));
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            child: const Text(
-              'Upgrade Now',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+        Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                ),
+                child: const Text('Maybe Later'),
               ),
             ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  // Don't pop the dialog immediately
+                  setState(() {
+                    _isUpgrading = true;
+                  });
+                  widget.homeBloc.add(HomeUpgradeTierStarted(widget.accountId));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text(
+                  'Upgrade Now',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          '\$1 USD payment will be made automatically from your secured balance',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.green,
+            fontSize: 14,
           ),
         ),
       ],

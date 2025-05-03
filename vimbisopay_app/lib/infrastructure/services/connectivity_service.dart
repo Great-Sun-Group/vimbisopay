@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 
@@ -40,27 +41,65 @@ class ConnectivityService {
     }
   }
 
-  // Update and broadcast connection status
-  void _updateConnectionStatus(ConnectivityResult result) {
-    final isConnected = result != ConnectivityResult.none;
-    
-    // Only broadcast if status changed
-    if (_isConnected != isConnected) {
-      _isConnected = isConnected;
-      _connectivityStreamController.add(isConnected);
+  // Check actual internet connectivity by pinging a reliable server
+  Future<bool> checkInternetConnectivity() async {
+    try {
+      // Try to reach a reliable endpoint
+      final response = await http.get(
+        Uri.parse('https://www.google.com'),
+        headers: {'Cache-Control': 'no-cache'},
+      ).timeout(const Duration(seconds: 5));
       
-      Logger.data('Connection status updated: ${isConnected ? 'ONLINE' : 'OFFLINE'}');
+      return response.statusCode == 200;
+    } catch (e) {
+      Logger.error('Error checking internet connectivity', e);
+      return false;
+    }
+  }
+
+  // Update and broadcast connection status
+  void _updateConnectionStatus(ConnectivityResult result) async {
+    // First check if connected to a network
+    final hasNetwork = result != ConnectivityResult.none;
+    
+    // If not connected to any network, definitely offline
+    if (!hasNetwork) {
+      if (_isConnected) {
+        _isConnected = false;
+        _connectivityStreamController.add(false);
+        Logger.data('Connection status updated: OFFLINE (no network)');
+      }
+      return;
+    }
+    
+    // If connected to a network, verify internet connectivity
+    final hasInternet = await checkInternetConnectivity();
+    
+    // Only update if status changed
+    if (_isConnected != hasInternet) {
+      _isConnected = hasInternet;
+      _connectivityStreamController.add(hasInternet);
+      Logger.data('Connection status updated: ${hasInternet ? 'ONLINE' : 'OFFLINE (no internet)'}');
     }
   }
 
   // Check current connectivity
   Future<bool> checkConnectivity() async {
     try {
+      // First check if connected to a network
       final result = await Connectivity().checkConnectivity();
-      return result != ConnectivityResult.none;
+      final hasNetwork = result != ConnectivityResult.none;
+      
+      // If not connected to any network, definitely offline
+      if (!hasNetwork) {
+        return false;
+      }
+      
+      // If connected to a network, verify internet connectivity
+      return await checkInternetConnectivity();
     } catch (e) {
       Logger.error('Error checking connectivity', e);
-      return true; // Assume connected on error to prevent false negatives
+      return false; // Changed to assume disconnected on error to prevent false positives
     }
   }
 

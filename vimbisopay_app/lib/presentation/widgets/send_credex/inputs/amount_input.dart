@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/denomination.dart';
-import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 
 /// Widget for amount input and denomination selection
 class AmountInputSection extends StatelessWidget {
@@ -15,6 +14,7 @@ class AmountInputSection extends StatelessWidget {
   final Function(String) onAmountChanged;
   final String? Function(String?)? validator;
   final bool isEnabled;
+  final bool isSecured; // Add isSecured parameter to determine border color
   
   const AmountInputSection({
     super.key,
@@ -27,6 +27,7 @@ class AmountInputSection extends StatelessWidget {
     required this.onAmountChanged,
     this.validator,
     this.isEnabled = true,
+    this.isSecured = true, // Default to secured
   });
   
   @override
@@ -50,11 +51,17 @@ class AmountInputSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                borderSide: BorderSide(
+                  color: isSecured ? AppColors.primary : AppColors.techAzure, 
+                  width: 1
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.techAzure, width: 1.5),
+                borderSide: BorderSide(
+                  color: isSecured ? AppColors.primary : AppColors.techAzure, 
+                  width: 1.5
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -84,11 +91,17 @@ class AmountInputSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.textSecondary, width: 1),
+                borderSide: BorderSide(
+                  color: isSecured ? AppColors.primary : AppColors.techAzure, 
+                  width: 1
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: AppColors.techAzure, width: 1.5),
+                borderSide: BorderSide(
+                  color: isSecured ? AppColors.primary : AppColors.techAzure, 
+                  width: 1.5
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -122,6 +135,9 @@ class AmountInputCard extends StatelessWidget {
   final VoidCallback onUpgradePressed;
   final bool isEnabled;
   final bool showFullContent;
+  final bool isSecured; // Add isSecured parameter to determine border color
+  final int? memberTier; // Add memberTier parameter to determine whether to show daily limit
+  final double? dailyLimit; // Add dailyLimit parameter to show the actual daily limit
   
   const AmountInputCard({
     super.key,
@@ -136,100 +152,46 @@ class AmountInputCard extends StatelessWidget {
     this.validator,
     this.isEnabled = true,
     this.showFullContent = false,
+    this.isSecured = true, // Default to secured
+    this.memberTier,
+    this.dailyLimit,
   });
   
   @override
   Widget build(BuildContext context) {
-    final denom = selectedDenomination.toString().split('.').last;
-    
-    // If not showing full content, just show an empty card with title
+    // If not showing full content, just show an empty container
     if (!showFullContent) {
-      return StyledCard.gold(
-        title: '3. Amount',
-        child: Container(
-          height: 10,
-        ),
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
       );
     }
     
-    // Otherwise show the full card content
-    return StyledCard.gold(
-      title: '3. Amount',
+    // Otherwise show the full content without background, similar to CredexTypeSection
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Opacity(
         opacity: isEnabled ? 1.0 : 0.6,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Amount and denomination input
-            AmountInputSection(
-              amountController: amountController,
-              amountFocusNode: amountFocusNode,
-              selectedDenomination: selectedDenomination,
-              availableDenominations: availableDenominations,
-              onDenominationChanged: onDenominationChanged,
-              decimalPlaces: decimalPlaces,
-              onAmountChanged: onAmountChanged,
-              validator: validator,
-              isEnabled: isEnabled,
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Daily Limit display with gold border
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: AppColors.yellowMain, // Gold color
-                  width: 1,
-                ),
+            children: [
+              // Amount and denomination input
+              AmountInputSection(
+                amountController: amountController,
+                amountFocusNode: amountFocusNode,
+                selectedDenomination: selectedDenomination,
+                availableDenominations: availableDenominations,
+                onDenominationChanged: onDenominationChanged,
+                decimalPlaces: decimalPlaces,
+                onAmountChanged: onAmountChanged,
+                validator: validator,
+                isEnabled: isEnabled,
+                isSecured: isSecured,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Daily Limit:',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        '10.0 $denom',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: onUpgradePressed,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Upgrade',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+              
+              const SizedBox(height: 12),
+              
+              // Daily limit box has been moved to under the Sign Offer button in send_credex_screen.dart
+            ],
         ),
       ),
     );

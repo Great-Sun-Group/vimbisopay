@@ -47,6 +47,10 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     emit(state.copyWith(
       credexType: event.credexType,
       dueDate: newDueDate,
+      // Preserve recipient information
+      recipientHandle: state.recipientHandle,
+      recipientAccountId: state.recipientAccountId,
+      verifiedAccountDetails: state.verifiedAccountDetails,
     ));
   }
   
@@ -56,9 +60,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     ));
   }
   
-  void _onInitialize(InitializeSendCredexEvent event, Emitter<SendCredexState> emit) {
-    // Extract available denominations from account balances
-    final availableDenominations = _getAvailableDenominations(event.senderAccount);
+  Future<void> _onInitialize(InitializeSendCredexEvent event, Emitter<SendCredexState> emit) async {
+    // Extract available denominations from account balances based on member tier
+    final availableDenominations = await _getAvailableDenominations(event.senderAccount);
     
     // Find default denomination
     final defaultDenomination = Denomination.values.firstWhere(
@@ -126,27 +130,22 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
     }
   }
   
-  List<Denomination> _getAvailableDenominations(dashboard.DashboardAccount account) {
-    final Set<String> denomStrs = {};
+  Future<List<Denomination>> _getAvailableDenominations(dashboard.DashboardAccount account) async {
+    // Get the user to check the member tier
+    final user = await databaseHelper.getUser();
+    final memberTier = user?.dashboard?.member.memberTier ?? 0;
     
-    // Add denominations from securedNetBalancesByDenom
-    for (final balance in account.balanceData.securedNetBalancesByDenom) {
-      final parts = balance.split(' ');
-      if (parts.length >= 2) {
-        denomStrs.add(parts.last);
-      }
+    // If member tier >= 5, show USD, CXX, CAD
+    if (memberTier >= 5) {
+      return [
+        Denomination.USD,
+        Denomination.CXX,
+        Denomination.CAD,
+      ];
     }
     
-    // Add default denomination
-    denomStrs.add(account.defaultDenom);
-    
-    // Convert to Denomination enum values
-    return denomStrs.map((denomStr) {
-      return Denomination.values.firstWhere(
-        (d) => d.toString().split('.').last == denomStr,
-        orElse: () => Denomination.USD,
-      );
-    }).toList();
+    // Otherwise just show USD
+    return [Denomination.USD];
   }
   
   Future<void> _onVerifyRecipient(VerifyRecipientEvent event, Emitter<SendCredexState> emit) async {
@@ -181,6 +180,9 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       statusMessage: 'Verifying recipient account...',
       recipientHandle: event.handle,
       showFullUI: true, // Show the full UI immediately when verification starts
+      // Explicitly preserve the current credexType and dueDate
+      credexType: state.credexType,
+      dueDate: state.dueDate,
     ));
     
     try {
@@ -256,6 +258,13 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           return;
         }
         
+        // Extract credit rating if available in the response
+        Map<String, dynamic>? creditRatingData;
+        if (details.containsKey('creditRating') && details['creditRating'] != null) {
+          creditRatingData = details['creditRating'] as Map<String, dynamic>;
+          Logger.data('Credit rating found in response: $creditRatingData');
+        }
+        
         Logger.data('Recipient verified successfully: $accountHandle ($accountID)');
         emit(state.copyWith(
           status: SendCredexStatus.recipientVerified,
@@ -265,6 +274,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
           verifiedAccountDetails: {
             'accountName': accountName,
             'accountHandle': accountHandle,
+            'creditRating': creditRatingData,
           },
           statusMessage: null,
           showFullUI: true, // Show the full UI after successful verification
@@ -405,6 +415,13 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             return;
           }
           
+          // Extract credit rating if available in the response
+          Map<String, dynamic>? creditRatingData;
+          if (details.containsKey('creditRating') && details['creditRating'] != null) {
+            creditRatingData = details['creditRating'] as Map<String, dynamic>;
+            Logger.data('Credit rating found in response after token refresh: $creditRatingData');
+          }
+          
           Logger.data('Recipient verified successfully after token refresh: $accountHandle ($accountID)');
           emit(state.copyWith(
             status: SendCredexStatus.recipientVerified,
@@ -414,6 +431,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
             verifiedAccountDetails: {
               'accountName': accountName,
               'accountHandle': accountHandle,
+              'creditRating': creditRatingData,
             },
             statusMessage: null,
             showFullUI: true, // Show the full UI after successful verification
@@ -521,7 +539,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
   }
   
   void _onChangeRecipient(ChangeRecipientEvent event, Emitter<SendCredexState> emit) {
-    // Create a new state with cleared recipient information and reset to secured credex type
+    // Create a new state with cleared recipient information but preserve credex type
     final newState = SendCredexState(
       status: SendCredexStatus.initial,
       senderAccount: state.senderAccount,
@@ -529,8 +547,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       availableDenominations: state.availableDenominations,
       amount: state.amount,
       isAmountFirstEdit: state.isAmountFirstEdit,
-      credexType: CredexType.SECURED, // Reset to secured state
-      dueDate: state.dueDate,
+      credexType: state.credexType, // Preserve current credex type
+      dueDate: state.dueDate, // Preserve due date
       showFullUI: true, // Keep showing the full UI
       // Explicitly clear recipient information
       recipientHandle: '',
@@ -606,6 +624,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       isLoading: true,
       errorMessage: null,
       statusMessage: state.credexType == CredexType.SECURED ? 'Offering Secured Credex...' : 'Offering Unsecured Credex...',
+      dueDate: state.dueDate, // Preserve the due date
     ));
     
     try {
@@ -617,7 +636,7 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         credexType: 'PURCHASE',
         offersOrRequests: 'OFFERS',
         securedCredex: state.credexType == CredexType.SECURED,
-        dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate?.toIso8601String(),
+        dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate != null ? "${state.dueDate!.year}-${state.dueDate!.month.toString().padLeft(2, '0')}-${state.dueDate!.day.toString().padLeft(2, '0')}" : null,
       );
       
       final result = await accountRepository.createCredex(credexRequest);

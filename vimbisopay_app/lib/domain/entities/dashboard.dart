@@ -252,6 +252,52 @@ class Dashboard extends Entity {
       );
 }
 
+class CreditRating {
+  final double redeemedTotalUSD;
+  final double outstandingTotalUSD;
+  final double defaultedTotalUSD;
+  final double writtenOffTotalUSD;
+
+  const CreditRating({
+    required this.redeemedTotalUSD,
+    required this.outstandingTotalUSD,
+    required this.defaultedTotalUSD,
+    required this.writtenOffTotalUSD,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'redeemedTotalUSD': redeemedTotalUSD,
+    'outstandingTotalUSD': outstandingTotalUSD,
+    'defaultedTotalUSD': defaultedTotalUSD,
+    'writtenOffTotalUSD': writtenOffTotalUSD,
+  };
+
+  factory CreditRating.fromMap(Map<String, dynamic> map) => CreditRating(
+    redeemedTotalUSD: (map['redeemedTotalUSD'] as num?)?.toDouble() ?? 0.0,
+    outstandingTotalUSD: (map['outstandingTotalUSD'] as num?)?.toDouble() ?? 0.0,
+    defaultedTotalUSD: (map['defaultedTotalUSD'] as num?)?.toDouble() ?? 0.0,
+    writtenOffTotalUSD: (map['writtenOffTotalUSD'] as num?)?.toDouble() ?? 0.0,
+  );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is CreditRating &&
+        other.redeemedTotalUSD == redeemedTotalUSD &&
+        other.outstandingTotalUSD == outstandingTotalUSD &&
+        other.defaultedTotalUSD == defaultedTotalUSD &&
+        other.writtenOffTotalUSD == writtenOffTotalUSD;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    redeemedTotalUSD,
+    outstandingTotalUSD,
+    defaultedTotalUSD,
+    writtenOffTotalUSD,
+  );
+}
+
 class DashboardMember {
   final String memberID;
   final int memberTier;
@@ -260,6 +306,8 @@ class DashboardMember {
   final String? memberHandle;
   final String defaultDenom;
   final String? profilePictureThumbnail;
+  final double remainingAvailableUSD;
+  final CreditRating? creditRating;
 
   const DashboardMember({
     required this.memberID,
@@ -269,6 +317,8 @@ class DashboardMember {
     this.memberHandle,
     required this.defaultDenom,
     this.profilePictureThumbnail,
+    this.remainingAvailableUSD = 0.0,
+    this.creditRating,
   });
 
   Map<String, dynamic> toMap() => {
@@ -279,28 +329,61 @@ class DashboardMember {
     'memberHandle': memberHandle,
     'defaultDenom': defaultDenom,
     'profilePictureThumbnail': profilePictureThumbnail,
+    'remainingAvailableUSD': remainingAvailableUSD,
+    'creditRating': creditRating?.toMap(),
   };
 
-  factory DashboardMember.fromMap(Map<String, dynamic> map) => DashboardMember(
-    memberID: map['memberID'] as String,
-    memberTier: map['memberTier'] as int,
-    firstname: map['firstname'] as String,
-    lastname: map['lastname'] as String,
-    memberHandle: map['memberHandle'] as String?,
-    defaultDenom: map['defaultDenom'] as String,
-    profilePictureThumbnail: map['profilePictureThumbnail'] as String?,
-  );
+  factory DashboardMember.fromMap(Map<String, dynamic> map) {
+    // Parse credit rating if available
+    CreditRating? creditRating;
+    if (map.containsKey('creditRating') && map['creditRating'] != null) {
+      creditRating = CreditRating.fromMap(map['creditRating'] as Map<String, dynamic>);
+    }
+
+    return DashboardMember(
+      memberID: map['memberID'] as String,
+      memberTier: map['memberTier'] as int,
+      firstname: map['firstname'] as String,
+      lastname: map['lastname'] as String,
+      memberHandle: map['memberHandle'] as String?,
+      defaultDenom: map['defaultDenom'] as String,
+      profilePictureThumbnail: map['profilePictureThumbnail'] as String?,
+      // Handle remainingAvailableUSD with special care for integer values
+      remainingAvailableUSD: (() {
+        final rawValue = map['remainingAvailableUSD'];
+        if (rawValue == null) return 0.0;
+        
+        if (rawValue is int) {
+          return rawValue.toDouble();
+        } else if (rawValue is double) {
+          return rawValue;
+        } else if (rawValue is String) {
+          return double.tryParse(rawValue) ?? 0.0;
+        } else {
+          // For any other type, try to convert to string first then parse
+          try {
+            return double.tryParse(rawValue.toString()) ?? 0.0;
+          } catch (_) {
+            return 0.0;
+          }
+        }
+      })(),
+      creditRating: creditRating,
+    );
+  }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is DashboardMember &&
         other.memberID == memberID &&
-        other.memberTier == memberTier;
+        other.memberTier == memberTier &&
+        other.remainingAvailableUSD == remainingAvailableUSD &&
+        other.creditRating == creditRating;
   }
 
   @override
-  int get hashCode => Object.hash(memberID, memberTier);
+  int get hashCode => Object.hash(memberID, memberTier, remainingAvailableUSD, creditRating);
 }
 
 class PendingData {
@@ -438,6 +521,7 @@ class PendingOffer {
   final String counterpartyAccountName;
   final bool secured;
   final DateTime? dueDate;
+  final CreditRating? counterpartyCreditRating;
 
   String get uniqueIdentifier {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -452,6 +536,7 @@ class PendingOffer {
     required this.counterpartyAccountName,
     required this.secured,
     this.dueDate,
+    this.counterpartyCreditRating,
   });
 
   Map<String, dynamic> toMap() => {
@@ -460,6 +545,7 @@ class PendingOffer {
     'counterpartyAccountName': counterpartyAccountName,
     'secured': secured,
     'dueDate': dueDate?.toIso8601String(),
+    'counterpartyCreditRating': counterpartyCreditRating?.toMap(),
   };
 
   factory PendingOffer.fromMap(Map<String, dynamic> map) {
@@ -507,12 +593,29 @@ class PendingOffer {
       }
     }
 
+    // Determine if the credex is secured
+    // If the secured field is missing but dueDate is present, it's unsecured
+    // If both are missing, default to secured for backward compatibility
+    bool isSecured = true;
+    if (map.containsKey('secured') && map['secured'] != null) {
+      isSecured = map['secured'] as bool;
+    } else if (map.containsKey('dueDate') && map['dueDate'] != null) {
+      isSecured = false; // If it has a due date but no secured field, it's unsecured
+    }
+
+    // Parse counterpartyCreditRating if available
+    CreditRating? counterpartyCreditRating;
+    if (map.containsKey('counterpartyCreditRating') && map['counterpartyCreditRating'] != null) {
+      counterpartyCreditRating = CreditRating.fromMap(map['counterpartyCreditRating'] as Map<String, dynamic>);
+    }
+
     return PendingOffer(
       credexID: map['credexID'] as String,
       formattedInitialAmount: formattedAmount,
       counterpartyAccountName: map['counterpartyAccountName'] as String,
-      secured: map['secured'] as bool,
+      secured: isSecured,
       dueDate: dueDate,
+      counterpartyCreditRating: counterpartyCreditRating,
     );
   }
 }

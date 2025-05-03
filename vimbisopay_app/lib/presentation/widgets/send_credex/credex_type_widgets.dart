@@ -115,7 +115,7 @@ class _DueDateSelectorState extends State<DueDateSelector> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Due Date (Optional)',
+            'worth of value to be delivered by:',
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
@@ -140,7 +140,7 @@ class _DueDateSelectorState extends State<DueDateSelector> {
                   Expanded(
                     child: Text(
                       widget.selectedDate == null 
-                          ? 'Recommended for business' 
+                          ? 'No due date' 
                           : _formatDate(_effectiveDate!),
                       style: TextStyle(
                         color: widget.selectedDate == null
