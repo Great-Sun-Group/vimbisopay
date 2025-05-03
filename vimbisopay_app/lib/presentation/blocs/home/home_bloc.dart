@@ -23,6 +23,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   
   int _totalAccounts = 0;
   int _processedAccounts = 0;
+  DateTime? _lastRefreshTimestamp;
 
   HomeBloc({
     required this.accountRepository,
@@ -123,7 +124,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 Starting home refresh:
 - Has dashboard: ${state.dashboard != null}
 - Current status: ${state.status}
-- Trigger: ${event.toString()}
+- Source: ${event.source}
+- Force refresh: ${event.forceRefresh}
 ''');
 
     // Check if update screen is showing - if so, don't proceed with refresh
@@ -136,6 +138,19 @@ Starting home refresh:
       _logger.e('Cannot refresh - no dashboard available');
       return;
     }
+    
+    // Apply throttling for foreground refreshes
+    if (event.source == RefreshSource.foreground && !event.forceRefresh) {
+      // Skip if last refresh was recent (within 2 minutes)
+      if (_lastRefreshTimestamp != null) {
+        final timeSinceLastRefresh = DateTime.now().difference(_lastRefreshTimestamp!);
+        if (timeSinceLastRefresh < const Duration(minutes: 2)) {
+          _logger.i('Skipping foreground refresh - last refresh was ${timeSinceLastRefresh.inSeconds} seconds ago');
+          return;
+        }
+      }
+    }
+    
     emit(state.copyWith(status: HomeStatus.refreshing));
     
     try {
@@ -203,7 +218,7 @@ Dashboard refresh stats:
             ));
             
             _logger.i('Loading ledger data for refreshed dashboard...');
-            await _loadLedgerData(user.dashboard!);
+            await _loadLedgerData(user.dashboard!, source: event.source);
             _logger.i('Refresh complete');
 
             // Show success message
@@ -212,6 +227,10 @@ Dashboard refresh stats:
               message: 'Dashboard refreshed successfully',
               processingCredexIds: state.processingCredexIds, // Preserve processing state
             ));
+            
+            // Update last refresh timestamp
+            _lastRefreshTimestamp = DateTime.now();
+            _logger.i('Updated last refresh timestamp: $_lastRefreshTimestamp');
           } catch (e) {
             final userFriendlyMessage = ErrorTranslator.translateError(e);
             _logger.e('Error saving user or updating state: $e');
@@ -620,8 +639,8 @@ Dashboard refresh stats:
     ));
   }
 
-  Future<void> _loadLedgerData(Dashboard dashboard) async {
-    _logger.d('Loading ledger data for accounts');
+  Future<void> _loadLedgerData(Dashboard dashboard, {RefreshSource source = RefreshSource.userAction}) async {
+    _logger.d('Loading ledger data for accounts (source: $source)');
 
     // Check if update screen is showing - if so, don't proceed with loading ledger data
     if (ServiceLocator.appStateManager.isUpdateScreenShowing) {
@@ -658,93 +677,114 @@ Dashboard refresh stats:
         }
       }
 
-      // Phase 2: Fetch new entries in background
-      _logger.d('Phase 2: Fetching new entries');
-      _totalAccounts = accounts.length;
-      _processedAccounts = 0;
+      // Phase 2: Fetch new entries in background (skip for foreground refreshes)
+      if (source != RefreshSource.foreground) {
+        _logger.d('Phase 2: Fetching new entries from API');
+        _totalAccounts = accounts.length;
+        _processedAccounts = 0;
 
-      for (final account in accounts) {
-        final hasCachedEntries = await databaseHelper.hasLedgerEntries(account.accountID);
-        final latestTimestamp = hasCachedEntries 
-          ? await databaseHelper.getLatestLedgerTimestamp(account.accountID)
-          : null;
+        for (final account in accounts) {
+          final hasCachedEntries = await databaseHelper.hasLedgerEntries(account.accountID);
+          final latestTimestamp = hasCachedEntries 
+            ? await databaseHelper.getLatestLedgerTimestamp(account.accountID)
+            : null;
 
-        _logger.d('Fetching entries for ${account.accountName} (cached: $hasCachedEntries)');
-        
-        _processedAccounts++;
-        
-        // Add delay between accounts to prevent rate limiting
-        if (_processedAccounts < _totalAccounts) {
-          await Future.delayed(const Duration(milliseconds: 5000)); // Increased delay to 5 seconds
-        }
+          _logger.d('Fetching entries for ${account.accountName} (cached: $hasCachedEntries)');
+          
+          _processedAccounts++;
+          
+          // Add delay between accounts to prevent rate limiting
+          if (_processedAccounts < _totalAccounts) {
+            await Future.delayed(const Duration(milliseconds: 5000)); // Increased delay to 5 seconds
+          }
 
-        // Fetch new entries with retry logic
-        bool success = false;
-        int retryDelay = 5000; // Start with 5 seconds
-        int retryCount = 0;
-        const maxRetries = 3;
+          // Fetch new entries with retry logic
+          bool success = false;
+          int retryDelay = 5000; // Start with 5 seconds
+          int retryCount = 0;
+          const maxRetries = 3;
 
-        while (!success && retryCount < maxRetries) {
-          try {
-            final result = await accountRepository.getLedger(
-              accountId: account.accountID,
-              afterTimestamp: latestTimestamp,
-              limit: hasCachedEntries ? 10 : null, // No limit for initial load
-            );
+          while (!success && retryCount < maxRetries) {
+            try {
+              final result = await accountRepository.getLedger(
+                accountId: account.accountID,
+                afterTimestamp: latestTimestamp,
+                limit: hasCachedEntries ? 10 : null, // No limit for initial load
+              );
 
-            await result.fold(
-              (failure) async {
-                final userFriendlyMessage = ErrorTranslator.translateError(failure);
-                _logger.e('Failed to fetch new entries for account ${account.accountID}: ${failure.toString()}');
-                errors.add('Failed to load new entries for ${account.accountName}: $userFriendlyMessage');
-                success = true; // Don't retry on non-rate-limit failures
-              },
-              (entries) async {
-                if (entries.isNotEmpty) {
-                  _logger.d('Received ${entries.length} new entries for ${account.accountName}');
-                  
-                  // Update or add to existing entries
-                  if (accountLedgers.containsKey(account.accountID)) {
-                    accountLedgers[account.accountID]!.addAll(entries);
-                  } else {
-                    accountLedgers[account.accountID] = entries;
+              await result.fold(
+                (failure) async {
+                  final userFriendlyMessage = ErrorTranslator.translateError(failure);
+                  _logger.e('Failed to fetch new entries for account ${account.accountID}: ${failure.toString()}');
+                  errors.add('Failed to load new entries for ${account.accountName}: $userFriendlyMessage');
+                  success = true; // Don't retry on non-rate-limit failures
+                },
+                (entries) async {
+                  if (entries.isNotEmpty) {
+                    _logger.d('Received ${entries.length} new entries for ${account.accountName}');
+                    
+                    // Update or add to existing entries
+                    if (accountLedgers.containsKey(account.accountID)) {
+                      accountLedgers[account.accountID]!.addAll(entries);
+                    } else {
+                      accountLedgers[account.accountID] = entries;
+                    }
+                    allEntries.addAll(entries);
+                    
+                    // Check if we got all entries
+                    hasMoreEntries = hasCachedEntries && entries.length >= 10;
+
+                    // Emit update with new entries
+                    final uniqueEntries = _deduplicateAndSortEntries(allEntries);
+                    add(HomeLedgerLoaded(
+                      accountLedgers: accountLedgers,
+                      combinedEntries: uniqueEntries,
+                      hasMore: hasMoreEntries,
+                      showCompletionToast: _processedAccounts == _totalAccounts && errors.isEmpty,
+                    ));
                   }
-                  allEntries.addAll(entries);
-                  
-                  // Check if we got all entries
-                  hasMoreEntries = hasCachedEntries && entries.length >= 10;
-
-                  // Emit update with new entries
-                  final uniqueEntries = _deduplicateAndSortEntries(allEntries);
-                  add(HomeLedgerLoaded(
-                    accountLedgers: accountLedgers,
-                    combinedEntries: uniqueEntries,
-                    hasMore: hasMoreEntries,
-                    showCompletionToast: _processedAccounts == _totalAccounts && errors.isEmpty,
-                  ));
+                  success = true;
+                },
+              );
+            } catch (e) {
+              if (e is RateLimitException) {
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  _logger.w('Rate limit hit (attempt $retryCount of $maxRetries), retrying in ${retryDelay}ms');
+                  await Future.delayed(Duration(milliseconds: retryDelay));
+                  retryDelay *= 2; // Exponential backoff
+                } else {
+                  _logger.e('Max retries reached for rate limit');
+                  errors.add('Rate limit exceeded for ${account.accountName}');
+                  success = true;
                 }
-                success = true;
-              },
-            );
-          } catch (e) {
-            if (e is RateLimitException) {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                _logger.w('Rate limit hit (attempt $retryCount of $maxRetries), retrying in ${retryDelay}ms');
-                await Future.delayed(Duration(milliseconds: retryDelay));
-                retryDelay *= 2; // Exponential backoff
               } else {
-                _logger.e('Max retries reached for rate limit');
-                errors.add('Rate limit exceeded for ${account.accountName}');
+                final userFriendlyMessage = ErrorTranslator.translateError(e);
+                _logger.e('Error fetching entries: $e');
+                errors.add('Error loading entries for ${account.accountName}: $userFriendlyMessage');
                 success = true;
               }
-            } else {
-              final userFriendlyMessage = ErrorTranslator.translateError(e);
-              _logger.e('Error fetching entries: $e');
-              errors.add('Error loading entries for ${account.accountName}: $userFriendlyMessage');
-              success = true;
             }
           }
+        }
+      } else {
+        _logger.d('Skipping API calls for foreground refresh - using cached data only');
+        // Just use the cached data we already loaded
+        if (allEntries.isNotEmpty) {
+          final uniqueEntries = _deduplicateAndSortEntries(allEntries);
+          add(HomeLedgerLoaded(
+            accountLedgers: accountLedgers,
+            combinedEntries: uniqueEntries,
+            hasMore: true,
+            showCompletionToast: true,
+          ));
+        } else {
+          add(const HomeLedgerLoaded(
+            accountLedgers: {},
+            combinedEntries: [],
+            hasMore: false,
+            showCompletionToast: true,
+          ));
         }
       }
 

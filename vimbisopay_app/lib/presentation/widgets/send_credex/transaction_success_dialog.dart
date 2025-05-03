@@ -6,6 +6,7 @@ import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/credex_response.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/home/home_event.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/common/action_button.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/common/styled_card.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/date_formatter.dart';
@@ -223,36 +224,17 @@ class _TransactionSuccessDialogState extends State<TransactionSuccessDialog> wit
   }
   
   void _handleDone(BuildContext context) {
+    Logger.data('TransactionSuccessDialog: _handleDone called');
     Navigator.of(context).pop();
     if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => WillPopScope(
-          onWillPop: () async => false,
-          child: const AlertDialog(
-            backgroundColor: AppColors.surface,
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Refreshing...',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
+      // Navigate directly to home screen without showing a separate loading dialog
       Navigator.of(context).popUntil((route) => route.isFirst);
       
-      // Trigger refresh to update dashboard and transactions
-      widget.homeBloc.add(const HomeFetchPendingTransactions());
+      // Trigger a full refresh including login call instead of just fetching pending transactions
+      // The home screen will show an inline loading indicator when refreshing
+      // Use notification source to indicate this is a high-priority refresh that should bypass throttling
+      Logger.data('TransactionSuccessDialog: Triggering HomeRefreshStarted for full reload with login call');
+      widget.homeBloc.add(const HomeRefreshStarted(source: RefreshSource.notification, forceRefresh: true));
     }
   }
 }

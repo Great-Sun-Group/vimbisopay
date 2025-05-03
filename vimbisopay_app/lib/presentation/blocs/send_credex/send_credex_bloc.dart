@@ -639,6 +639,8 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
         dueDate: state.credexType == CredexType.SECURED ? null : state.dueDate != null ? "${state.dueDate!.year}-${state.dueDate!.month.toString().padLeft(2, '0')}-${state.dueDate!.day.toString().padLeft(2, '0')}" : null,
       );
       
+      Logger.data('Submitting credex request: ${credexRequest.toJson()}');
+      Logger.data('Current state before API call: status=${state.status}, isLoading=${state.isLoading}');
       final result = await accountRepository.createCredex(credexRequest);
       
       // Handle failure case
@@ -821,15 +823,41 @@ class SendCredexBloc extends Bloc<SendCredexEvent, SendCredexState> {
       // Handle success case
       final response = result.fold((l) => null, (r) => r);
       if (response != null) {
-        // Update transactions in database with original response
-        await databaseHelper.updatePendingTransactions(response);
+        Logger.data('Credex request successful, emitting success state with response: ${response.message}');
+        Logger.data('Response details: ${response.data.action.details.toString()}');
         
-        emit(state.copyWith(
+        // Check for "Invalid date" in pendingOutData
+        for (var account in response.data.dashboard.accounts) {
+          for (var offer in account.pendingOutData) {
+            if (offer.dueDate == null) {
+              Logger.data('Found null dueDate in pendingOutData for credexID: ${offer.credexID}');
+            }
+          }
+        }
+        
+        try {
+          // Update transactions in database with original response
+          await databaseHelper.updatePendingTransactions(response);
+          Logger.data('Successfully updated pending transactions in database');
+        } catch (e) {
+          Logger.error('Error updating pending transactions, but continuing with success state', e);
+          // Continue with success state despite the error
+        }
+        
+        // Explicitly log the state we're about to emit
+        final newState = state.copyWith(
           status: SendCredexStatus.success,
           isLoading: false,
           statusMessage: null,
           credexResponse: response,
-        ));
+        );
+        
+        Logger.data('About to emit new state with: status=${newState.status}, isLoading=${newState.isLoading}, hasResponse=${newState.credexResponse != null}');
+        
+        emit(newState);
+        
+        // Log the state after emission to confirm it was updated correctly
+        Logger.data('Success state emitted, current state: status=${state.status}, isLoading=${state.isLoading}, hasResponse=${state.credexResponse != null}');
         
         // Trigger refresh to update dashboard and transactions
         homeBloc.add(const HomeFetchPendingTransactions());

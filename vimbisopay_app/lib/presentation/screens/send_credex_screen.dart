@@ -14,6 +14,7 @@ import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/index.dart';
 import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
+import 'package:vimbisopay_app/core/utils/logger.dart';
 
 class SendCredexScreen extends StatefulWidget {
   static const String routeName = '/send-credex';
@@ -200,6 +201,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
       create: (context) => _bloc,
       child: BlocConsumer<SendCredexBloc, SendCredexState>(
         listener: (context, state) {
+          // Log state changes
+          Logger.data('SendCredexScreen: State changed - status=${state.status}, isLoading=${state.isLoading}, hasResponse=${state.credexResponse != null}');
+          
           // Update UI controllers based on state changes
           if (state.amount != _amountController.text && !_amountFocusNode.hasFocus) {
             _amountController.text = state.amount;
@@ -236,18 +240,25 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
           }
           
           // Show success dialog
+          Logger.data('SendCredexScreen: Checking success condition - status=${state.status}, hasResponse=${state.credexResponse != null}');
           if (state.status == SendCredexStatus.success && state.credexResponse != null) {
+            Logger.data('SendCredexScreen: Success condition met, preparing to show dialog');
             WidgetsBinding.instance.addPostFrameCallback((_) {
+              Logger.data('SendCredexScreen: Inside post frame callback, about to show dialog');
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => TransactionSuccessDialog(
-                  response: state.credexResponse!,
-                  amount: state.amount,
-                  denomination: state.selectedDenomination.toString().split('.').last,
-                  homeBloc: widget.homeBloc,
-                ),
+                builder: (context) {
+                  Logger.data('SendCredexScreen: Building TransactionSuccessDialog');
+                  return TransactionSuccessDialog(
+                    response: state.credexResponse!,
+                    amount: state.amount,
+                    denomination: state.selectedDenomination.toString().split('.').last,
+                    homeBloc: widget.homeBloc,
+                  );
+                },
               );
+              Logger.data('SendCredexScreen: Dialog show method called');
             });
           }
         },

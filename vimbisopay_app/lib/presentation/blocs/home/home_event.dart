@@ -23,8 +23,16 @@ class HomeLoadStarted extends HomeEvent {
   const HomeLoadStarted();
 }
 
+enum RefreshSource { userAction, foreground, notification }
+
 class HomeRefreshStarted extends HomeEvent {
-  const HomeRefreshStarted();
+  final RefreshSource source;
+  final bool forceRefresh;
+  
+  const HomeRefreshStarted({
+    this.source = RefreshSource.userAction,
+    this.forceRefresh = false,
+  });
 }
 
 class HomeLoadMoreStarted extends HomeEvent {

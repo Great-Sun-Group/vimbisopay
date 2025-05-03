@@ -1,3 +1,5 @@
+import 'package:vimbisopay_app/core/utils/logger.dart';
+
 class CredexResponse {
   final String message;
   final CredexData data;
@@ -290,10 +292,17 @@ class PendingOffer {
     if (map.containsKey('dueDate') && map['dueDate'] != null) {
       try {
         if (map['dueDate'] is String) {
-          dueDate = DateTime.parse(map['dueDate'] as String);
+          final dateStr = map['dueDate'] as String;
+          // Skip parsing if the string is "Invalid date"
+          if (dateStr != "Invalid date") {
+            dueDate = DateTime.parse(dateStr);
+          } else {
+            Logger.data('Skipping "Invalid date" string in PendingOffer.fromMap for credexID: ${map['credexID']}');
+          }
         }
       } catch (e) {
         // Ignore parsing errors and leave dueDate as null
+        Logger.error('Error parsing due date: ${map['dueDate']} for credexID: ${map['credexID']}', e);
       }
     }
 

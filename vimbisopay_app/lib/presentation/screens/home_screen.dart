@@ -532,10 +532,11 @@ Error setting up notification listeners:
       _setupNotificationListeners().then((_) {
         Logger.lifecycle('Notification listeners reinitialized');
         
-        // Trigger a refresh to ensure data is up to date
+        // Trigger a refresh to ensure data is up to date, but mark it as foreground
+        // to allow the bloc to optimize the refresh behavior
         if (mounted && !_isDisposed) {
-          Logger.lifecycle('Triggering refresh after resume');
-          _homeBloc.add(const HomeRefreshStarted());
+          Logger.lifecycle('Triggering HomeRefreshStarted event with foreground source');
+          _homeBloc.add(const HomeRefreshStarted(source: RefreshSource.foreground));
         }
       }).catchError((error, stackTrace) {
         Logger.error('''
@@ -812,8 +813,8 @@ Error reinitializing notification listeners:
           cancelOnError: false,
         );
 
-        // Trigger the refresh
-        _homeBloc.add(const HomeRefreshStarted());
+        // Trigger the refresh with userAction source to bypass throttling
+        _homeBloc.add(const HomeRefreshStarted(source: RefreshSource.userAction, forceRefresh: true));
 
         try {
           // Wait for completion
@@ -830,6 +831,35 @@ Error reinitializing notification listeners:
         child: Column(
           children: [
             if (state.dashboard != null) _buildAccountsSection(state),
+            
+            // Add loading indicator below accounts section when refreshing
+            if (state.isRefreshing)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(8.0),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const InlineLoadingAnimation(size: 24),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Refreshing your dashboard...',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
             TransactionsList(
               key: ValueKey('transactions_${state.combinedLedgerEntries.length}_${state.accountLedgers.length}'),
             ),

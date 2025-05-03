@@ -1247,6 +1247,18 @@ class DatabaseHelper {
         );
         
         for (var offer in account.pendingInData ?? []) {
+          // Safely convert dueDate to ISO string
+          String? dueDateStr = null;
+          if (offer.dueDate != null) {
+            try {
+              dueDateStr = offer.dueDate?.toIso8601String();
+              Logger.data('Converted dueDate to ISO string: $dueDateStr for credexID: ${offer.credexID}');
+            } catch (e) {
+              Logger.error('Error converting dueDate to ISO string for credexID: ${offer.credexID}', e);
+              // Leave dueDateStr as null
+            }
+          }
+          
           await txn.insert('pending_transactions', {
             'credexId': offer.credexID,
             'accountId': account.accountID,
@@ -1254,7 +1266,7 @@ class DatabaseHelper {
             'counterpartyName': offer.counterpartyAccountName ?? '',
             'isSecured': offer.secured ? 1 : 0,
             'direction': 'in',
-            'dueDate': offer.dueDate?.toIso8601String(),
+            'dueDate': dueDateStr,
             'counterpartyCreditRating_redeemedTotalUSD': offer.counterpartyCreditRating?.redeemedTotalUSD,
             'counterpartyCreditRating_outstandingTotalUSD': offer.counterpartyCreditRating?.outstandingTotalUSD,
             'counterpartyCreditRating_defaultedTotalUSD': offer.counterpartyCreditRating?.defaultedTotalUSD,
@@ -1263,6 +1275,18 @@ class DatabaseHelper {
         }
         
         for (var offer in account.pendingOutData ?? []) {
+          // Safely convert dueDate to ISO string
+          String? dueDateStr = null;
+          if (offer.dueDate != null) {
+            try {
+              dueDateStr = offer.dueDate?.toIso8601String();
+              Logger.data('Converted dueDate to ISO string: $dueDateStr for credexID: ${offer.credexID}');
+            } catch (e) {
+              Logger.error('Error converting dueDate to ISO string for credexID: ${offer.credexID}', e);
+              // Leave dueDateStr as null
+            }
+          }
+          
           await txn.insert('pending_transactions', {
             'credexId': offer.credexID,
             'accountId': account.accountID,
@@ -1270,7 +1294,7 @@ class DatabaseHelper {
             'counterpartyName': offer.counterpartyAccountName ?? '',
             'isSecured': offer.secured ? 1 : 0,
             'direction': 'out',
-            'dueDate': offer.dueDate?.toIso8601String(),
+            'dueDate': dueDateStr,
             'counterpartyCreditRating_redeemedTotalUSD': offer.counterpartyCreditRating?.redeemedTotalUSD,
             'counterpartyCreditRating_outstandingTotalUSD': offer.counterpartyCreditRating?.outstandingTotalUSD,
             'counterpartyCreditRating_defaultedTotalUSD': offer.counterpartyCreditRating?.defaultedTotalUSD,
