@@ -274,3 +274,9 @@ Example entry format:
 -e 
 ## [4.5.3+13] - 2025-05-04
 - Unsecured credexes and minor bug fixes
+-e 
+## [4.5.3+14] - 2025-05-04
+- Unsecured credex and  minor version updates
+-e 
+## [4.5.3+15] - 2025-05-04
+- Unsecured credex and minor fixes
