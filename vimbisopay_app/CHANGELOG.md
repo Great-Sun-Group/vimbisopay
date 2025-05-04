@@ -280,3 +280,6 @@ Example entry format:
 -e 
 ## [4.5.3+15] - 2025-05-04
 - Unsecured credex and minor fixes
+-e 
+## [4.5.3+16] - 2025-05-04
+- Disabled market place feature for release builds
