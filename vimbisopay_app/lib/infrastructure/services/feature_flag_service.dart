@@ -100,16 +100,29 @@ class FeatureFlagService {
   ///
   /// Returns true if the marketplace feature is enabled, false otherwise.
   /// If a local override is set, it takes precedence over the remote config value.
+  /// In release mode, local overrides are ignored to ensure the remote config is always used.
+  /// If there's any error accessing the remote config, defaults to false.
   bool isMarketplaceEnabled() {
-    // Check if there's a local override
-    if (_prefs.containsKey(_marketplaceOverrideKey)) {
-      final localOverride = _prefs.getBool(_marketplaceOverrideKey);
-      Logger.data('Using local override for marketplace feature: $localOverride');
-      return localOverride ?? _remoteConfig.getBool(FeatureFlags.enableMarketplace);
+    try {
+      // For release builds, ignore local overrides and use only remote config
+      if (kReleaseMode) {
+        return _remoteConfig.getBool(FeatureFlags.enableMarketplace);
+      }
+      
+      // For debug/profile builds, check if there's a local override
+      if (_prefs.containsKey(_marketplaceOverrideKey)) {
+        final localOverride = _prefs.getBool(_marketplaceOverrideKey);
+        Logger.data('Using local override for marketplace feature: $localOverride');
+        return localOverride ?? _remoteConfig.getBool(FeatureFlags.enableMarketplace);
+      }
+      
+      // Otherwise use the remote config value
+      return _remoteConfig.getBool(FeatureFlags.enableMarketplace);
+    } catch (e) {
+      // If there's any error accessing the remote config, default to false
+      Logger.error('Error checking marketplace feature flag, defaulting to false', e);
+      return false;
     }
-    
-    // Otherwise use the remote config value
-    return _remoteConfig.getBool(FeatureFlags.enableMarketplace);
   }
   
   /// Sets a local override for the marketplace feature flag.
