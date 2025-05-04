@@ -166,6 +166,21 @@ void main() async {
     Logger.data('ConfigManager initialized successfully');
     Logger.data(
         'Marketplace feature enabled: ${configManager.isFeatureEnabled('enable_marketplace')}');
+        
+    // Force refresh all configuration in the background
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      print('Refreshing all configuration on app start...');
+      final refreshed = await configManager.refreshAll();
+      Logger.data('Configuration refresh on app start result: $refreshed');
+      
+      if (refreshed) {
+        Logger.data('Configuration refreshed successfully on app start');
+        Logger.data(
+            'Marketplace feature enabled after refresh: ${configManager.isFeatureEnabled('enable_marketplace')}');
+      } else {
+        Logger.error('Failed to refresh configuration on app start');
+      }
+    });
 
     // Schedule app updates check for after UI is rendered
     Future.delayed(const Duration(seconds: 2), () async {

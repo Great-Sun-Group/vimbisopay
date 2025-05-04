@@ -280,3 +280,12 @@ Example entry format:
 -e 
 ## [4.5.3+15] - 2025-05-04
 - Unsecured credex and minor fixes
+-e 
+## [4.5.3+16] - 2025-05-04
+- Disabled market place feature for release builds
+-e 
+## [4.5.3+17] - 2025-05-04
+- Changed firebase fetch interval
+-e 
+## [4.5.3+18] - 2025-05-04
+- Remote config optimization
