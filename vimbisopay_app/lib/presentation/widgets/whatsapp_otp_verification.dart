@@ -4,6 +4,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/otp_utils.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/core/utils/deep_link_handler.dart';
+import 'package:vimbisopay_app/core/config/api_config.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/infrastructure/services/service_locator.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
@@ -349,6 +350,40 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                       ),
                     if (_error != null) const SizedBox(height: 16),
                     
+                    // Development mode indicator
+                    if (ApiConfig.isDevelopment)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.developer_mode,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Development Mode: Use OTP 123456',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
                     // Instructions
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -362,35 +397,48 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Verification Steps:',
-                            style: TextStyle(
+                          Text(
+                            ApiConfig.isDevelopment ? 'Development Verification:' : 'Verification Steps:',
+                            style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _buildInstructionStep(
-                            1,
-                            'Tap the "Open WhatsApp" button below',
-                            _otpSent,
-                          ),
-                          _buildInstructionStep(
-                            2,
-                            'Send the pre-filled message to the Vimbiso chatbot',
-                            _otpSent,
-                          ),
-                          _buildInstructionStep(
-                            3,
-                            'Wait for confirmation in WhatsApp',
-                            _verificationComplete,
-                          ),
-                          _buildInstructionStep(
-                            4,
-                            'Return to this app to complete the process',
-                            _verificationComplete,
-                          ),
+                          if (ApiConfig.isDevelopment) ...[
+                            _buildInstructionStep(
+                              1,
+                              'Use the fixed development OTP: 123456',
+                              false,
+                            ),
+                            _buildInstructionStep(
+                              2,
+                              'No WhatsApp verification needed in dev mode',
+                              false,
+                            ),
+                          ] else ...[
+                            _buildInstructionStep(
+                              1,
+                              'Tap the "Open WhatsApp" button below',
+                              _otpSent,
+                            ),
+                            _buildInstructionStep(
+                              2,
+                              'Send the pre-filled message to the Vimbiso chatbot',
+                              _otpSent,
+                            ),
+                            _buildInstructionStep(
+                              3,
+                              'Wait for confirmation in WhatsApp',
+                              _verificationComplete,
+                            ),
+                            _buildInstructionStep(
+                              4,
+                              'Return to this app to complete the process',
+                              _verificationComplete,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -428,27 +476,31 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                         ),
                         child: Column(
                           children: [
-                            const Text(
-                              'Your verification code:',
-                              style: TextStyle(
+                            Text(
+                              ApiConfig.isDevelopment 
+                                ? 'Development verification code:'
+                                : 'Your verification code:',
+                              style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 14,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _otp!,
-                              style: const TextStyle(
-                                color: AppColors.primary,
+                              ApiConfig.isDevelopment ? '123456' : _otp!,
+                              style: TextStyle(
+                                color: ApiConfig.isDevelopment ? Colors.orange : AppColors.primary,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 2,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'This code will be automatically included in your WhatsApp message.',
-                              style: TextStyle(
+                            Text(
+                              ApiConfig.isDevelopment
+                                ? 'Use this fixed code for development verification.'
+                                : 'This code will be automatically included in your WhatsApp message.',
+                              style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 12,
                               ),
