@@ -1,0 +1,266 @@
+name: Deploy Mobile App to Local Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_required:
+        description: 'Is this update required for users?'
+        required: true
+        type: boolean
+        default: false
+      release_notes:
+        description: 'Release notes for this version'
+        required: true
+        type: string
+        default: 'Bug fixes and performance improvements'
+
+jobs:
+  deploy-mobile-app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Determine version increment
+        id: version
+        run: |
+          # Read current version from pubspec.yaml
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          # Increment version based on update_required
+          if [ "${{ github.event.inputs.update_required }}" = "true" ]; then
+            # Required update: increment minor version, reset patch
+            NEW_MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+            echo "Required update: incrementing minor version"
+          else
+            # Optional update: increment patch version
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            echo "Optional update: incrementing patch version"
+          fi
+          
+          echo "New version: $NEW_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "deployment_id=vimbisopay-$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Update version in pubspec.yaml
+        run: |
+          # Update version in pubspec.yaml with build number
+          BUILD_NUMBER=$(date +%s)
+          NEW_VERSION_WITH_BUILD="${{ steps.version.outputs.new_version }}+${BUILD_NUMBER}"
+          
+          echo "Updating pubspec.yaml with version: $NEW_VERSION_WITH_BUILD"
+          sed -i "s/^version:.*/version: $NEW_VERSION_WITH_BUILD/" pubspec.yaml
+          
+          # Verify the change
+          echo "Updated pubspec.yaml version:"
+          grep '^version:' pubspec.yaml
+
+      - name: Build APK
+        run: |
+          echo "🔨 Building Flutter APK..."
+          flutter build apk --release --verbose
+          
+          # Verify APK was created
+          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            echo "✅ APK built successfully"
+            APK_SIZE=$(stat -c%s "build/app/outputs/flutter-apk/app-release.apk")
+            echo "APK size: $APK_SIZE bytes"
+          else
+            echo "❌ APK build failed - file not found"
+            exit 1
+          fi
+
+      - name: Upload APK to deployment API
+        id: upload
+        run: |
+          echo "📤 Uploading APK to deployment API..."
+          
+          APK_FILE="build/app/outputs/flutter-apk/app-release.apk"
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          UPDATE_REQUIRED="${{ github.event.inputs.update_required }}"
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          
+          echo "Version: $NEW_VERSION"
+          echo "Update Required: $UPDATE_REQUIRED"
+          echo "Release Notes: $RELEASE_NOTES"
+          
+          # Upload APK with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Upload attempt $RETRY_COUNT of $MAX_RETRIES..."
+            
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST \
+              -H "X-Request-ID: ${{ steps.version.outputs.deployment_id }}" \
+              -F "apk_file=@${APK_FILE}" \
+              -F "version=${NEW_VERSION}" \
+              -F "update_required=${UPDATE_REQUIRED}" \
+              -F "release_notes=${RELEASE_NOTES}" \
+              -F "deploy_token=${{ secrets.DEPLOY_TOKEN }}" \
+              http://localhost:4000/api/upload-apk)
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+            
+            echo "HTTP Status: $HTTP_CODE"
+            echo "Response: $RESPONSE_BODY"
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              SUCCESS=true
+              echo "✅ APK uploaded successfully!"
+              echo "response_body=$RESPONSE_BODY" >> $GITHUB_OUTPUT
+              break
+            elif [ "$HTTP_CODE" = "401" ]; then
+              echo "❌ Authentication failed - invalid deploy token"
+              exit 1
+            elif [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "⏳ Upload failed, retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "❌ APK upload failed after $MAX_RETRIES attempts"
+            echo "Final response: $RESPONSE_BODY"
+            exit 1
+          fi
+
+      - name: Verify APK availability
+        run: |
+          echo "🔍 Verifying APK availability..."
+          
+          # Wait a moment for the upload to be processed
+          sleep 5
+          
+          # Check if APK is available for download
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          DOWNLOAD_CHECK=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4000/downloads/vimbisopay-${NEW_VERSION}.apk" || echo "000")
+          
+          if [ "$DOWNLOAD_CHECK" = "200" ]; then
+            echo "✅ APK is available for download"
+          else
+            echo "⚠️  APK download returned: $DOWNLOAD_CHECK"
+            echo "This may be normal if the file is still being processed"
+          fi
+          
+          # Check latest APK link
+          LATEST_CHECK=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4000/downloads/vimbisopay-latest.apk" || echo "000")
+          
+          if [ "$LATEST_CHECK" = "200" ]; then
+            echo "✅ Latest APK link is working"
+          else
+            echo "⚠️  Latest APK link returned: $LATEST_CHECK"
+          fi
+
+      - name: Report deployment status
+        if: always()
+        run: |
+          if [ "${{ steps.upload.outcome }}" = "success" ]; then
+            echo "🎉 Mobile App Deployment Summary:"
+            echo "✅ App: vimbisopay"
+            echo "✅ Version: ${{ steps.version.outputs.current_version }} → ${{ steps.version.outputs.new_version }}"
+            echo "✅ Update Required: ${{ github.event.inputs.update_required }}"
+            echo "✅ Status: Successfully deployed"
+            echo "✅ Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "📱 Download URLs:"
+            echo "   • Versioned: http://localhost:4000/downloads/vimbisopay-${{ steps.version.outputs.new_version }}.apk"
+            echo "   • Latest: http://localhost:4000/downloads/vimbisopay-latest.apk"
+            echo ""
+            echo "📝 Release Notes:"
+            echo "${{ github.event.inputs.release_notes }}"
+          else
+            echo "❌ Mobile App Deployment Failed:"
+            echo "   • App: vimbisopay"
+            echo "   • Version: ${{ steps.version.outputs.current_version }} → ${{ steps.version.outputs.new_version }}"
+            echo "   • Status: Failed"
+            echo "   • Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "🔧 Troubleshooting:"
+            echo "   • Check deployment token in repository secrets"
+            echo "   • Verify local deployment API is running"
+            echo "   • Check Flutter build logs above"
+            echo "   • Review upload response logs"
+          fi
+
+      - name: Create deployment artifact
+        if: success()
+        run: |
+          mkdir -p deployment-artifacts
+          
+          # Create deployment info
+          cat > deployment-artifacts/deployment-info.json <<EOF
+          {
+            "service": "vimbisopay",
+            "previous_version": "${{ steps.version.outputs.current_version }}",
+            "new_version": "${{ steps.version.outputs.new_version }}",
+            "update_required": ${{ github.event.inputs.update_required }},
+            "release_notes": "${{ github.event.inputs.release_notes }}",
+            "deployment_id": "${{ steps.version.outputs.deployment_id }}",
+            "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+            "status": "success",
+            "workflow_run_id": "${{ github.run_id }}",
+            "actor": "${{ github.actor }}",
+            "download_urls": {
+              "versioned": "http://localhost:4000/downloads/vimbisopay-${{ steps.version.outputs.new_version }}.apk",
+              "latest": "http://localhost:4000/downloads/vimbisopay-latest.apk"
+            }
+          }
+          EOF
+          
+          # Copy APK to artifacts (for backup/reference)
+          cp build/app/outputs/flutter-apk/app-release.apk deployment-artifacts/vimbisopay-${{ steps.version.outputs.new_version }}.apk
+
+      - name: Upload deployment artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-deployment-${{ steps.version.outputs.deployment_id }}
+          path: deployment-artifacts/
+          retention-days: 90
+
+      - name: Commit version update
+        if: success()
+        run: |
+          echo "📝 Committing version update to repository..."
+          
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add pubspec.yaml
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+          
+          echo "✅ Version update committed and pushed"
