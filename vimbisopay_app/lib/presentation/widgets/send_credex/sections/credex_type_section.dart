@@ -131,7 +131,7 @@ class CredexTypeSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Text(
-                '$amount $selectedDenomination will be transferred immediately from your Secured Balance',
+                '$amount $selectedDenomination will be deducted immediately from your Secured Balance',
                 style: const TextStyle(
                   color: AppColors.primary,
                   fontSize: 14,
