@@ -64,6 +64,3 @@ flutter:
     - assets/animations/
     - assets/audio/
     - .env
-
-dependency_overrides:
-  shared_preferences_android: 2.2.0

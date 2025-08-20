@@ -294,7 +294,7 @@ class PendingOffer {
         if (map['dueDate'] is String) {
           final dateStr = map['dueDate'] as String;
           // Skip parsing if the string is "Invalid date"
-          if (dateStr != "Invalid date") {
+          if (dateStr != 'Invalid date') {
             dueDate = DateTime.parse(dateStr);
           } else {
             Logger.data('Skipping "Invalid date" string in PendingOffer.fromMap for credexID: ${map['credexID']}');

@@ -843,12 +843,12 @@ Error reinitializing notification listeners:
                   borderRadius: BorderRadius.circular(8.0),
                   border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const InlineLoadingAnimation(size: 24),
-                    const SizedBox(width: 12),
-                    const Text(
+                    InlineLoadingAnimation(size: 24),
+                    SizedBox(width: 12),
+                    Text(
                       'Refreshing your dashboard...',
                       style: TextStyle(
                         color: AppColors.textPrimary,

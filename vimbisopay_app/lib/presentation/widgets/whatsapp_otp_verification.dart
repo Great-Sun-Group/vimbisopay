@@ -362,15 +362,15 @@ class _WhatsAppOTPVerificationState extends State<WhatsAppOTPVerification> {
                             color: Colors.orange.withOpacity(0.3),
                           ),
                         ),
-                        child: Row(
+                        child: const Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.developer_mode,
                               color: Colors.orange,
                               size: 20,
                             ),
-                            const SizedBox(width: 8),
-                            const Expanded(
+                            SizedBox(width: 8),
+                            Expanded(
                               child: Text(
                                 'Development Mode: Use OTP 123456',
                                 style: TextStyle(

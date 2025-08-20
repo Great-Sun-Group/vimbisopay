@@ -1248,7 +1248,7 @@ class DatabaseHelper {
         
         for (var offer in account.pendingInData ?? []) {
           // Safely convert dueDate to ISO string
-          String? dueDateStr = null;
+          String? dueDateStr;
           if (offer.dueDate != null) {
             try {
               dueDateStr = offer.dueDate?.toIso8601String();
@@ -1276,7 +1276,7 @@ class DatabaseHelper {
         
         for (var offer in account.pendingOutData ?? []) {
           // Safely convert dueDate to ISO string
-          String? dueDateStr = null;
+          String? dueDateStr;
           if (offer.dueDate != null) {
             try {
               dueDateStr = offer.dueDate?.toIso8601String();
