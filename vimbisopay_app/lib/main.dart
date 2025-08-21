@@ -26,11 +26,13 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/vendor
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/counterparty_credit_report_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/test_whatsapp_otp.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
 import 'package:vimbisopay_app/infrastructure/utils/database_test.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
+import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/navigation_utils.dart';
@@ -571,6 +573,28 @@ class MyApp extends StatelessWidget {
                 databaseHelper: args.databaseHelper,
                 recipientHandle: args.recipientHandle,
                 recipientAccountId: args.recipientAccountId,
+              ),
+              settings: settings,
+            );
+          }
+
+          // Counterparty credit report screen route
+          if (settings.name == '/counterparty-credit-report') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || 
+                !args.containsKey('memberId') || 
+                !args.containsKey('memberName') ||
+                !args.containsKey('accountRepository')) {
+              Logger.error('Missing required arguments for counterparty-credit-report route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            return MaterialPageRoute(
+              builder: (context) => CounterpartyCreditReportScreen(
+                memberId: args['memberId'] as String,
+                memberName: args['memberName'] as String,
+                accountRepository: args['accountRepository'] as AccountRepository,
               ),
               settings: settings,
             );

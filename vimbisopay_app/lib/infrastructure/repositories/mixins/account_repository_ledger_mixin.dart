@@ -4,6 +4,8 @@ import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/core/error/exceptions.dart';
 import 'package:vimbisopay_app/domain/entities/account.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
+import 'package:vimbisopay_app/domain/entities/counterparty_credit_report.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/base_account_repository.dart';
 
@@ -210,6 +212,91 @@ mixin AccountRepositoryLedgerMixin on BaseAccountRepository {
         } else {
           final errorMessage =
               json.decode(response.body)['message'] ?? 'Failed to get account';
+          return Left(InfrastructureFailure(errorMessage));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, CounterpartyCreditReport>> getCounterpartyCreditReport({
+    required String memberId,
+  }) async {
+    return executeAuthenticatedRequest(
+      request: (token) async {
+        final url = '$baseUrl/getCounterpartyCreditReport';
+        final headers = authHeaders(token);
+        final body = {'memberID': memberId};
+
+        final response = await loggedRequest(
+          () => httpClient.post(
+            Uri.parse(url),
+            headers: headers,
+            body: json.encode(body),
+          ),
+          url,
+          'POST',
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          final jsonResponse = json.decode(response.body);
+
+          if (!jsonResponse.containsKey('data') ||
+              !jsonResponse['data'].containsKey('creditReport')) {
+            return const Left(InfrastructureFailure('Invalid response format'));
+          }
+
+          final creditReportData = jsonResponse['data']['creditReport'];
+          
+          // Parse credit rating if available
+          CreditRating? creditRating;
+          if (creditReportData.containsKey('creditRating') && creditReportData['creditRating'] != null) {
+            final creditRatingMap = creditReportData['creditRating'] as Map<String, dynamic>;
+            creditRating = CreditRating(
+              redeemedTotalUSD: (creditRatingMap['redeemedTotal'] as num).toDouble(),
+              outstandingTotalUSD: (creditRatingMap['outstandingTotal'] as num).toDouble(),
+              defaultedTotalUSD: (creditRatingMap['defaultedTotal'] as num).toDouble(),
+              writtenOffTotalUSD: (creditRatingMap['writtenOffTotal'] as num).toDouble(),
+            );
+          }
+
+          // Parse accounts if available
+          List<CounterpartyAccount> accounts = [];
+          if (creditReportData.containsKey('accounts') && creditReportData['accounts'] != null) {
+            accounts = (creditReportData['accounts'] as List)
+                .map((account) => CounterpartyAccount.fromMap(account as Map<String, dynamic>))
+                .toList();
+          }
+
+          // Parse member name
+          final memberName = creditReportData['memberName'] as String;
+          final nameParts = memberName.split(' ');
+          final firstname = nameParts.isNotEmpty ? nameParts.first : '';
+          final lastname = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+          final report = CounterpartyCreditReport(
+            id: creditReportData['memberID'] as String,
+            memberID: creditReportData['memberID'] as String,
+            firstname: firstname,
+            lastname: lastname,
+            memberHandle: creditReportData['memberHandle'] as String?,
+            memberTier: 1, // Default tier since not provided by backend
+            profilePictureThumbnail: creditReportData['profilePictureUrls'] != null && 
+                creditReportData['profilePictureUrls']['thumbnail'] != null
+                ? creditReportData['profilePictureUrls']['thumbnail'] as String
+                : null,
+            creditRating: creditRating,
+            accounts: accounts,
+            reportGeneratedAt: DateTime.parse(creditReportData['reportGeneratedAt'] as String),
+          );
+
+          return Right(report);
+        } else if (response.statusCode == 404) {
+          return const Left(InfrastructureFailure('Member not found'));
+        } else {
+          final errorMessage = json.decode(response.body)['message'] ?? 'Failed to get credit report';
           return Left(InfrastructureFailure(errorMessage));
         }
       },

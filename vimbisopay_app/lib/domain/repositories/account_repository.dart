@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/domain/entities/verification_status.dart';
+import 'package:vimbisopay_app/domain/entities/counterparty_credit_report.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({
@@ -114,5 +115,13 @@ abstract class AccountRepository {
   /// Returns a verification status object with verification details
   Future<Either<Failure, VerificationStatus>> checkOtpVerificationStatus({
     required String phone,
+  });
+
+  /// Get comprehensive credit report for a counterparty member
+  /// 
+  /// [memberId] The member ID to get the credit report for
+  /// Returns a detailed credit report including member info, credit rating, and accounts
+  Future<Either<Failure, CounterpartyCreditReport>> getCounterpartyCreditReport({
+    required String memberId,
   });
 }

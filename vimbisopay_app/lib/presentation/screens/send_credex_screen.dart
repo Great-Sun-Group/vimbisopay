@@ -320,6 +320,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                   showSecuredBalance: state.credexType == CredexType.SECURED,
                                   // Pass credit rating data
                                   creditRating: snapshot.data?.dashboard?.member.creditRating,
+                                  // Add missing parameters for navigation
+                                  memberId: snapshot.data?.dashboard?.member.memberID,
+                                  accountRepository: widget.accountRepository,
                                 );
                               },
                             ),
@@ -378,6 +381,9 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                 isVerifying: state.status == SendCredexStatus.verifyingRecipient,
                                 // Pass recipient's credit rating data from verifiedAccountDetails
                                 creditRating: recipientCreditRating,
+                                // Add missing parameters for navigation
+                                memberId: state.verifiedAccountDetails!['memberID'] as String?,
+                                accountRepository: widget.accountRepository,
                               );
                             },
                           ),
