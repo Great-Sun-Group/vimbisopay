@@ -27,6 +27,7 @@ import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_
 import 'package:vimbisopay_app/presentation/screens/marketplace/search_results_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/product_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/counterparty_credit_report_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/credex_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/debug_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/test_whatsapp_otp.dart';
 import 'package:vimbisopay_app/infrastructure/database/database_helper.dart';
@@ -594,6 +595,26 @@ class MyApp extends StatelessWidget {
               builder: (context) => CounterpartyCreditReportScreen(
                 memberId: args['memberId'] as String,
                 memberName: args['memberName'] as String,
+                accountRepository: args['accountRepository'] as AccountRepository,
+              ),
+              settings: settings,
+            );
+          }
+
+          // Credex detail screen route
+          if (settings.name == '/credex-detail') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null || 
+                !args.containsKey('credexID') || 
+                !args.containsKey('accountRepository')) {
+              Logger.error('Missing required arguments for credex-detail route');
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            }
+            return MaterialPageRoute(
+              builder: (context) => CredexDetailScreen(
+                credexId: args['credexID'] as String,
                 accountRepository: args['accountRepository'] as AccountRepository,
               ),
               settings: settings,

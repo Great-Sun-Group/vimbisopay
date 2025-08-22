@@ -12,6 +12,7 @@ import 'package:vimbisopay_app/presentation/blocs/home/home_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/empty_state.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/curved_text_painter.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/utils/date_formatter.dart';
+import 'package:vimbisopay_app/infrastructure/repositories/account_repository_impl.dart';
 
 
 /// A compact loading animation widget that uses the Lottie animation
@@ -261,8 +262,7 @@ class _TransactionsListState extends State<TransactionsList> {
       ),
       child: InkWell(
         onTap: (state.status == HomeStatus.acceptingCredex ||
-                isProcessing ||
-                !isIncoming)
+                isProcessing)
             ? null
             : _selectionMode
                 ? () {
@@ -274,7 +274,17 @@ class _TransactionsListState extends State<TransactionsList> {
                       }
                     });
                   }
-                : null,
+                : () {
+                    // Navigate to Credex detail screen
+                    Navigator.pushNamed(
+                      context,
+                      '/credex-detail',
+                      arguments: {
+                        'credexID': offer.credexID,
+                        'accountRepository': AccountRepositoryImpl(),
+                      },
+                    );
+                  },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(

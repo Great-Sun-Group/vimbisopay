@@ -8,6 +8,7 @@ import 'package:vimbisopay_app/domain/entities/recurring_request.dart';
 import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
+import 'package:vimbisopay_app/domain/entities/credex_detail.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/base_account_repository.dart';
 
 /// Mixin that provides Credex and recurring payment-related methods for AccountRepositoryImpl
@@ -505,6 +506,83 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
           Logger.error('[UPGRADE_TO_HUSTLER10K] Error during upgrade', e, stackTrace);
           return Left(InfrastructureFailure(
               'Unexpected error during upgrade: ${e.toString()}'));
+        }
+      },
+    );
+  }
+
+  @override
+  Future<Either<Failure, CredexDetail>> getCredexDetail({
+    required String credexId,
+  }) async {
+    Logger.data('[GET_CREDEX_DETAIL] Starting request for credexId: $credexId');
+    
+    return executeAuthenticatedRequest(
+      request: (token) async {
+        try {
+          // Get current user to determine accountID
+          final user = await databaseHelper.getUser();
+          if (user == null || user.dashboard == null || user.dashboard!.accounts.isEmpty) {
+            Logger.error('[GET_CREDEX_DETAIL] No user or accounts found in database');
+            return const Left(InfrastructureFailure('User not authenticated or no accounts available'));
+          }
+
+          // Use the user's first account ID
+          final accountId = user.dashboard!.accounts.first.accountID;
+          
+          final url = '$baseUrl/getCredex';
+          final headers = authHeaders(token);
+          final body = {
+            'credexID': credexId,
+            'accountID': accountId,
+          };
+
+          Logger.data('[GET_CREDEX_DETAIL] Sending request to $url with accountID: $accountId');
+          final response = await loggedRequest(
+            () => httpClient.post(
+              Uri.parse(url),
+              headers: headers,
+              body: json.encode(body),
+            ),
+            url,
+            'POST',
+            headers: headers,
+            body: body,
+          );
+
+          if (response.statusCode == 200) {
+            Logger.data('[GET_CREDEX_DETAIL] Request successful');
+            final jsonResponse = json.decode(response.body);
+
+            // Validate response structure
+            if (!jsonResponse.containsKey('data')) {
+              Logger.error('[GET_CREDEX_DETAIL] Invalid response: Missing data field');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing data field'));
+            }
+
+            final data = jsonResponse['data'];
+            if (!data.containsKey('action')) {
+              Logger.error('[GET_CREDEX_DETAIL] Invalid response: Missing action field');
+              return const Left(InfrastructureFailure(
+                  'Invalid response format: Missing action field'));
+            }
+
+            Logger.data('[GET_CREDEX_DETAIL] Creating CredexDetail from response');
+            final credexDetail = CredexDetail.fromApiResponse(data);
+            
+            return Right(credexDetail);
+          } else {
+            final responseBody = json.decode(response.body);
+            final errorMessage = responseBody['message'] ?? 'Failed to get Credex details';
+            
+            Logger.error('[GET_CREDEX_DETAIL] Request failed with status ${response.statusCode}', errorMessage);
+            return Left(InfrastructureFailure(errorMessage));
+          }
+        } catch (e, stackTrace) {
+          Logger.error('[GET_CREDEX_DETAIL] Error during request', e, stackTrace);
+          return Left(InfrastructureFailure(
+              'Unexpected error while getting Credex details: ${e.toString()}'));
         }
       },
     );

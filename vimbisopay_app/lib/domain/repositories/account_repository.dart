@@ -10,6 +10,7 @@ import 'package:vimbisopay_app/domain/entities/ledger_entry.dart';
 import 'package:vimbisopay_app/domain/entities/otp_verification_response.dart';
 import 'package:vimbisopay_app/domain/entities/verification_status.dart';
 import 'package:vimbisopay_app/domain/entities/counterparty_credit_report.dart';
+import 'package:vimbisopay_app/domain/entities/credex_detail.dart';
 
 abstract class AccountRepository {
   Future<Either<Failure, User>> login({
@@ -123,5 +124,13 @@ abstract class AccountRepository {
   /// Returns a detailed credit report including member info, credit rating, and accounts
   Future<Either<Failure, CounterpartyCreditReport>> getCounterpartyCreditReport({
     required String memberId,
+  });
+
+  /// Get detailed information about a specific Credex transaction
+  /// 
+  /// [credexId] The ID of the Credex to retrieve details for
+  /// Returns detailed Credex information including status, amounts, and cleared transactions
+  Future<Either<Failure, CredexDetail>> getCredexDetail({
+    required String credexId,
   });
 }
