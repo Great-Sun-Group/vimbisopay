@@ -250,49 +250,98 @@ mixin AccountRepositoryLedgerMixin on BaseAccountRepository {
 
           final creditReportData = jsonResponse['data']['creditReport'];
           
-          // Parse credit rating if available
-          CreditRating? creditRating;
-          if (creditReportData.containsKey('creditRating') && creditReportData['creditRating'] != null) {
-            final creditRatingMap = creditReportData['creditRating'] as Map<String, dynamic>;
-            creditRating = CreditRating(
-              redeemedTotalUSD: (creditRatingMap['redeemedTotal'] as num).toDouble(),
-              outstandingTotalUSD: (creditRatingMap['outstandingTotal'] as num).toDouble(),
-              defaultedTotalUSD: (creditRatingMap['defaultedTotal'] as num).toDouble(),
-              writtenOffTotalUSD: (creditRatingMap['writtenOffTotal'] as num).toDouble(),
+          try {
+            // Parse credit rating if available
+            CreditRating? creditRating;
+            if (creditReportData.containsKey('creditRating') && creditReportData['creditRating'] != null) {
+              final creditRatingMap = creditReportData['creditRating'] as Map<String, dynamic>;
+              creditRating = CreditRating(
+                redeemedTotalUSD: (creditRatingMap['redeemedTotal'] as num?)?.toDouble() ?? 0.0,
+                outstandingTotalUSD: (creditRatingMap['outstandingTotal'] as num?)?.toDouble() ?? 0.0,
+                defaultedTotalUSD: (creditRatingMap['defaultedTotal'] as num?)?.toDouble() ?? 0.0,
+                writtenOffTotalUSD: (creditRatingMap['writtenOffTotal'] as num?)?.toDouble() ?? 0.0,
+              );
+            }
+
+            // Parse accounts if available with comprehensive error handling
+            List<CounterpartyAccount> accounts = [];
+            if (creditReportData.containsKey('accounts') && creditReportData['accounts'] != null) {
+              final accountsList = creditReportData['accounts'] as List;
+              for (final accountData in accountsList) {
+                try {
+                  if (accountData is Map<String, dynamic>) {
+                    // Create a safe map with null-safe string extraction
+                    final safeAccountMap = <String, dynamic>{
+                      'accountID': _safeStringExtract(accountData, 'accountID') ?? '',
+                      'accountName': _safeStringExtract(accountData, 'accountName') ?? '',
+                      'accountHandle': _safeStringExtract(accountData, 'accountHandle') ?? '',
+                      'accountType': _safeStringExtract(accountData, 'accountType') ?? 'STANDARD',
+                      'defaultDenom': _safeStringExtract(accountData, 'defaultDenom') ?? 'USD',
+                      'isOwnedAccount': accountData['isOwnedAccount'] as bool? ?? true,
+                    };
+                    accounts.add(CounterpartyAccount.fromMap(safeAccountMap));
+                  }
+                } catch (e) {
+                  Logger.error('Error parsing individual account', e);
+                  // Continue processing other accounts
+                }
+              }
+            }
+
+            // Safe parsing of member name with null checks
+            final memberName = _safeStringExtract(creditReportData, 'memberName') ?? '';
+            final nameParts = memberName.isNotEmpty ? memberName.split(' ') : [''];
+            final firstname = nameParts.isNotEmpty ? nameParts.first : '';
+            final lastname = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+            // Safe parsing of member handle (backend returns empty string, not null)
+            final memberHandleRaw = _safeStringExtract(creditReportData, 'memberHandle');
+            final memberHandle = (memberHandleRaw != null && memberHandleRaw.isNotEmpty) ? memberHandleRaw : null;
+
+            // Safe parsing of profile picture thumbnail
+            String? profilePictureThumbnail;
+            if (creditReportData.containsKey('profilePictureUrls') && 
+                creditReportData['profilePictureUrls'] != null) {
+              final profileUrls = creditReportData['profilePictureUrls'] as Map<String, dynamic>;
+              profilePictureThumbnail = _safeStringExtract(profileUrls, 'thumbnail');
+            }
+
+            // Safe parsing of required fields
+            final memberID = _safeStringExtract(creditReportData, 'memberID');
+            final reportGeneratedAtStr = _safeStringExtract(creditReportData, 'reportGeneratedAt');
+
+            if (memberID == null || memberID.isEmpty) {
+              return const Left(InfrastructureFailure('Missing memberID in response'));
+            }
+
+            DateTime reportGeneratedAt;
+            try {
+              reportGeneratedAt = reportGeneratedAtStr != null 
+                  ? DateTime.parse(reportGeneratedAtStr)
+                  : DateTime.now();
+            } catch (e) {
+              Logger.error('Error parsing reportGeneratedAt, using current time', e);
+              reportGeneratedAt = DateTime.now();
+            }
+
+            final report = CounterpartyCreditReport(
+              id: memberID,
+              memberID: memberID,
+              firstname: firstname,
+              lastname: lastname,
+              memberHandle: memberHandle,
+              memberTier: 1, // Default tier since not provided by backend
+              profilePictureThumbnail: profilePictureThumbnail,
+              creditRating: creditRating,
+              accounts: accounts,
+              reportGeneratedAt: reportGeneratedAt,
             );
+
+            return Right(report);
+          } catch (e) {
+            Logger.error('Error parsing credit report data', e);
+            return Left(InfrastructureFailure('Error parsing credit report: ${e.toString()}'));
           }
-
-          // Parse accounts if available
-          List<CounterpartyAccount> accounts = [];
-          if (creditReportData.containsKey('accounts') && creditReportData['accounts'] != null) {
-            accounts = (creditReportData['accounts'] as List)
-                .map((account) => CounterpartyAccount.fromMap(account as Map<String, dynamic>))
-                .toList();
-          }
-
-          // Parse member name
-          final memberName = creditReportData['memberName'] as String;
-          final nameParts = memberName.split(' ');
-          final firstname = nameParts.isNotEmpty ? nameParts.first : '';
-          final lastname = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
-          final report = CounterpartyCreditReport(
-            id: creditReportData['memberID'] as String,
-            memberID: creditReportData['memberID'] as String,
-            firstname: firstname,
-            lastname: lastname,
-            memberHandle: creditReportData['memberHandle'] as String?,
-            memberTier: 1, // Default tier since not provided by backend
-            profilePictureThumbnail: creditReportData['profilePictureUrls'] != null && 
-                creditReportData['profilePictureUrls']['thumbnail'] != null
-                ? creditReportData['profilePictureUrls']['thumbnail'] as String
-                : null,
-            creditRating: creditRating,
-            accounts: accounts,
-            reportGeneratedAt: DateTime.parse(creditReportData['reportGeneratedAt'] as String),
-          );
-
-          return Right(report);
         } else if (response.statusCode == 404) {
           return const Left(InfrastructureFailure('Member not found'));
         } else {
@@ -301,5 +350,18 @@ mixin AccountRepositoryLedgerMixin on BaseAccountRepository {
         }
       },
     );
+  }
+
+  /// Safely extract a string value from a map, handling null and type casting issues
+  String? _safeStringExtract(Map<String, dynamic> map, String key) {
+    try {
+      final value = map[key];
+      if (value == null) return null;
+      if (value is String) return value;
+      return value.toString();
+    } catch (e) {
+      Logger.error('Error extracting string for key: $key', e);
+      return null;
+    }
   }
 }

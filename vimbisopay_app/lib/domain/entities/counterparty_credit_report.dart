@@ -169,14 +169,24 @@ class CounterpartyAccount {
     'isOwnedAccount': isOwnedAccount,
   };
 
-  factory CounterpartyAccount.fromMap(Map<String, dynamic> map) => CounterpartyAccount(
-    accountID: map['accountID'] as String,
-    accountName: map['accountName'] as String,
-    accountHandle: map['accountHandle'] as String,
-    accountType: map['accountType'] as String,
-    defaultDenom: map['defaultDenom'] as String? ?? 'USD', // Default to USD if not provided
-    isOwnedAccount: map['isOwnedAccount'] as bool? ?? true, // Default to true for counterparty accounts
-  );
+  factory CounterpartyAccount.fromMap(Map<String, dynamic> map) {
+    // Safe string extraction helper
+    String safeStringExtract(String key, [String defaultValue = '']) {
+      final value = map[key];
+      if (value == null) return defaultValue;
+      if (value is String) return value;
+      return value.toString();
+    }
+
+    return CounterpartyAccount(
+      accountID: safeStringExtract('accountID'),
+      accountName: safeStringExtract('accountName'),
+      accountHandle: safeStringExtract('accountHandle'),
+      accountType: safeStringExtract('accountType', 'STANDARD'),
+      defaultDenom: safeStringExtract('defaultDenom', 'USD'),
+      isOwnedAccount: map['isOwnedAccount'] as bool? ?? true,
+    );
+  }
 
   /// Factory constructor to create from DashboardAccount
   factory CounterpartyAccount.fromDashboardAccount(DashboardAccount account) {

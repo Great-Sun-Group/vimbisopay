@@ -352,18 +352,8 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                             credexType: state.credexType,
                           ),
                         ] else ...[
-                          FutureBuilder<User?>(
-                            future: _userFuture,
-                            builder: (context, snapshot) {
-                              String? profileImageUrl;
-                              String? memberName;
-                              if (snapshot.hasData && 
-                                  snapshot.data != null && 
-                                  snapshot.data!.dashboard != null) {
-                                profileImageUrl = snapshot.data!.dashboard!.member.profilePictureThumbnail;
-                                memberName = '${snapshot.data!.dashboard!.member.firstname} ${snapshot.data!.dashboard!.member.lastname}';
-                              }
-                              
+                          Builder(
+                            builder: (context) {
                               // Convert credit rating data from verifiedAccountDetails if available
                               dashboard.CreditRating? recipientCreditRating;
                               if (state.verifiedAccountDetails!.containsKey('creditRating') && 
@@ -372,12 +362,19 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                                 recipientCreditRating = dashboard.CreditRating.fromMap(creditRatingData);
                               }
                               
+                              // Extract recipient's member name from verifiedAccountDetails
+                              String? recipientMemberName;
+                              if (state.verifiedAccountDetails!.containsKey('memberName') && 
+                                  state.verifiedAccountDetails!['memberName'] != null) {
+                                recipientMemberName = state.verifiedAccountDetails!['memberName'] as String;
+                              }
+                              
                               return VerifiedRecipientCard(
                                 accountDetails: state.verifiedAccountDetails!,
                                 onChangeRecipient: () => _bloc.add(const ChangeRecipientEvent()),
                                 credexType: state.credexType,
-                                profileImageUrl: profileImageUrl,
-                                memberName: memberName,
+                                profileImageUrl: null, // Recipient's profile image not available in current data
+                                memberName: recipientMemberName, // Use recipient's name, not sender's
                                 isVerifying: state.status == SendCredexStatus.verifyingRecipient,
                                 // Pass recipient's credit rating data from verifiedAccountDetails
                                 creditRating: recipientCreditRating,
