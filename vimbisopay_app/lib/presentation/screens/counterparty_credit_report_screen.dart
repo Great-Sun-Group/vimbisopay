@@ -9,7 +9,7 @@ import 'package:vimbisopay_app/core/utils/logger.dart';
 /// Screen displaying comprehensive credit report for a counterparty member
 class CounterpartyCreditReportScreen extends StatefulWidget {
   static const String routeName = '/counterparty-credit-report';
-  
+
   final String memberId;
   final String memberName;
   final AccountRepository accountRepository;
@@ -22,13 +22,17 @@ class CounterpartyCreditReportScreen extends StatefulWidget {
   });
 
   @override
-  State<CounterpartyCreditReportScreen> createState() => _CounterpartyCreditReportScreenState();
+  State<CounterpartyCreditReportScreen> createState() =>
+      _CounterpartyCreditReportScreenState();
 }
 
-class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditReportScreen> {
+class _CounterpartyCreditReportScreenState
+    extends State<CounterpartyCreditReportScreen> {
   CounterpartyCreditReport? _creditReport;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isAccountsExpanded = false;
+  bool _isCreditDetailsExpanded = false;
 
   @override
   void initState() {
@@ -60,7 +64,8 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
             _isLoading = false;
             _creditReport = creditReport;
           });
-          Logger.data('Credit report loaded successfully for member: ${widget.memberId}');
+          Logger.data(
+              'Credit report loaded successfully for member: ${widget.memberId}');
         },
       );
     } catch (e) {
@@ -158,7 +163,8 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.textPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
                 child: const Text('Retry'),
               ),
@@ -231,11 +237,44 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
               ],
             ),
             const SizedBox(height: 16),
-            _buildInfoRow('Name', _creditReport!.fullName),
-            if (_creditReport!.memberHandle != null)
-              _buildInfoRow('Handle', '@${_creditReport!.memberHandle!}'),
-            _buildInfoRow('Member ID', _creditReport!.memberID),
-            _buildInfoRow('Tier', _creditReport!.tierName),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Picture
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.darkBluePrimary,
+                    border: Border.all(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    color: AppColors.primary,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Member Information
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoRow('Name', _creditReport!.fullName),
+                      if (_creditReport!.memberHandle != null)
+                        _buildInfoRow(
+                            'Handle', '@${_creditReport!.memberHandle!}'),
+                      _buildInfoRow('Member ID', _creditReport!.memberID),
+                      _buildInfoRow('Tier', _creditReport!.tierName),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -276,10 +315,7 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
               ],
             ),
             const SizedBox(height: 16),
-            CreditRatingDisplay.detailed(
-              creditRating: _creditReport!.creditRating,
-              memberName: _creditReport!.fullName,
-            ),
+            _buildCreditRatingContent(),
           ],
         ),
       ),
@@ -301,39 +337,61 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.account_balance_wallet,
-                  color: AppColors.primary,
-                  size: 24,
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _isAccountsExpanded = !_isAccountsExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Member Accounts (${_creditReport!.accounts.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      _isAccountsExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Member Accounts (${_creditReport!.accounts.length})',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_creditReport!.accounts.isEmpty)
-              const Text(
-                'No accounts available for this member.',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-              )
-            else
-              Column(
-                children: _creditReport!.accounts.map((account) => 
-                  _buildAccountItem(account)
-                ).toList(),
               ),
+            ),
+            if (_isAccountsExpanded) ...[
+              const SizedBox(height: 16),
+              if (_creditReport!.accounts.isEmpty)
+                const Text(
+                  'No accounts available for this member.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                )
+              else
+                Column(
+                  children: _creditReport!.accounts
+                      .map((account) => _buildAccountItem(account))
+                      .toList(),
+                ),
+            ],
           ],
         ),
       ),
@@ -373,22 +431,6 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
                   ),
                 ),
               ),
-              if (account.isOwnedAccount)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'OWNED',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 4),
@@ -398,26 +440,6 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text(
-                'Type: ${account.accountType}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'Currency: ${account.defaultDenom}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -464,7 +486,7 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
             ),
             const SizedBox(height: 8),
             const Text(
-              'This report shows the credit history and account information for the selected member. Credit ratings are based on historical transaction data and are updated in real-time.',
+              'This report shows the credit history and account information for the selected member. Visual representations are based on historical transaction data and are updated in real-time.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -506,6 +528,191 @@ class _CounterpartyCreditReportScreenState extends State<CounterpartyCreditRepor
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCreditRatingContent() {
+    final creditRating = _creditReport!.creditRating;
+    final totalCreditActivity = (creditRating?.redeemedTotalUSD ?? 0.0) +
+        (creditRating?.outstandingTotalUSD ?? 0.0) +
+        (creditRating?.defaultedTotalUSD ?? 0.0) +
+        (creditRating?.writtenOffTotalUSD ?? 0.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with total credit activity
+        Text(
+          '${_creditReport!.fullName}\'s Credit Rating',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Total Credit Activity: \$${totalCreditActivity.toStringAsFixed(2)} USD',
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Clickable credit rating bar with integrated dropdown arrow
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.darkBlueDark1,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: AppColors.techAzure.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _isCreditDetailsExpanded = !_isCreditDetailsExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(4),
+            child: Stack(
+              children: [
+                CreditRatingDisplay.compact(
+                  creditRating: creditRating,
+                  memberName: _creditReport!.fullName,
+                ),
+                Positioned(
+                  right: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Icon(
+                    _isCreditDetailsExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: AppColors.darkBlueDark1,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Expandable breakdown details
+        if (_isCreditDetailsExpanded) ...[
+          const SizedBox(height: 12),
+          _buildBreakdownDetails(creditRating, totalCreditActivity),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBreakdownDetails(
+      dynamic creditRating, double totalCreditActivity) {
+    return Column(
+      children: [
+        _buildBreakdownRow(
+          'Redeemed',
+          'Successfully completed credex transactions, where value has been promised then provided.',
+          creditRating?.redeemedTotalUSD ?? 0.0,
+          totalCreditActivity,
+          AppColors.primary,
+        ),
+        const SizedBox(height: 8),
+        _buildBreakdownRow(
+          'Outstanding',
+          'Active credex transactions, with value promised but not yet delivered.',
+          creditRating?.outstandingTotalUSD ?? 0.0,
+          totalCreditActivity,
+          AppColors.techAzure,
+        ),
+        const SizedBox(height: 8),
+        _buildBreakdownRow(
+          'Defaulted',
+          'Overdue credex transactions',
+          creditRating?.defaultedTotalUSD ?? 0.0,
+          totalCreditActivity,
+          AppColors.yellowPrimary,
+        ),
+        const SizedBox(height: 8),
+        _buildBreakdownRow(
+          'Written Off',
+          'Uncollectable credex transactions',
+          creditRating?.writtenOffTotalUSD ?? 0.0,
+          totalCreditActivity,
+          AppColors.darkRed,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBreakdownRow(String label, String description, double amount,
+      double totalCreditActivity, Color color) {
+    final percentage = totalCreditActivity > 0
+        ? (amount / totalCreditActivity * 100).toStringAsFixed(1)
+        : '0.0';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '\$${amount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '($percentage%)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
