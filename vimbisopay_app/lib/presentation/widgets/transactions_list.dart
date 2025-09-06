@@ -261,6 +261,7 @@ class _TransactionsListState extends State<TransactionsList> {
         ),
       ),
       child: InkWell(
+        borderRadius: BorderRadius.circular(8),
         onTap: (state.status == HomeStatus.acceptingCredex ||
                 isProcessing)
             ? null
@@ -275,7 +276,11 @@ class _TransactionsListState extends State<TransactionsList> {
                     });
                   }
                 : () {
-                    // Navigate to Credex detail screen
+                    // Add debug logging
+                    Logger.data('Transaction tapped: ${offer.credexID}, secured: ${offer.secured}');
+                    
+                    // Navigate to Credex detail screen for both secured and unsecured credexes
+                    Logger.data('Navigating to credex detail for credex: ${offer.credexID}');
                     Navigator.pushNamed(
                       context,
                       '/credex-detail',
@@ -552,52 +557,74 @@ class _TransactionsListState extends State<TransactionsList> {
                   width: 1.0,
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  // Add debug logging for ledger transactions
+                  Logger.data('Ledger transaction tapped: ${transaction.credexID}, secured: $isSecured');
+                  
+                  // Navigate to Credex detail screen for both secured and unsecured ledger transactions
+                  if (transaction.credexID != null) {
+                    Logger.data('Navigating to credex detail for ledger transaction: ${transaction.credexID}');
+                    Navigator.pushNamed(
+                      context,
+                      '/credex-detail',
+                      arguments: {
+                        'credexID': transaction.credexID!,
+                        'accountRepository': AccountRepositoryImpl(),
+                      },
+                    );
+                  } else {
+                    Logger.data('No credexID available - no navigation');
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              transaction.counterpartyAccountName,
+                              style: TextStyle(
+                                color: accentColor,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('MMM d, yyyy h:mm a').format(transaction.timestamp),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            transaction.counterpartyAccountName,
+                            transaction.formattedAmount,
                             style: TextStyle(
-                              color: accentColor,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            DateFormat('MMM d, yyyy h:mm a').format(transaction.timestamp),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
+                              color: amountColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          transaction.formattedAmount,
-                          style: TextStyle(
-                            color: amountColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
