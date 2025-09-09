@@ -4,12 +4,18 @@ import 'package:intl/intl.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/credex_detail.dart';
+import 'package:vimbisopay_app/domain/entities/dashboard.dart';
+import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/repositories/account_repository.dart';
 import 'package:vimbisopay_app/presentation/blocs/credex_detail/credex_detail_bloc.dart';
 import 'package:vimbisopay_app/presentation/blocs/credex_detail/credex_detail_event.dart';
 import 'package:vimbisopay_app/presentation/blocs/credex_detail/credex_detail_state.dart';
+import 'package:vimbisopay_app/presentation/widgets/credex_bar_graph.dart';
+import 'package:vimbisopay_app/presentation/widgets/member_card.dart';
+import 'package:vimbisopay_app/presentation/widgets/transaction_arrow.dart';
 import 'package:vimbisopay_app/presentation/widgets/loading_dialog.dart';
 import 'package:vimbisopay_app/presentation/widgets/transactions_list.dart';
+import 'package:vimbisopay_app/presentation/screens/counterparty_credit_report_screen.dart';
 
 class CredexDetailScreen extends StatelessWidget {
   final String credexId;
@@ -106,14 +112,15 @@ class CredexDetailView extends StatelessWidget {
           }
 
           // Navigate back after successful action that changes status
-          if (state.message != null && 
-              (state.message!.contains('accepted') || 
-               state.message!.contains('declined') || 
-               state.message!.contains('cancelled'))) {
+          if (state.message != null &&
+              (state.message!.contains('accepted') ||
+                  state.message!.contains('declined') ||
+                  state.message!.contains('cancelled'))) {
             // Delay navigation to allow user to see the success message
             Future.delayed(const Duration(seconds: 2), () {
               if (context.mounted) {
-                Navigator.of(context).pop(true); // Return true to indicate action was taken
+                Navigator.of(context)
+                    .pop(true); // Return true to indicate action was taken
               }
             });
           }
@@ -199,16 +206,13 @@ class CredexDetailView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStatusHeader(context, state.credexDetail!),
+                  _buildCredexBarGraph(state.credexDetail!),
                   const SizedBox(height: 24),
-                  _buildAmountSection(state.credexDetail!),
-                  const SizedBox(height: 24),
-                  _buildCounterpartySection(state.credexDetail!),
-                  const SizedBox(height: 24),
-                  _buildDetailsSection(state.credexDetail!),
+                  _buildMemberCardsSection(context, state.credexDetail!),
                   if (state.credexDetail!.clearedAgainst.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    _buildClearedTransactionsSection(context, state.credexDetail!),
+                    _buildClearedTransactionsSection(
+                        context, state.credexDetail!),
                   ],
                   const SizedBox(height: 24),
                   _buildActionButtons(context, state),
@@ -222,282 +226,8 @@ class CredexDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusHeader(BuildContext context, CredexDetail credex) {
-    Color statusColor;
-    IconData statusIcon;
-    
-    switch (credex.status) {
-      case CredexStatus.pending:
-        statusColor = AppColors.yellowPrimary;
-        statusIcon = Icons.schedule;
-        break;
-      case CredexStatus.accepted:
-        statusColor = AppColors.techAzure;
-        statusIcon = Icons.check_circle;
-        break;
-      case CredexStatus.redeemed:
-        statusColor = AppColors.success;
-        statusIcon = Icons.check_circle_outline;
-        break;
-      case CredexStatus.cancelled:
-        statusColor = AppColors.error;
-        statusIcon = Icons.cancel;
-        break;
-      case CredexStatus.declined:
-        statusColor = AppColors.error;
-        statusIcon = Icons.block;
-        break;
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor, width: 2),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            statusIcon,
-            size: 48,
-            color: statusColor,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            credex.statusDisplayName,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: statusColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            credex.securedCredex ? 'SECURED CREDEX' : 'UNSECURED CREDEX',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: credex.securedCredex ? AppColors.yellowMain : AppColors.techAzure,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmountSection(CredexDetail credex) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Amount Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildAmountRow('Initial Amount', credex.formattedInitialAmount, AppColors.textPrimary),
-          if (credex.outstandingAmount != credex.initialAmount)
-            _buildAmountRow('Outstanding', credex.formattedOutstandingAmount, AppColors.yellowPrimary),
-          if (credex.redeemedAmount > 0)
-            _buildAmountRow('Redeemed', credex.formattedRedeemedAmount, AppColors.success),
-          if (credex.defaultedAmount > 0)
-            _buildAmountRow('Defaulted', credex.formattedDefaultedAmount, AppColors.error),
-          if (credex.writtenOffAmount > 0)
-            _buildAmountRow('Written Off', credex.formattedWrittenOffAmount, AppColors.error),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmountRow(String label, String amount, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCounterpartySection(CredexDetail credex) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Counterparty',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(
-                Icons.person,
-                color: AppColors.primary,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  credex.counterpartyAccountName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (credex.securerName != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(
-                  Icons.security,
-                  color: AppColors.yellowMain,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Secured by',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        credex.securerName!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailsSection(CredexDetail credex) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Transaction Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildDetailRow('Credex ID', credex.credexID),
-          _buildDetailRow('Transaction Type', credex.transactionType),
-          _buildDetailRow('Direction', credex.debit ? 'Outgoing' : 'Incoming'),
-          if (credex.dueDate != null)
-            _buildDetailRow('Due Date', DateFormat('MMM d, yyyy').format(credex.dueDate!)),
-          if (credex.acceptedAt != null)
-            _buildDetailRow('Accepted', DateFormat('MMM d, yyyy').format(credex.acceptedAt!)),
-          if (credex.declinedAt != null)
-            _buildDetailRow('Declined', DateFormat('MMM d, yyyy').format(credex.declinedAt!)),
-          if (credex.cancelledAt != null)
-            _buildDetailRow('Cancelled', DateFormat('MMM d, yyyy').format(credex.cancelledAt!)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildClearedTransactionsSection(BuildContext context, CredexDetail credex) {
+  Widget _buildClearedTransactionsSection(
+      BuildContext context, CredexDetail credex) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20.0),
@@ -526,13 +256,15 @@ class CredexDetailView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ...credex.clearedAgainst.map((cleared) => _buildClearedTransactionTile(context, cleared)),
+          ...credex.clearedAgainst
+              .map((cleared) => _buildClearedTransactionTile(context, cleared)),
         ],
       ),
     );
   }
 
-  Widget _buildClearedTransactionTile(BuildContext context, ClearedTransaction cleared) {
+  Widget _buildClearedTransactionTile(
+      BuildContext context, ClearedTransaction cleared) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
       padding: const EdgeInsets.all(16.0),
@@ -548,7 +280,8 @@ class CredexDetailView extends StatelessWidget {
             MaterialPageRoute(
               builder: (context) => CredexDetailScreen(
                 credexId: cleared.credexID,
-                accountRepository: context.read<CredexDetailBloc>().accountRepository,
+                accountRepository:
+                    context.read<CredexDetailBloc>().accountRepository,
               ),
             ),
           );
@@ -605,7 +338,7 @@ class CredexDetailView extends StatelessWidget {
 
   Widget _buildActionButtons(BuildContext context, CredexDetailState state) {
     final credex = state.credexDetail!;
-    
+
     if (credex.isFinalized) {
       return const SizedBox.shrink(); // No actions for finalized credexes
     }
@@ -636,7 +369,8 @@ class CredexDetailView extends StatelessWidget {
                     )
                   : const Text(
                       'Accept Credex',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -666,7 +400,8 @@ class CredexDetailView extends StatelessWidget {
                     )
                   : const Text(
                       'Decline Credex',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -696,12 +431,316 @@ class CredexDetailView extends StatelessWidget {
                     )
                   : const Text(
                       'Cancel Credex',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildCredexBarGraph(CredexDetail credex) {
+    return CredexBarGraph(
+      credexDetail: credex,
+      showLegend: true,
+    );
+  }
+
+  Widget _buildMemberCardsSection(BuildContext context, CredexDetail credex) {
+    // Get current user information - try multiple ways
+    User? user;
+
+    try {
+      // Try StreamProvider first
+      user = context.watch<User?>();
+    } catch (e) {
+      // If StreamProvider fails, try regular Provider
+      try {
+        user = context.read<User?>();
+      } catch (e2) {
+        // If both fail, user is null
+        user = null;
+      }
+    }
+
+    // Check if we have member data
+    final hasIssuerData =
+        credex.issuerMemberId != null && credex.issuerFirstName != null;
+    final hasAcceptorData =
+        credex.acceptorMemberId != null && credex.acceptorFirstName != null;
+
+    // If we have member data but no user context, we can still show the cards
+    // We'll assume the current user based on the transaction direction
+    if (user == null && (hasIssuerData || hasAcceptorData)) {
+      return _buildMemberCardsWithoutUserContext(
+          context, credex, hasIssuerData, hasAcceptorData);
+    }
+
+    // If we don't have sufficient data, return empty
+    if (user == null || (!hasIssuerData && !hasAcceptorData)) {
+      return const SizedBox.shrink();
+    }
+
+    // Account names are now determined in the CredexDetail.fromApiResponse method
+
+    // Determine current user position and arrow direction
+    final isCurrentUserIssuer = user!.memberId == credex.issuerMemberId;
+    final isCurrentUserAcceptor = user.memberId == credex.acceptorMemberId;
+
+    // Current user is always on the left
+    late final MemberCard leftCard;
+    late final MemberCard rightCard;
+
+    if (isCurrentUserIssuer) {
+      // Current user is issuer (left), counterparty is acceptor (right)
+      leftCard = MemberCard(
+        memberId: credex.issuerMemberId,
+        firstName: credex.issuerFirstName,
+        lastName: credex.issuerLastName,
+        handle: credex.issuerHandle,
+        tier: credex.issuerTier,
+        profilePicture: credex.issuerProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
+        isCurrentUser: true,
+        accountName: credex.currentUserAccountName,
+        onTap: credex.issuerMemberId != null
+            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
+                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
+            : null,
+      );
+      rightCard = MemberCard(
+        memberId: credex.acceptorMemberId,
+        firstName: credex.acceptorFirstName,
+        lastName: credex.acceptorLastName,
+        handle: credex.acceptorHandle,
+        tier: credex.acceptorTier,
+        profilePicture: credex.acceptorProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
+        isCurrentUser: false,
+        accountName: credex.counterpartyAccountName,
+        onTap: credex.acceptorMemberId != null
+            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
+                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
+            : null,
+      );
+    } else if (isCurrentUserAcceptor) {
+      // Current user is acceptor (left), counterparty is issuer (right)
+      leftCard = MemberCard(
+        memberId: credex.acceptorMemberId,
+        firstName: credex.acceptorFirstName,
+        lastName: credex.acceptorLastName,
+        handle: credex.acceptorHandle,
+        tier: credex.acceptorTier,
+        profilePicture: credex.acceptorProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
+        isCurrentUser: true,
+        accountName: credex.currentUserAccountName,
+        onTap: credex.acceptorMemberId != null
+            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
+                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
+            : null,
+      );
+      rightCard = MemberCard(
+        memberId: credex.issuerMemberId,
+        firstName: credex.issuerFirstName,
+        lastName: credex.issuerLastName,
+        handle: credex.issuerHandle,
+        tier: credex.issuerTier,
+        profilePicture: credex.issuerProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
+        isCurrentUser: false,
+        accountName: credex.counterpartyAccountName,
+        onTap: credex.issuerMemberId != null
+            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
+                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
+            : null,
+      );
+    } else {
+      // Fallback: shouldn't happen, but handle gracefully
+      return const SizedBox.shrink();
+    }
+
+    // Return just the row with cards, ensuring same height
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left card (current user)
+        Expanded(child: leftCard),
+        const SizedBox(width: 8), // Small gap between cards
+        // Right card (counterparty)
+        Expanded(child: rightCard),
+      ],
+    );
+  }
+
+  // Helper method to build member cards when user context is not available
+  Widget _buildMemberCardsWithoutUserContext(
+    BuildContext context,
+    CredexDetail credex,
+    bool hasIssuerData,
+    bool hasAcceptorData,
+  ) {
+    // Determine layout based on available data and transaction direction
+    final isDebit = credex
+        .debit; // true = outgoing (user is issuer), false = incoming (user is acceptor)
+
+    late final MemberCard leftCard;
+    late final MemberCard rightCard;
+    late final bool arrowPointsRight;
+
+    if (isDebit && hasIssuerData) {
+      // Outgoing transaction - current user is issuer (left)
+      leftCard = MemberCard(
+        memberId: credex.issuerMemberId,
+        firstName: credex.issuerFirstName,
+        lastName: credex.issuerLastName,
+        handle: credex.issuerHandle,
+        tier: credex.issuerTier,
+        profilePicture: credex.issuerProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
+        isCurrentUser: true,
+        accountName: credex.currentUserAccountName,
+        onTap: credex.issuerMemberId != null
+            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
+                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
+            : null,
+      );
+      rightCard = MemberCard(
+        memberId: credex.acceptorMemberId,
+        firstName: credex.acceptorFirstName,
+        lastName: credex.acceptorLastName,
+        handle: credex.acceptorHandle,
+        tier: credex.acceptorTier,
+        profilePicture: credex.acceptorProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
+        isCurrentUser: false,
+        accountName: credex.counterpartyAccountName,
+        onTap: credex.acceptorMemberId != null
+            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
+                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
+            : null,
+      );
+      arrowPointsRight = true; // Outgoing transaction
+    } else if (!isDebit && hasAcceptorData) {
+      // Incoming transaction - current user is acceptor (left)
+      leftCard = MemberCard(
+        memberId: credex.acceptorMemberId,
+        firstName: credex.acceptorFirstName,
+        lastName: credex.acceptorLastName,
+        handle: credex.acceptorHandle,
+        tier: credex.acceptorTier,
+        profilePicture: credex.acceptorProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
+        isCurrentUser: true,
+        accountName: credex.currentUserAccountName,
+        onTap: credex.acceptorMemberId != null
+            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
+                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
+            : null,
+      );
+      rightCard = MemberCard(
+        memberId: credex.issuerMemberId,
+        firstName: credex.issuerFirstName,
+        lastName: credex.issuerLastName,
+        handle: credex.issuerHandle,
+        tier: credex.issuerTier,
+        profilePicture: credex.issuerProfilePicture,
+        creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
+        isCurrentUser: false,
+        accountName: credex.counterpartyAccountName,
+        onTap: credex.issuerMemberId != null
+            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
+                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
+            : null,
+      );
+      arrowPointsRight = false; // Incoming transaction
+    } else {
+      // Fallback - show available data
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasIssuerData) ...[
+            MemberCard(
+              memberId: credex.issuerMemberId,
+              firstName: credex.issuerFirstName,
+              lastName: credex.issuerLastName,
+              handle: credex.issuerHandle,
+              tier: credex.issuerTier,
+              profilePicture: credex.issuerProfilePicture,
+              creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
+              isCurrentUser: false,
+              onTap: credex.issuerMemberId != null
+                  ? () => _navigateToCreditReport(
+                      context,
+                      credex.issuerMemberId!,
+                      '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
+                  : null,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (hasAcceptorData) ...[
+            MemberCard(
+              memberId: credex.acceptorMemberId,
+              firstName: credex.acceptorFirstName,
+              lastName: credex.acceptorLastName,
+              handle: credex.acceptorHandle,
+              tier: credex.acceptorTier,
+              profilePicture: credex.acceptorProfilePicture,
+              creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
+              isCurrentUser: false,
+              onTap: credex.acceptorMemberId != null
+                  ? () => _navigateToCreditReport(
+                      context,
+                      credex.acceptorMemberId!,
+                      '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
+                  : null,
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Return just the row with cards, no container wrapper
+    return Row(
+      children: [
+        // Left card (current user)
+        Expanded(child: leftCard),
+        const SizedBox(width: 8), // Small gap between cards
+        // Right card (counterparty)
+        Expanded(child: rightCard),
+      ],
+    );
+  }
+
+  // Helper method to create CreditRating from API response data
+  CreditRating? _createCreditRatingFromCredex(
+      CredexDetail credex, String memberType) {
+    // Return the credit rating for the specific member type
+    if (memberType == 'issuer') {
+      return credex.issuerCreditRating;
+    } else if (memberType == 'acceptor') {
+      return credex.acceptorCreditRating;
+    }
+
+    return null;
+  }
+
+  void _navigateToCreditReport(
+      BuildContext context, String memberId, String memberName) {
+    // Get the account repository from the current bloc
+    final accountRepository =
+        context.read<CredexDetailBloc>().accountRepository;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CounterpartyCreditReportScreen(
+          memberId: memberId,
+          memberName: memberName,
+          accountRepository: accountRepository,
+        ),
+      ),
     );
   }
 }
