@@ -505,6 +505,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
         isCurrentUser: true,
         accountName: credex.currentUserAccountName,
+        useExpandedSpacing: true, // Left card gets expanded spacing
         onTap: credex.issuerMemberId != null
             ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
                 '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
@@ -520,6 +521,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
         isCurrentUser: false,
         accountName: credex.counterpartyAccountName,
+        useExpandedSpacing: false, // Right card keeps compact spacing
         onTap: credex.acceptorMemberId != null
             ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
                 '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
@@ -537,6 +539,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
         isCurrentUser: true,
         accountName: credex.currentUserAccountName,
+        useExpandedSpacing: true, // Left card gets expanded spacing
         onTap: credex.acceptorMemberId != null
             ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
                 '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
@@ -552,6 +555,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
         isCurrentUser: false,
         accountName: credex.counterpartyAccountName,
+        useExpandedSpacing: false, // Right card keeps compact spacing
         onTap: credex.issuerMemberId != null
             ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
                 '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
@@ -562,15 +566,39 @@ class CredexDetailView extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // Return just the row with cards, ensuring same height
+    // Create the amount with arrow element
+    final isNegative = credex.initialAmount < 0;
+    final amountWithArrow = AmountWithArrow(
+      amount: credex.formattedInitialAmount,
+      isNegative: isNegative,
+      amountColor: isNegative ? AppColors.errorRed : AppColors.success,
+      arrowColor: AppColors.primary,
+      amountFontSize: 20.0,
+      containerSize: 100.0,
+    );
+
+    // Original working layout with flexible cards
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left card (current user)
         Expanded(child: leftCard),
-        const SizedBox(width: 8), // Small gap between cards
-        // Right card (counterparty)
-        Expanded(child: rightCard),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: isNegative
+                ? [
+                    amountWithArrow,
+                    const SizedBox(height: 8),
+                    rightCard,
+                  ]
+                : [
+                    rightCard,
+                    const SizedBox(height: 8),
+                    amountWithArrow,
+                  ],
+          ),
+        ),
       ],
     );
   }
@@ -602,6 +630,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
         isCurrentUser: true,
         accountName: credex.currentUserAccountName,
+        useExpandedSpacing: true, // Left card gets expanded spacing
         onTap: credex.issuerMemberId != null
             ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
                 '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
@@ -617,6 +646,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
         isCurrentUser: false,
         accountName: credex.counterpartyAccountName,
+        useExpandedSpacing: false, // Right card keeps compact spacing
         onTap: credex.acceptorMemberId != null
             ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
                 '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
@@ -635,6 +665,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
         isCurrentUser: true,
         accountName: credex.currentUserAccountName,
+        useExpandedSpacing: true, // Left card gets expanded spacing
         onTap: credex.acceptorMemberId != null
             ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
                 '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
@@ -650,6 +681,7 @@ class CredexDetailView extends StatelessWidget {
         creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
         isCurrentUser: false,
         accountName: credex.counterpartyAccountName,
+        useExpandedSpacing: false, // Right card keeps compact spacing
         onTap: credex.issuerMemberId != null
             ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
                 '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
@@ -671,6 +703,7 @@ class CredexDetailView extends StatelessWidget {
               profilePicture: credex.issuerProfilePicture,
               creditRating: _createCreditRatingFromCredex(credex, 'issuer'),
               isCurrentUser: false,
+              useExpandedSpacing: true, // Left card gets expanded spacing
               onTap: credex.issuerMemberId != null
                   ? () => _navigateToCreditReport(
                       context,
@@ -690,6 +723,7 @@ class CredexDetailView extends StatelessWidget {
               profilePicture: credex.acceptorProfilePicture,
               creditRating: _createCreditRatingFromCredex(credex, 'acceptor'),
               isCurrentUser: false,
+              useExpandedSpacing: false, // Right card keeps compact spacing
               onTap: credex.acceptorMemberId != null
                   ? () => _navigateToCreditReport(
                       context,
@@ -702,14 +736,39 @@ class CredexDetailView extends StatelessWidget {
       );
     }
 
-    // Return just the row with cards, no container wrapper
+    // Create the amount with arrow element
+    final isNegative = credex.initialAmount < 0;
+    final amountWithArrow = AmountWithArrow(
+      amount: credex.formattedInitialAmount,
+      isNegative: isNegative,
+      amountColor: isNegative ? AppColors.errorRed : AppColors.success,
+      arrowColor: AppColors.primary,
+      amountFontSize: 20.0,
+      containerSize: 100.0,
+    );
+
+    // Original working layout with flexible cards
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left card (current user)
         Expanded(child: leftCard),
-        const SizedBox(width: 8), // Small gap between cards
-        // Right card (counterparty)
-        Expanded(child: rightCard),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: isNegative
+                ? [
+                    amountWithArrow,
+                    const SizedBox(height: 8),
+                    rightCard,
+                  ]
+                : [
+                    rightCard,
+                    const SizedBox(height: 8),
+                    amountWithArrow,
+                  ],
+          ),
+        ),
       ],
     );
   }

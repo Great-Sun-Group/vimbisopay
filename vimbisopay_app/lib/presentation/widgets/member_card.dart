@@ -15,6 +15,7 @@ class MemberCard extends StatelessWidget {
   final bool isCurrentUser;
   final VoidCallback? onTap;
   final String? accountName;
+  final bool useExpandedSpacing; // New parameter to control spacing
 
   const MemberCard({
     super.key,
@@ -28,6 +29,7 @@ class MemberCard extends StatelessWidget {
     this.isCurrentUser = false,
     this.onTap,
     this.accountName,
+    this.useExpandedSpacing = false, // Default to compact spacing
   });
 
   String get displayName {
@@ -42,13 +44,8 @@ class MemberCard extends StatelessWidget {
     // Debug logging for account name
     print('MemberCard: isCurrentUser=$isCurrentUser, accountName="$accountName"');
 
-    // Calculate 50% of screen width minus padding for arrow
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidth = (screenWidth - 80) /
-        2; // 80px total padding (40px each side + arrow space)
-
+    // Remove fixed width constraint to allow flexible sizing
     return SizedBox(
-      width: cardWidth,
       child: Card(
         color: AppColors.surface,
         shape: RoundedRectangleBorder(
@@ -81,7 +78,7 @@ class MemberCard extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: useExpandedSpacing ? 45.0 : 8.0), // Conditional spacing - more space above picture
                 ],
 
                 // Profile section
@@ -122,7 +119,7 @@ class MemberCard extends StatelessWidget {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: useExpandedSpacing ? 24.0 : 8.0), // Conditional spacing - more space below picture
 
                     // Name and handle (centered)
                     Center(
@@ -140,7 +137,7 @@ class MemberCard extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           if (handle != null) ...[
-                            const SizedBox(height: 2),
+                            SizedBox(height: useExpandedSpacing ? 8.0 : 2.0), // Conditional spacing
                             Text(
                               '@$handle',
                               style: TextStyle(
@@ -158,7 +155,7 @@ class MemberCard extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 16),
+                SizedBox(height: useExpandedSpacing ? 32.0 : 16.0), // Conditional spacing
 
                 // Mini credit bar graph
                 Builder(
@@ -173,7 +170,7 @@ class MemberCard extends StatelessWidget {
 
                     return Column(
                       children: [
-                        const SizedBox(height: 12),
+                        SizedBox(height: useExpandedSpacing ? 20.0 : 12.0), // Conditional spacing
                         CreditRatingDisplay(
                           creditRating: creditRating,
                           height: 16,

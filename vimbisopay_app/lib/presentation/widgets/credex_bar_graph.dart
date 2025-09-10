@@ -54,24 +54,20 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with total amount
-        Text(
-          'Credex Breakdown',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+        // Header with SECURED/UNSECURED status
+        Center(
+          child: Text(
+            widget.credexDetail.securedCredex ? 'SECURED' : 'UNSECURED',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: widget.credexDetail.securedCredex
+                  ? AppColors.primary
+                  : AppColors.techAzure,
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Total: ${widget.credexDetail.formattedInitialAmount}',
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
 
         // Clickable bar graph with integrated dropdown arrow
         Container(
@@ -238,19 +234,19 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
                   Expanded(
                     child: Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: color,
                       ),
                     ),
                   ),
                   Text(
                     '\$${amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: color,
                     ),
                   ),
                   const SizedBox(width: 8),
