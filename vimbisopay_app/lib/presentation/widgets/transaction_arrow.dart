@@ -90,7 +90,8 @@ class TransactionArrowDetailed extends StatelessWidget {
 
 /// Custom painter for drawing hollow arrows around amount elements
 class HollowArrowPainter extends CustomPainter {
-  final bool isNegative; // true for negative amounts (arrow from left, turns down)
+  final bool
+      isNegative; // true for negative amounts (arrow from left, turns down)
   final Color arrowColor;
   final double strokeWidth;
 
@@ -123,21 +124,26 @@ class HollowArrowPainter extends CustomPainter {
 
       // Curve around the left side of the amount element
       path.quadraticBezierTo(
-        size.width * 0.3, size.height * 0.3,
-        size.width * 0.5, size.height * 0.2,
+        size.width * 0.3,
+        size.height * 0.3,
+        size.width * 0.5,
+        size.height * 0.2,
       );
 
       // Continue around the top
       path.quadraticBezierTo(
-        size.width * 0.7, size.height * 0.1,
-        size.width * 0.9, size.height * 0.2,
+        size.width * 0.7,
+        size.height * 0.1,
+        size.width * 0.9,
+        size.height * 0.2,
       );
 
       // Turn downward to point at the card
       path.lineTo(endX, endY);
 
       // Draw arrow head
-      _drawArrowHead(canvas, Offset(endX, endY), 0.5 * 3.14159, paint); // 90 degrees down
+      _drawArrowHead(
+          canvas, Offset(endX, endY), 0.5 * 3.14159, paint); // 90 degrees down
     } else {
       // For positive amounts: arrow from top side, around number, turns leftward
       final startX = size.width * 0.5;
@@ -150,21 +156,26 @@ class HollowArrowPainter extends CustomPainter {
 
       // Curve around the top of the amount element
       path.quadraticBezierTo(
-        size.width * 0.7, size.height * 0.3,
-        size.width * 0.8, size.height * 0.5,
+        size.width * 0.7,
+        size.height * 0.3,
+        size.width * 0.8,
+        size.height * 0.5,
       );
 
       // Continue around the right side
       path.quadraticBezierTo(
-        size.width * 0.9, size.height * 0.7,
-        size.width * 0.8, size.height * 0.9,
+        size.width * 0.9,
+        size.height * 0.7,
+        size.width * 0.8,
+        size.height * 0.9,
       );
 
       // Turn leftward to point at the card
       path.lineTo(endX, endY);
 
       // Draw arrow head
-      _drawArrowHead(canvas, Offset(endX, endY), 3.14159, paint); // 180 degrees left
+      _drawArrowHead(
+          canvas, Offset(endX, endY), 3.14159, paint); // 180 degrees left
     }
 
     canvas.drawPath(path, paint);
@@ -199,7 +210,7 @@ class HollowArrowPainter extends CustomPainter {
   }
 }
 
-/// Widget for displaying amount with hollow arrow
+/// Widget for displaying amount with L-shaped arrow
 class AmountWithArrow extends StatelessWidget {
   final String amount;
   final bool isNegative;
@@ -222,44 +233,177 @@ class AmountWithArrow extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: containerSize,
-      height: containerSize,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Hollow arrow background
-          CustomPaint(
-            size: Size(containerSize, containerSize),
-            painter: HollowArrowPainter(
-              isNegative: isNegative,
-              arrowColor: arrowColor,
-              strokeWidth: 2.0,
-            ),
-          ),
-          // Amount text in center
-          Container(
-            width: containerSize * 0.6,
-            height: containerSize * 0.6,
-            decoration: BoxDecoration(
-              color: AppColors.background.withOpacity(0.9),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: amountColor.withOpacity(0.3),
-                width: 1.0,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              amount,
-              style: TextStyle(
-                fontSize: amountFontSize * 0.8,
-                fontWeight: FontWeight.bold,
-                color: amountColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
+      height: containerSize * 1.2, // More height for arrowhead
+      child: CustomPaint(
+        size: Size(containerSize, containerSize * 1.2),
+        painter: LShapedArrowPainter(
+          amount: amount,
+          isNegative: isNegative,
+          amountColor: amountColor,
+          arrowColor: arrowColor,
+          amountFontSize: amountFontSize,
+        ),
       ),
     );
+  }
+}
+
+/// Custom painter for L-shaped arrow with amount box
+class LShapedArrowPainter extends CustomPainter {
+  final String amount;
+  final bool isNegative;
+  final Color amountColor;
+  final Color arrowColor;
+  final double amountFontSize;
+
+  LShapedArrowPainter({
+    required this.amount,
+    required this.isNegative,
+    required this.amountColor,
+    required this.arrowColor,
+    required this.amountFontSize,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = arrowColor
+      ..style = PaintingStyle.fill;
+
+    final backgroundPaint = Paint()
+      ..color = AppColors.background
+      ..style = PaintingStyle.fill;
+
+    // Calculate dimensions for stepped arrow design
+    final fixedTransparentWidth = 10.0;
+    final mainBoxHeight = size.height * 0.25;
+    final smallerBoxHeight = size.height * 0.1;
+    final arrowHeadSize = 22.0;
+    
+    // Variable width for colored portion (responsive)
+    final coloredWidth = size.width - fixedTransparentWidth;
+    
+    // Vertical positioning
+    final mainBoxY = (size.height - mainBoxHeight) / 2;
+
+    if (isNegative) {
+      // For negative amounts: stepped arrow pointing down
+      
+      // 1. Main horizontal box (contains amount) - no rounded corners
+      final mainBoxRect = Rect.fromLTWH(0, mainBoxY, size.width, mainBoxHeight);
+      canvas.drawRect(mainBoxRect, paint);
+      
+      // Draw transparent area on right side of main box
+      final transparentRect1 = Rect.fromLTWH(coloredWidth, mainBoxY, fixedTransparentWidth, mainBoxHeight);
+      canvas.drawRect(transparentRect1, backgroundPaint);
+
+      // 2. Smaller rectangle below (aligned to right side of main box) - no gap
+      final smallerBoxY = mainBoxY + mainBoxHeight; // No gap
+      final smallerBoxX = coloredWidth - (coloredWidth * 0.35); // Align to right portion
+      final smallerBoxWidth = coloredWidth * 0.3 + fixedTransparentWidth;
+      
+      final smallerBoxRect = Rect.fromLTWH(smallerBoxX, smallerBoxY, smallerBoxWidth, smallerBoxHeight);
+      canvas.drawRect(smallerBoxRect, paint);
+      
+      // Draw transparent area on right side of smaller box
+      final transparentRect2 = Rect.fromLTWH(coloredWidth, smallerBoxY, fixedTransparentWidth, smallerBoxHeight);
+      canvas.drawRect(transparentRect2, backgroundPaint);
+
+      // 3. Arrowhead pointing down (triangle) - shorter height, same width, centered on colored portion
+      final coloredSmallerBoxWidth = coloredWidth * 0.35; // Width of colored portion only
+      final arrowTipX = smallerBoxX + coloredSmallerBoxWidth / 2; // Center of colored portion
+      final arrowHeadHeight = arrowHeadSize * 0.6; // Shorter height
+      final arrowTipY = smallerBoxY + smallerBoxHeight + arrowHeadHeight; // Below smaller box
+      final arrowWidth = arrowHeadSize; // Keep same width
+      final arrowPath = Path()
+        ..moveTo(arrowTipX, arrowTipY) // tip
+        ..lineTo(arrowTipX - arrowWidth, smallerBoxY + smallerBoxHeight) // left
+        ..lineTo(arrowTipX + arrowWidth, smallerBoxY + smallerBoxHeight) // right
+        ..close();
+      canvas.drawPath(arrowPath, paint);
+
+    } else {
+      // For positive amounts: stepped arrow pointing up
+      
+      // 1. Smaller rectangle above (aligned to right side)
+      final smallerBoxY = mainBoxY - smallerBoxHeight;
+      final smallerBoxX = coloredWidth - (coloredWidth * 0.35); // Match the negative case alignment
+      final smallerBoxWidth = coloredWidth * 0.3 + fixedTransparentWidth;
+      
+      final smallerBoxRect = Rect.fromLTWH(smallerBoxX, smallerBoxY, smallerBoxWidth, smallerBoxHeight);
+      canvas.drawRect(smallerBoxRect, paint);
+      
+      // Draw transparent area on right side of smaller box
+      final transparentRect2 = Rect.fromLTWH(coloredWidth, smallerBoxY, fixedTransparentWidth, smallerBoxHeight);
+      canvas.drawRect(transparentRect2, backgroundPaint);
+
+      // 2. Main horizontal box (contains amount) - no rounded corners
+      final mainBoxRect = Rect.fromLTWH(0, mainBoxY, size.width, mainBoxHeight);
+      canvas.drawRect(mainBoxRect, paint);
+      
+      // Draw transparent area on right side of main box
+      final transparentRect1 = Rect.fromLTWH(coloredWidth, mainBoxY, fixedTransparentWidth, mainBoxHeight);
+      canvas.drawRect(transparentRect1, backgroundPaint);
+      
+      // 3. Arrowhead pointing up (triangle) - shorter height, same width, centered on colored portion
+      final coloredSmallerBoxWidth = coloredWidth * 0.3; // Width of colored portion only
+      final arrowTipX = smallerBoxX + coloredSmallerBoxWidth / 2; // Center of colored portion
+      final arrowHeadHeight = arrowHeadSize * 0.6; // Shorter height
+      final arrowTipY = smallerBoxY - arrowHeadHeight; // Above smaller box
+      final arrowWidth = arrowHeadSize; // Keep same width
+      final arrowPath = Path()
+        ..moveTo(arrowTipX, arrowTipY) // tip
+        ..lineTo(arrowTipX - arrowWidth, smallerBoxY) // left
+        ..lineTo(arrowTipX + arrowWidth, smallerBoxY) // right
+        ..close();
+      canvas.drawPath(arrowPath, paint);
+    }
+
+    // Draw the amount text in the main horizontal box
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: amount,
+        style: TextStyle(
+          fontSize: amountFontSize * 0.8,
+          fontWeight: FontWeight.bold,
+          color: AppColors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    // Position text in the colored portion of the main box
+    final textX = (coloredWidth - textPainter.width) / 2;
+    final textY = mainBoxY + (mainBoxHeight - textPainter.height) / 2;
+    textPainter.paint(canvas, Offset(textX, textY));
+  }
+
+  void _drawArrowHead(
+      Canvas canvas, Offset tip, double angle, double size, Paint paint) {
+    const arrowHeadAngle = 0.4; // radians
+
+    final arrowPoint1 = Offset(
+      tip.dx - size * cos(angle - arrowHeadAngle),
+      tip.dy - size * sin(angle - arrowHeadAngle),
+    );
+
+    final arrowPoint2 = Offset(
+      tip.dx - size * cos(angle + arrowHeadAngle),
+      tip.dy - size * sin(angle + arrowHeadAngle),
+    );
+
+    final arrowHeadPath = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(arrowPoint1.dx, arrowPoint1.dy)
+      ..lineTo(arrowPoint2.dx, arrowPoint2.dy)
+      ..close();
+
+    canvas.drawPath(arrowHeadPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }
