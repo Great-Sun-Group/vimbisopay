@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
+import 'package:vimbisopay_app/core/services/dashboard_service.dart';
 import 'package:vimbisopay_app/domain/entities/credex_detail.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
@@ -181,7 +182,7 @@ class CredexDetailView extends StatelessWidget {
                   ),
                   onPressed: () {
                     context.read<CredexDetailBloc>().add(
-                          CredexDetailLoadStarted(''),
+                          CredexDetailLoadStarted(state.credexId!),
                         );
                   },
                 ),
@@ -220,7 +221,7 @@ class CredexDetailView extends StatelessWidget {
                     ElevatedButton(
                       onPressed: () {
                         context.read<CredexDetailBloc>().add(
-                              CredexDetailLoadStarted(''),
+                              CredexDetailLoadStarted(state.credexId!),
                             );
                       },
                       style: ElevatedButton.styleFrom(
@@ -255,7 +256,7 @@ class CredexDetailView extends StatelessWidget {
                   ),
                   onPressed: () {
                     context.read<CredexDetailBloc>().add(
-                          CredexDetailLoadStarted(''),
+                          CredexDetailLoadStarted(state.credexId!),
                         );
                   },
                 ),
@@ -365,7 +366,7 @@ class CredexDetailView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMemberCardsSection(context, state.credexDetail!),
+                  _buildMemberCardsSection(context, state.credexDetail!, state),
                   if (state.credexDetail!.clearedAgainst.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _buildClearedTransactionsSection(context, state.credexDetail!),
@@ -389,7 +390,7 @@ class CredexDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildMemberCardsSection(BuildContext context, CredexDetail credex) {
+  Widget _buildMemberCardsSection(BuildContext context, CredexDetail credex, CredexDetailState state) {
     // Get current user information
     User? user;
     try {
@@ -402,97 +403,25 @@ class CredexDetailView extends StatelessWidget {
       }
     }
 
-    // Check if we have member data
-    final hasIssuerData = credex.issuerMemberId != null && credex.issuerFirstName != null;
-    final hasAcceptorData = credex.acceptorMemberId != null && credex.acceptorFirstName != null;
+    // Use centralized DashboardService for account hierarchy decisions
+    final dashboardService = DashboardService.instance;
 
-    // Build member cards without user context if needed
-    if (user == null && (hasIssuerData || hasAcceptorData)) {
-      return _buildMemberCardsWithoutUserContext(context, credex, hasIssuerData, hasAcceptorData);
-    }
+    // Determine card positions using new hierarchy logic with centralized dashboard data
+    late final ({MemberCard leftCard, MemberCard rightCard}) cardPositions;
 
-    // Return empty if insufficient data
-    if (user == null || (!hasIssuerData && !hasAcceptorData)) {
-      return const SizedBox.shrink();
-    }
-
-    // Determine user position
-    final isCurrentUserIssuer = user!.memberId == credex.issuerMemberId;
-    final isCurrentUserAcceptor = user.memberId == credex.acceptorMemberId;
-
-    // Current user is always on the left
-    late final MemberCard leftCard;
-    late final MemberCard rightCard;
-
-    if (isCurrentUserIssuer) {
-      leftCard = MemberCard(
-        memberId: credex.issuerMemberId,
-        firstName: credex.issuerFirstName,
-        lastName: credex.issuerLastName,
-        handle: credex.issuerHandle,
-        tier: credex.issuerTier,
-        profilePicture: credex.issuerProfilePicture,
-        creditRating: _getCreditRating(credex, 'issuer'),
-        isCurrentUser: true,
-        accountName: credex.currentUserAccountName,
-        useExpandedSpacing: true,
-        onTap: credex.issuerMemberId != null
-            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
-                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
-            : null,
-      );
-      rightCard = MemberCard(
-        memberId: credex.acceptorMemberId,
-        firstName: credex.acceptorFirstName,
-        lastName: credex.acceptorLastName,
-        handle: credex.acceptorHandle,
-        tier: credex.acceptorTier,
-        profilePicture: credex.acceptorProfilePicture,
-        creditRating: _getCreditRating(credex, 'acceptor'),
-        isCurrentUser: false,
-        accountName: credex.counterpartyAccountName,
-        useExpandedSpacing: false,
-        onTap: credex.acceptorMemberId != null
-            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
-                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
-            : null,
-      );
-    } else if (isCurrentUserAcceptor) {
-      leftCard = MemberCard(
-        memberId: credex.acceptorMemberId,
-        firstName: credex.acceptorFirstName,
-        lastName: credex.acceptorLastName,
-        handle: credex.acceptorHandle,
-        tier: credex.acceptorTier,
-        profilePicture: credex.acceptorProfilePicture,
-        creditRating: _getCreditRating(credex, 'acceptor'),
-        isCurrentUser: true,
-        accountName: credex.currentUserAccountName,
-        useExpandedSpacing: true,
-        onTap: credex.acceptorMemberId != null
-            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
-                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
-            : null,
-      );
-      rightCard = MemberCard(
-        memberId: credex.issuerMemberId,
-        firstName: credex.issuerFirstName,
-        lastName: credex.issuerLastName,
-        handle: credex.issuerHandle,
-        tier: credex.issuerTier,
-        profilePicture: credex.issuerProfilePicture,
-        creditRating: _getCreditRating(credex, 'issuer'),
-        isCurrentUser: false,
-        accountName: credex.counterpartyAccountName,
-        useExpandedSpacing: false,
-        onTap: credex.issuerMemberId != null
-            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
-                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
-            : null,
-      );
+    // User context should always be available via StreamProvider, but handle gracefully if not
+    if (user != null) {
+      cardPositions = _determineCardPositions(context, user, credex, dashboardService);
     } else {
-      return const SizedBox.shrink();
+      Logger.error('[CREDEX_DETAIL] User context not available, falling back to default card layout');
+      // Fallback: put current user on left based on API response
+      final leftCard = _buildMemberCard(context, credex, 'issuer', true);
+      final rightCard = _buildMemberCard(context, credex, 'acceptor', false);
+      cardPositions = (leftCard: leftCard, rightCard: rightCard);
     }
+
+    final leftCard = cardPositions.leftCard;
+    final rightCard = cardPositions.rightCard;
 
     // Create amount widget with conditional colors
     final isNegative = credex.initialAmount < 0;
@@ -533,161 +462,7 @@ class CredexDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildMemberCardsWithoutUserContext(
-      BuildContext context, CredexDetail credex, bool hasIssuerData, bool hasAcceptorData) {
-    // Determine layout based on transaction direction
-    final isDebit = credex.debit;
 
-    late final MemberCard leftCard;
-    late final MemberCard rightCard;
-
-    if (isDebit && hasIssuerData) {
-      leftCard = MemberCard(
-        memberId: credex.issuerMemberId,
-        firstName: credex.issuerFirstName,
-        lastName: credex.issuerLastName,
-        handle: credex.issuerHandle,
-        tier: credex.issuerTier,
-        profilePicture: credex.issuerProfilePicture,
-        creditRating: _getCreditRating(credex, 'issuer'),
-        isCurrentUser: true,
-        accountName: credex.currentUserAccountName,
-        useExpandedSpacing: true,
-        onTap: credex.issuerMemberId != null
-            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
-                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
-            : null,
-      );
-      rightCard = MemberCard(
-        memberId: credex.acceptorMemberId,
-        firstName: credex.acceptorFirstName,
-        lastName: credex.acceptorLastName,
-        handle: credex.acceptorHandle,
-        tier: credex.acceptorTier,
-        profilePicture: credex.acceptorProfilePicture,
-        creditRating: _getCreditRating(credex, 'acceptor'),
-        isCurrentUser: false,
-        accountName: credex.counterpartyAccountName,
-        useExpandedSpacing: false,
-        onTap: credex.acceptorMemberId != null
-            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
-                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
-            : null,
-      );
-    } else if (!isDebit && hasAcceptorData) {
-      leftCard = MemberCard(
-        memberId: credex.acceptorMemberId,
-        firstName: credex.acceptorFirstName,
-        lastName: credex.acceptorLastName,
-        handle: credex.acceptorHandle,
-        tier: credex.acceptorTier,
-        profilePicture: credex.acceptorProfilePicture,
-        creditRating: _getCreditRating(credex, 'acceptor'),
-        isCurrentUser: true,
-        accountName: credex.currentUserAccountName,
-        useExpandedSpacing: true,
-        onTap: credex.acceptorMemberId != null
-            ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
-                '${credex.acceptorFirstName ?? 'Unknown'} ${credex.acceptorLastName ?? 'Member'}')
-            : null,
-      );
-      rightCard = MemberCard(
-        memberId: credex.issuerMemberId,
-        firstName: credex.issuerFirstName,
-        lastName: credex.issuerLastName,
-        handle: credex.issuerHandle,
-        tier: credex.issuerTier,
-        profilePicture: credex.issuerProfilePicture,
-        creditRating: _getCreditRating(credex, 'issuer'),
-        isCurrentUser: false,
-        accountName: credex.counterpartyAccountName,
-        useExpandedSpacing: false,
-        onTap: credex.issuerMemberId != null
-            ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
-                '${credex.issuerFirstName ?? 'Unknown'} ${credex.issuerLastName ?? 'Member'}')
-            : null,
-      );
-    } else {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasIssuerData) ...[
-            MemberCard(
-              memberId: credex.issuerMemberId,
-              firstName: credex.issuerFirstName,
-              lastName: credex.issuerLastName,
-              handle: credex.issuerHandle,
-              tier: credex.issuerTier,
-              profilePicture: credex.issuerProfilePicture,
-              creditRating: _getCreditRating(credex, 'issuer'),
-              isCurrentUser: false,
-              useExpandedSpacing: true,
-              onTap: credex.issuerMemberId != null
-                  ? () => _navigateToCreditReport(context, credex.issuerMemberId!,
-                      '${credex.issuerFirstName ?? ''} ${credex.issuerLastName ?? ''}'.trim())
-                  : null,
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (hasAcceptorData) ...[
-            MemberCard(
-              memberId: credex.acceptorMemberId,
-              firstName: credex.acceptorFirstName,
-              lastName: credex.acceptorLastName,
-              handle: credex.acceptorHandle,
-              tier: credex.acceptorTier,
-              profilePicture: credex.acceptorProfilePicture,
-              creditRating: _getCreditRating(credex, 'acceptor'),
-              isCurrentUser: false,
-              useExpandedSpacing: false,
-              onTap: credex.acceptorMemberId != null
-                  ? () => _navigateToCreditReport(context, credex.acceptorMemberId!,
-                      '${credex.acceptorFirstName ?? ''} ${credex.acceptorLastName ?? ''}'.trim())
-                  : null,
-            ),
-          ],
-        ],
-      );
-    }
-
-    // Create amount widget with conditional colors
-    final isNegative = credex.initialAmount < 0;
-    final arrowColor = _getAmountArrowColor(credex.securedCredex);
-    final displayAmount = credex.formattedInitialAmount.replaceAll('-', '');
-
-    final amountWithArrow = AmountWithArrow(
-      amount: displayAmount,
-      isNegative: isNegative,
-      amountColor: isNegative ? AppColors.errorRed : AppColors.success,
-      arrowColor: arrowColor,
-      amountFontSize: 20.0,
-      containerSize: CredexDetailDimensions.transactionArrowContainerSize,
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: leftCard),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: isNegative
-                ? [
-                    amountWithArrow,
-                    const SizedBox(height: 8),
-                    rightCard,
-                  ]
-                : [
-                    rightCard,
-                    const SizedBox(height: 8),
-                    amountWithArrow,
-                  ],
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildClearedTransactionsSection(BuildContext context, CredexDetail credex) {
     return Container(
@@ -914,6 +689,106 @@ class CredexDetailView extends StatelessWidget {
     }
     return null;
   }
+
+  // Helper method to implement account selection hierarchy using DashboardService
+  ({MemberCard leftCard, MemberCard rightCard}) _determineCardPositions(
+    BuildContext context,
+    User user,
+    CredexDetail credex,
+    DashboardService dashboardService,
+  ) {
+    final isCurrentUserIssuer = user.memberId == credex.issuerMemberId;
+    final isCurrentUserAcceptor = user.memberId == credex.acceptorMemberId;
+
+    // Use DashboardService to determine which accounts the current user owns
+    final ownedAccountIds = dashboardService.getOwnedAccountIds(user.memberId);
+
+    final bool ownsIssuerAccount = dashboardService.isAccountOwned(credex.issuerAccountID ?? '');
+    final bool ownsAcceptorAccount = dashboardService.isAccountOwned(credex.acceptorAccountID ?? '');
+
+    final issuerAccountType = dashboardService.getAccountType(credex.issuerAccountID ?? '');
+    final acceptorAccountType = dashboardService.getAccountType(credex.acceptorAccountID ?? '');
+
+    MemberCard leftCard;
+    MemberCard rightCard;
+
+    // Apply hierarchy rules
+    if (ownsIssuerAccount && !ownsAcceptorAccount) {
+      // Rule 1: One owned account → owned account on left
+      leftCard = _buildMemberCard(context, credex, 'issuer', isCurrentUserIssuer);
+      rightCard = _buildMemberCard(context, credex, 'acceptor', isCurrentUserAcceptor);
+    } else if (!ownsIssuerAccount && ownsAcceptorAccount) {
+      // Rule 1: One owned account → owned account on left
+      leftCard = _buildMemberCard(context, credex, 'acceptor', isCurrentUserAcceptor);
+      rightCard = _buildMemberCard(context, credex, 'issuer', isCurrentUserIssuer);
+    } else if (ownsIssuerAccount && ownsAcceptorAccount) {
+      // Rule 2: Both owned → check PERSONAL type preference
+      final bool issuerIsPersonal = issuerAccountType == 'PERSONAL';
+      final bool acceptorIsPersonal = acceptorAccountType == 'PERSONAL';
+
+      if (issuerIsPersonal && !acceptorIsPersonal) {
+        // Issuer is PERSONAL, put it on left
+        leftCard = _buildMemberCard(context, credex, 'issuer', isCurrentUserIssuer);
+        rightCard = _buildMemberCard(context, credex, 'acceptor', isCurrentUserAcceptor);
+      } else if (!issuerIsPersonal && acceptorIsPersonal) {
+        // Acceptor is PERSONAL, put it on left
+        leftCard = _buildMemberCard(context, credex, 'acceptor', isCurrentUserAcceptor);
+        rightCard = _buildMemberCard(context, credex, 'issuer', isCurrentUserIssuer);
+      } else {
+        // Rule 3: Both owned, neither is PERSONAL → random choice
+        // For now, use issuer as left (could be randomized later)
+        leftCard = _buildMemberCard(context, credex, 'issuer', isCurrentUserIssuer);
+        rightCard = _buildMemberCard(context, credex, 'acceptor', isCurrentUserAcceptor);
+      }
+    } else {
+      // Fallback: Current user on left (backward compatibility)
+      if (isCurrentUserIssuer) {
+        leftCard = _buildMemberCard(context, credex, 'issuer', true);
+        rightCard = _buildMemberCard(context, credex, 'acceptor', false);
+      } else if (isCurrentUserAcceptor) {
+        leftCard = _buildMemberCard(context, credex, 'acceptor', true);
+        rightCard = _buildMemberCard(context, credex, 'issuer', false);
+      } else {
+        // Error case - just put issuer on left
+        leftCard = _buildMemberCard(context, credex, 'issuer', false);
+        rightCard = _buildMemberCard(context, credex, 'acceptor', false);
+      }
+    }
+
+    return (leftCard: leftCard, rightCard: rightCard);
+  }
+
+
+
+
+
+  // Helper method to build member card for specific role
+  MemberCard _buildMemberCard(BuildContext context, CredexDetail credex, String role, bool isCurrentUser) {
+    final isIssuer = role == 'issuer';
+    final memberId = isIssuer ? credex.issuerMemberId : credex.acceptorMemberId;
+    final firstName = isIssuer ? credex.issuerFirstName : credex.acceptorFirstName;
+    final lastName = isIssuer ? credex.issuerLastName : credex.acceptorLastName;
+    final tier = isIssuer ? credex.issuerTier : credex.acceptorTier;
+    final profilePicture = isIssuer ? credex.issuerProfilePicture : credex.acceptorProfilePicture;
+
+    return MemberCard(
+      memberId: memberId,
+      firstName: firstName,
+      lastName: lastName,
+      tier: tier,
+      profilePicture: profilePicture,
+      creditRating: _getCreditRating(credex, role),
+      isCurrentUser: isCurrentUser,
+      accountName: isCurrentUser ? credex.currentUserAccountName : credex.counterpartyAccountName,
+      accountHandle: isCurrentUser ? credex.currentUserAccountHandle : credex.counterpartyAccountHandle,
+      useExpandedSpacing: true,
+      onTap: memberId != null
+          ? () => _navigateToCreditReport(context, memberId, '$firstName $lastName'.trim())
+          : null,
+    );
+  }
+
+
 
   // Helper method to navigate to credit report
   void _navigateToCreditReport(BuildContext context, String memberId, String memberName) {

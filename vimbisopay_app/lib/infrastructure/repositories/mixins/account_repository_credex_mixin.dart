@@ -9,6 +9,7 @@ import 'package:vimbisopay_app/domain/entities/recurring_response.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
 import 'package:vimbisopay_app/domain/entities/credex_detail.dart';
+import 'package:vimbisopay_app/core/services/dashboard_service.dart';
 import 'package:vimbisopay_app/infrastructure/repositories/base_account_repository.dart';
 
 /// Mixin that provides Credex and recurring payment-related methods for AccountRepositoryImpl
@@ -516,28 +517,17 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
     required String credexId,
   }) async {
     Logger.data('[GET_CREDEX_DETAIL] Starting request for credexId: $credexId');
-    
+
     return executeAuthenticatedRequest(
       request: (token) async {
         try {
-          // Get current user to determine accountID
-          final user = await databaseHelper.getUser();
-          if (user == null || user.dashboard == null || user.dashboard!.accounts.isEmpty) {
-            Logger.error('[GET_CREDEX_DETAIL] No user or accounts found in database');
-            return const Left(InfrastructureFailure('User not authenticated or no accounts available'));
-          }
-
-          // Use the user's first account ID
-          final accountId = user.dashboard!.accounts.first.accountID;
-          
           final url = '$baseUrl/getCredex';
           final headers = authHeaders(token);
           final body = {
             'credexID': credexId,
-            'accountID': accountId,
           };
 
-          Logger.data('[GET_CREDEX_DETAIL] Sending request to $url with accountID: $accountId');
+          Logger.data('[GET_CREDEX_DETAIL] Sending request to $url');
           final response = await loggedRequest(
             () => httpClient.post(
               Uri.parse(url),
@@ -568,9 +558,39 @@ mixin AccountRepositoryCredexMixin on BaseAccountRepository {
                   'Invalid response format: Missing action field'));
             }
 
+            // Handle dashboard data (now optional in state-agnostic API)
+            if (data.containsKey('dashboard') && data['dashboard'] != null && data['dashboard'] is Map && (data['dashboard'] as Map).isNotEmpty) {
+              Logger.data('[GET_CREDEX_DETAIL] Dashboard data found, updating central service');
+              try {
+                final dashboardMap = Map<String, dynamic>.from(data['dashboard']);
+
+                // Only update if we have complete required data
+                if (dashboardMap.containsKey('member') && dashboardMap['member'] != null &&
+                    dashboardMap.containsKey('accounts') && dashboardMap['accounts'] != null) {
+
+                  // Ensure member has required fields
+                  final memberMap = dashboardMap['member'] as Map<String, dynamic>;
+                  if (memberMap.containsKey('memberID') && memberMap['memberID'] != null) {
+                    final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
+                    DashboardService.instance.updateDashboard(dashboardObj);
+                    Logger.data('[GET_CREDEX_DETAIL] Dashboard updated in centralized service');
+                  } else {
+                    Logger.data('[GET_CREDEX_DETAIL] Dashboard member missing memberID, skipping update');
+                  }
+                } else {
+                  Logger.data('[GET_CREDEX_DETAIL] Dashboard missing required member or accounts data, skipping update');
+                }
+              } catch (e, stackTrace) {
+                Logger.error('[GET_CREDEX_DETAIL] Failed to update dashboard service', e, stackTrace);
+                // Continue processing credex detail even if dashboard update fails
+              }
+            } else {
+              Logger.data('[GET_CREDEX_DETAIL] No dashboard data in response (state-agnostic API)');
+            }
+
             Logger.data('[GET_CREDEX_DETAIL] Creating CredexDetail from response');
             final credexDetail = CredexDetail.fromApiResponse(data);
-            
+
             return Right(credexDetail);
           } else {
             final responseBody = json.decode(response.body);

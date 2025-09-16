@@ -70,6 +70,7 @@ class CredexDetailBloc extends Bloc<CredexDetailEvent, CredexDetailState> {
     // Keep current data while refreshing
     emit(state.copyWith(
       status: CredexDetailStatus.loading,
+      credexId: event.credexId,
       error: null,
       message: null,
     ));

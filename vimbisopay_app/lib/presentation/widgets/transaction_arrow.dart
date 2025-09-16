@@ -345,16 +345,14 @@ class LShapedArrowPainter extends CustomPainter {
       final transparentRect1 = Rect.fromLTWH(coloredWidth, mainBoxY, fixedTransparentWidth, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
       
-      // 3. Arrowhead pointing up (triangle) - shorter height, same width, centered on colored portion
-      final coloredSmallerBoxWidth = coloredWidth * 0.3; // Width of colored portion only
-      final arrowTipX = smallerBoxX + coloredSmallerBoxWidth / 2; // Center of colored portion
-      final arrowHeadHeight = arrowHeadSize * 0.6; // Shorter height
-      final arrowTipY = smallerBoxY - arrowHeadHeight; // Above smaller box
-      final arrowWidth = arrowHeadSize; // Keep same width
+      // 3. Arrowhead pointing left (triangle) - positioned on left side of main rectangle
+      final arrowTipX = -(arrowHeadSize * 0.6); // Left of main box
+      final arrowTipY = mainBoxY + mainBoxHeight / 2; // Center vertically on main box
+      final arrowHeight = arrowHeadSize; // Keep same size
       final arrowPath = Path()
-        ..moveTo(arrowTipX, arrowTipY) // tip
-        ..lineTo(arrowTipX - arrowWidth, smallerBoxY) // left
-        ..lineTo(arrowTipX + arrowWidth, smallerBoxY) // right
+        ..moveTo(arrowTipX, arrowTipY) // tip pointing left
+        ..lineTo(0, arrowTipY - arrowHeight) // top, connecting to main box left edge
+        ..lineTo(0, arrowTipY + arrowHeight) // bottom, connecting to main box left edge
         ..close();
       canvas.drawPath(arrowPath, paint);
     }
