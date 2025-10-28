@@ -302,7 +302,7 @@ class LShapedArrowPainter extends CustomPainter {
       canvas.drawRect(transparentRect1, backgroundPaint);
 
       // 2. Arrowhead pointing down (triangle) - positioned at bottom of main box, centered
-      final arrowTipX = coloredWidth * 0.5; // Center on colored portion
+      final arrowTipX = coloredWidth * 0.75; // Shifted right from center
       final arrowTipY =
           mainBoxY + mainBoxHeight + (mainBoxHeight * 0.5); // Below main box
       final arrowWidth = arrowHeadSize; // Keep same width
@@ -316,30 +316,36 @@ class LShapedArrowPainter extends CustomPainter {
       canvas.drawPath(arrowPath, paint);
     } else {
       // For positive amounts: stepped arrow pointing up
+      
+      // Add horizontal offset to shift entire arrow right
+      final horizontalOffset = coloredWidth * 0.13;
 
       // 1. Main horizontal box (contains amount) - shortened to fit just the text
       final mainBoxWidth =
           coloredWidth * 0.8; // Shorter than before, just enough for text
       final mainBoxRect =
-          Rect.fromLTWH(0, mainBoxY, mainBoxWidth, mainBoxHeight);
+          Rect.fromLTWH(horizontalOffset, mainBoxY, mainBoxWidth, mainBoxHeight);
       canvas.drawRect(mainBoxRect, paint);
 
       // Draw transparent area on the remainder of the box width
       final transparentRect1 = Rect.fromLTWH(
-          mainBoxWidth, mainBoxY, size.width - mainBoxWidth, mainBoxHeight);
+          0, mainBoxY, horizontalOffset, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
+      final transparentRect2 = Rect.fromLTWH(
+          horizontalOffset + mainBoxWidth, mainBoxY, size.width - (horizontalOffset + mainBoxWidth), mainBoxHeight);
+      canvas.drawRect(transparentRect2, backgroundPaint);
 
       // 3. Arrowhead pointing left (triangle) - positioned on left side of main rectangle
-      final arrowTipX = -(arrowHeadSize * 0.6); // Left of main box
+      final arrowTipX = horizontalOffset - (arrowHeadSize * 0.6); // Tip left of box
       final arrowTipY =
           mainBoxY + mainBoxHeight / 2; // Center vertically on main box
       final arrowHeight = arrowHeadSize; // Keep same size
       final arrowPath = Path()
         ..moveTo(arrowTipX, arrowTipY) // tip pointing left
-        ..lineTo(
-            0, arrowTipY - arrowHeight) // top, connecting to main box left edge
-        ..lineTo(0,
-            arrowTipY + arrowHeight) // bottom, connecting to main box left edge
+        ..lineTo(horizontalOffset,
+            arrowTipY - arrowHeight) // top, connecting to box left edge
+        ..lineTo(horizontalOffset,
+            arrowTipY + arrowHeight) // bottom, connecting to box left edge
         ..close();
       canvas.drawPath(arrowPath, paint);
     }
