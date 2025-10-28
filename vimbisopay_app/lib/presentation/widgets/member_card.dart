@@ -117,86 +117,24 @@ class MemberCard extends StatelessWidget {
                   SizedBox(height: useExpandedSpacing ? 45.0 : 8.0), // Conditional spacing - more space above picture
                 ],
 
-                // Profile section
-                Column(
-                  children: [
-                    // Profile picture (centered)
-                    Center(
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.darkBluePrimary,
-                          border: Border.all(
-                            color: isCurrentUser
-                                ? AppColors.primary
-                                : AppColors.textSecondary.withOpacity(0.3),
-                            width: 2,
-                          ),
-                        ),
-                        child: profilePicture != null
-                            ? ClipOval(
-                                child: Image.network(
-                                  profilePicture!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Icon(
-                                    Icons.person,
-                                    color: AppColors.primary,
-                                    size: 30,
-                                  ),
-                                ),
-                              )
-                            : Icon(
-                                Icons.person,
-                                color: AppColors.primary,
-                                size: 30,
-                              ),
-                      ),
-                    ),
-                    SizedBox(height: useExpandedSpacing ? 24.0 : 8.0), // Conditional spacing - more space below picture
+                // Simplified content section (credit rating bar only)
+                Builder(
+                  builder: (context) {
+                    // Debug logging for credit rating
+                    if (creditRating != null) {
+                      print(
+                          'MemberCard: creditRating exists - redeemed: ${creditRating!.redeemedTotalUSD}, outstanding: ${creditRating!.outstandingTotalUSD}, defaulted: ${creditRating!.defaultedTotalUSD}, writtenOff: ${creditRating!.writtenOffTotalUSD}');
+                    } else {
+                      print('MemberCard: creditRating is null');
+                    }
 
-                    // Name (centered)
-                    Center(
-                      child: Text(
-                        displayName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-
-                    // Credit rating bar (moved here from bottom)
-                    Builder(
-                      builder: (context) {
-                        // Debug logging for credit rating
-                        if (creditRating != null) {
-                          print(
-                              'MemberCard: creditRating exists - redeemed: ${creditRating!.redeemedTotalUSD}, outstanding: ${creditRating!.outstandingTotalUSD}, defaulted: ${creditRating!.defaultedTotalUSD}, writtenOff: ${creditRating!.writtenOffTotalUSD}');
-                        } else {
-                          print('MemberCard: creditRating is null');
-                        }
-
-                        return Column(
-                          children: [
-                            SizedBox(height: useExpandedSpacing ? 16.0 : 8.0), // Reduced spacing since moved up
-                            CreditRatingDisplay(
-                              creditRating: creditRating,
-                              height: 16,
-                              showDetailed: false,
-                              showLegend: false,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
+                    return CreditRatingDisplay(
+                      creditRating: creditRating,
+                      height: 24,
+                      showDetailed: false,
+                      showLegend: false,
+                    );
+                  },
                 ),
               ],
             ),

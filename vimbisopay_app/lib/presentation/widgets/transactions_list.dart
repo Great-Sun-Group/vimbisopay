@@ -699,7 +699,7 @@ class _TransactionsListState extends State<TransactionsList> {
         ),
         child: const Center(
           child: Text(
-            'Counterparty credit rating not yet established',
+            'Credit rating not yet established',
             style: TextStyle(
               color: AppColors.techAzure,
               fontSize: 11,
@@ -760,11 +760,11 @@ class _TransactionsListState extends State<TransactionsList> {
           ),
         ),
         
-        // Counterparty credit rating text inside the bar
+        // Credit rating text inside the bar
         const Padding(
           padding: EdgeInsets.only(left: 8.0),
           child: Text(
-            'Counterparty credit rating',
+            'Credit rating',
             style: TextStyle(
               color: Colors.black,
               fontSize: 11,

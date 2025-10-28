@@ -52,7 +52,6 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Header with SECURED/UNSECURED status
         Center(
@@ -69,8 +68,9 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
         ),
         const SizedBox(height: 16),
 
-        // Clickable bar graph with integrated dropdown arrow
+        // Bar graph container
         Container(
+          height: widget.height,
           decoration: BoxDecoration(
             color: AppColors.darkBlueDark1,
             borderRadius: BorderRadius.circular(4),
@@ -92,10 +92,11 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
               children: [
                 // Bar graph with calculated proportions
                 _buildBarGraph(totalAmount),
-                // Dropdown arrow
+
+                // Dropdown arrow (centered if legend is enabled)
                 if (widget.showLegend)
                   Positioned(
-                    right: 8,
+                    right: widget.height * 0.25, // Position relative to height
                     top: 0,
                     bottom: 0,
                     child: Icon(
@@ -103,7 +104,7 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
                           ? Icons.keyboard_arrow_up
                           : Icons.keyboard_arrow_down,
                       color: AppColors.darkBlueDark1,
-                      size: 16,
+                      size: widget.height * 0.8,
                     ),
                   ),
               ],

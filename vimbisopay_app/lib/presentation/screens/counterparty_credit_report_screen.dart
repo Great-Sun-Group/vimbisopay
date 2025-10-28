@@ -82,7 +82,7 @@ class _CounterpartyCreditReportScreenState
     return Scaffold(
       backgroundColor: AppColors.darkBlueDark1,
       appBar: AppBar(
-        title: Text('${widget.memberName} Credit Report'),
+        title: const Text('Counterparty Credit'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         leading: IconButton(
@@ -193,8 +193,6 @@ class _CounterpartyCreditReportScreenState
         children: [
           _buildMemberInfoCard(),
           const SizedBox(height: 16),
-          _buildCreditRatingCard(),
-          const SizedBox(height: 16),
           _buildAccountsCard(),
           const SizedBox(height: 16),
           _buildReportInfoCard(),
@@ -204,6 +202,12 @@ class _CounterpartyCreditReportScreenState
   }
 
   Widget _buildMemberInfoCard() {
+    final creditRating = _creditReport!.creditRating;
+    final totalCreditActivity = (creditRating?.redeemedTotalUSD ?? 0.0) +
+        (creditRating?.outstandingTotalUSD ?? 0.0) +
+        (creditRating?.defaultedTotalUSD ?? 0.0) +
+        (creditRating?.writtenOffTotalUSD ?? 0.0);
+
     return Card(
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
@@ -218,25 +222,6 @@ class _CounterpartyCreditReportScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.person,
-                  color: AppColors.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Member Information',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -264,63 +249,97 @@ class _CounterpartyCreditReportScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildInfoRow('Name', _creditReport!.fullName),
+                      Text(
+                        _creditReport!.fullName,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                       if (_creditReport!.memberHandle != null)
-                        _buildInfoRow(
-                            'Handle', '@${_creditReport!.memberHandle!}'),
-                      _buildInfoRow('Member ID', _creditReport!.memberID),
-                      _buildInfoRow('Tier', _creditReport!.tierName),
+                        Text(
+                          '@${_creditReport!.memberHandle!}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            // Clickable credit rating bar with integrated dropdown arrow (full width)
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.darkBlueDark1,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: AppColors.techAzure.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              width: double.infinity,
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _isCreditDetailsExpanded = !_isCreditDetailsExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Stack(
+                  children: [
+                    CreditRatingDisplay.compact(
+                      creditRating: creditRating,
+                      memberName: _creditReport!.fullName,
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Icon(
+                        _isCreditDetailsExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: AppColors.darkBlueDark1,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Total Credit Activity',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              '\$${totalCreditActivity.toStringAsFixed(2)} USD',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            // Expandable breakdown details
+            if (_isCreditDetailsExpanded) ...[
+              const SizedBox(height: 12),
+              _buildBreakdownDetails(creditRating, totalCreditActivity),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCreditRatingCard() {
-    return Card(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(
-          color: AppColors.techAzure,
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.assessment,
-                  color: AppColors.techAzure,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Credit Rating',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildCreditRatingContent(),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildAccountsCard() {
     return Card(
@@ -356,7 +375,7 @@ class _CounterpartyCreditReportScreenState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Member Accounts (${_creditReport!.accounts.length})',
+                        'Accounts (${_creditReport!.accounts.length})',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

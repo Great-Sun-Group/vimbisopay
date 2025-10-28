@@ -279,80 +279,67 @@ class LShapedArrowPainter extends CustomPainter {
     final mainBoxHeight = size.height * 0.25;
     final smallerBoxHeight = size.height * 0.1;
     final arrowHeadSize = 22.0;
-    
+
     // Variable width for colored portion (responsive)
     final coloredWidth = size.width - fixedTransparentWidth;
-    
+
     // Vertical positioning
     final mainBoxY = (size.height - mainBoxHeight) / 2;
 
     if (isNegative) {
       // For negative amounts: stepped arrow pointing down
-      
-      // 1. Main horizontal box (contains amount) - no rounded corners
-      final mainBoxRect = Rect.fromLTWH(0, mainBoxY, size.width, mainBoxHeight);
+
+      // 1. Main horizontal box (contains amount) - shortened to fit just the text
+      final mainBoxWidth =
+          coloredWidth * 0.6; // Shorter than before, just enough for text
+      final mainBoxRect =
+          Rect.fromLTWH(0, mainBoxY, mainBoxWidth, mainBoxHeight);
       canvas.drawRect(mainBoxRect, paint);
-      
-      // Draw transparent area on right side of main box
-      final transparentRect1 = Rect.fromLTWH(coloredWidth, mainBoxY, fixedTransparentWidth, mainBoxHeight);
+
+      // Draw transparent area on the remainder of the box width
+      final transparentRect1 = Rect.fromLTWH(
+          mainBoxWidth, mainBoxY, size.width - mainBoxWidth, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
 
-      // 2. Smaller rectangle below (aligned to right side of main box) - no gap
-      final smallerBoxY = mainBoxY + mainBoxHeight; // No gap
-      final smallerBoxX = coloredWidth - (coloredWidth * 0.35); // Align to right portion
-      final smallerBoxWidth = coloredWidth * 0.3 + fixedTransparentWidth;
-      
-      final smallerBoxRect = Rect.fromLTWH(smallerBoxX, smallerBoxY, smallerBoxWidth, smallerBoxHeight);
-      canvas.drawRect(smallerBoxRect, paint);
-      
-      // Draw transparent area on right side of smaller box
-      final transparentRect2 = Rect.fromLTWH(coloredWidth, smallerBoxY, fixedTransparentWidth, smallerBoxHeight);
-      canvas.drawRect(transparentRect2, backgroundPaint);
-
-      // 3. Arrowhead pointing down (triangle) - shorter height, same width, centered on colored portion
-      final coloredSmallerBoxWidth = coloredWidth * 0.35; // Width of colored portion only
-      final arrowTipX = smallerBoxX + coloredSmallerBoxWidth / 2; // Center of colored portion
-      final arrowHeadHeight = arrowHeadSize * 0.6; // Shorter height
-      final arrowTipY = smallerBoxY + smallerBoxHeight + arrowHeadHeight; // Below smaller box
+      // 2. Arrowhead pointing down (triangle) - positioned at bottom of main box, centered
+      final arrowTipX = coloredWidth * 0.5; // Center on colored portion
+      final arrowTipY =
+          mainBoxY + mainBoxHeight + (mainBoxHeight * 0.5); // Below main box
       final arrowWidth = arrowHeadSize; // Keep same width
       final arrowPath = Path()
         ..moveTo(arrowTipX, arrowTipY) // tip
-        ..lineTo(arrowTipX - arrowWidth, smallerBoxY + smallerBoxHeight) // left
-        ..lineTo(arrowTipX + arrowWidth, smallerBoxY + smallerBoxHeight) // right
+        ..lineTo(arrowTipX - arrowWidth,
+            mainBoxY + mainBoxHeight) // left, connecting to main box
+        ..lineTo(arrowTipX + arrowWidth,
+            mainBoxY + mainBoxHeight) // right, connecting to main box
         ..close();
       canvas.drawPath(arrowPath, paint);
-
     } else {
       // For positive amounts: stepped arrow pointing up
-      
-      // 1. Smaller rectangle above (aligned to right side)
-      final smallerBoxY = mainBoxY - smallerBoxHeight;
-      final smallerBoxX = coloredWidth - (coloredWidth * 0.35); // Match the negative case alignment
-      final smallerBoxWidth = coloredWidth * 0.3 + fixedTransparentWidth;
-      
-      final smallerBoxRect = Rect.fromLTWH(smallerBoxX, smallerBoxY, smallerBoxWidth, smallerBoxHeight);
-      canvas.drawRect(smallerBoxRect, paint);
-      
-      // Draw transparent area on right side of smaller box
-      final transparentRect2 = Rect.fromLTWH(coloredWidth, smallerBoxY, fixedTransparentWidth, smallerBoxHeight);
-      canvas.drawRect(transparentRect2, backgroundPaint);
 
-      // 2. Main horizontal box (contains amount) - no rounded corners
-      final mainBoxRect = Rect.fromLTWH(0, mainBoxY, size.width, mainBoxHeight);
+      // 1. Main horizontal box (contains amount) - shortened to fit just the text
+      final mainBoxWidth =
+          coloredWidth * 0.8; // Shorter than before, just enough for text
+      final mainBoxRect =
+          Rect.fromLTWH(0, mainBoxY, mainBoxWidth, mainBoxHeight);
       canvas.drawRect(mainBoxRect, paint);
-      
-      // Draw transparent area on right side of main box
-      final transparentRect1 = Rect.fromLTWH(coloredWidth, mainBoxY, fixedTransparentWidth, mainBoxHeight);
+
+      // Draw transparent area on the remainder of the box width
+      final transparentRect1 = Rect.fromLTWH(
+          mainBoxWidth, mainBoxY, size.width - mainBoxWidth, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
-      
+
       // 3. Arrowhead pointing left (triangle) - positioned on left side of main rectangle
       final arrowTipX = -(arrowHeadSize * 0.6); // Left of main box
-      final arrowTipY = mainBoxY + mainBoxHeight / 2; // Center vertically on main box
+      final arrowTipY =
+          mainBoxY + mainBoxHeight / 2; // Center vertically on main box
       final arrowHeight = arrowHeadSize; // Keep same size
       final arrowPath = Path()
         ..moveTo(arrowTipX, arrowTipY) // tip pointing left
-        ..lineTo(0, arrowTipY - arrowHeight) // top, connecting to main box left edge
-        ..lineTo(0, arrowTipY + arrowHeight) // bottom, connecting to main box left edge
+        ..lineTo(
+            0, arrowTipY - arrowHeight) // top, connecting to main box left edge
+        ..lineTo(0,
+            arrowTipY + arrowHeight) // bottom, connecting to main box left edge
         ..close();
       canvas.drawPath(arrowPath, paint);
     }
