@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import 'package:vimbisopay_app/core/error/failures.dart';
 import 'package:vimbisopay_app/domain/entities/user.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
+import 'package:vimbisopay_app/core/services/dashboard_service.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
 import 'package:vimbisopay_app/core/utils/error_translator.dart';
 import 'package:vimbisopay_app/core/utils/phone_formatter.dart';
@@ -94,6 +95,7 @@ mixin AccountRepositoryAuthMixin on BaseAccountRepository {
                     'accountID': accountData['accountID'],
                     'accountName': accountData['accountName'],
                     'accountHandle': accountData['accountHandle'],
+                    'accountType': accountData['accountType'],
                     'defaultDenom': accountData['defaultDenom'],
                     'isOwnedAccount': accountData['isOwnedAccount'],
                     'balanceData': {
@@ -135,6 +137,10 @@ mixin AccountRepositoryAuthMixin on BaseAccountRepository {
         }
         
         final dashboardObj = dashboard.Dashboard.fromMap(dashboardMap);
+
+        // Update the centralized dashboard service with the latest data
+        DashboardService.instance.updateDashboard(dashboardObj);
+        Logger.data('[LOGIN] Dashboard updated in centralized service');
 
         // Extract version and authMethod from token
         final tokenInfo = extractTokenInfo(token);

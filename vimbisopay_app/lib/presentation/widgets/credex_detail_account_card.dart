@@ -113,7 +113,6 @@ class CredexDetailAccountCard extends StatelessWidget {
                         if (accountHandle != null) ...[
                           SizedBox(height: useExpandedSpacing ? 4.0 : 2.0),
                           Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.credit_card,
@@ -121,17 +120,19 @@ class CredexDetailAccountCard extends StatelessWidget {
                                 color: isSecured ? AppColors.secondary : AppColors.primary,
                               ),
                               const SizedBox(width: 2),
-                              Text(
-                                accountHandle!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w300, // Thin font
-                                  color: isSecured ? AppColors.secondary : AppColors.primary,
-                                  fontFamily: 'Roboto', // Narrow font family
+                              Expanded(
+                                child: Text(
+                                  accountHandle!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w300, // Thin font
+                                    color: isSecured ? AppColors.secondary : AppColors.primary,
+                                    fontFamily: 'Roboto', // Narrow font family
+                                  ),
+                                  maxLines: 2,
+                                  softWrap: true,
+                                  textAlign: TextAlign.center,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),

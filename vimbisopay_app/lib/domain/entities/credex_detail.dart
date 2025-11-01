@@ -204,9 +204,6 @@ class CredexDetail {
 
       // Note: Dashboard member data extraction removed - now using direct API fields from details
 
-      final issuerAccountID = details['issuerAccountID']?.toString();
-      final acceptorAccountID = details['acceptorAccountID']?.toString();
-
       // Store raw account names from API - UI will determine current user vs counterparty
       Logger.data(
           '[ACCOUNT_NAMES] Setting account names directly from API details');
@@ -216,7 +213,12 @@ class CredexDetail {
       final issuerData = details['issuer'] as Map<String, dynamic>?;
       final acceptorData = details['acceptor'] as Map<String, dynamic>?;
 
+      // Extract account IDs from nested issuer/acceptor objects
+      final issuerAccountID = issuerData?['accountID']?.toString();
+      final acceptorAccountID = acceptorData?['accountID']?.toString();
 
+      Logger.data('[ACCOUNT_IDS] issuerAccountID: $issuerAccountID');
+      Logger.data('[ACCOUNT_IDS] acceptorAccountID: $acceptorAccountID');
 
       // Store issuer and acceptor account info - UI will resolve current user positioning
       final issuerAccountName = issuerData != null ? issuerData['accountName'] as String? : null;
@@ -345,8 +347,8 @@ class CredexDetail {
         acceptorAccountName: acceptorAccountName,
         securerName: null, // Not provided in current API response
         denomination: details['denomination']?.toString() ?? '',
-        issuerAccountID: details['issuerAccountID']?.toString() ?? '',
-        acceptorAccountID: details['acceptorAccountID']?.toString() ?? '',
+        issuerAccountID: issuerAccountID,
+        acceptorAccountID: acceptorAccountID,
         initialAmount: parseAmount(details['initialAmount']?.toString()),
         outstandingAmount: parseAmount(status['outstandingAmount']?.toString()),
         redeemedAmount: parseAmount(status['redeemedAmount']?.toString()),
