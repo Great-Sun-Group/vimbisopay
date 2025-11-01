@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 class CredexDetailDimensions {
   // Base header dimensions - easy to understand/modify
   static const double titleHeight = 56.0;          // Standard AppBar height
-  static const double barGraphContentHeight = 93.0; // Content space for bar graph
+  static const double barGraphContentHeight = 0.0; // Minimal space for bar graph (shrunk down to almost none)
   static const double borderWidth = 1.0;           // Clear visual separator thickness
 
   // Computed header dimensions - automatically maintained

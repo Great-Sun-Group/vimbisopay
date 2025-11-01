@@ -91,12 +91,12 @@ class TransactionArrowDetailed extends StatelessWidget {
 /// Custom painter for drawing hollow arrows around amount elements
 class HollowArrowPainter extends CustomPainter {
   final bool
-      isNegative; // true for negative amounts (arrow from left, turns down)
+      pointsRight; // true = arrow points right, false = arrow points left
   final Color arrowColor;
   final double strokeWidth;
 
   HollowArrowPainter({
-    required this.isNegative,
+    required this.pointsRight,
     required this.arrowColor,
     this.strokeWidth = 2.0,
   });
@@ -112,7 +112,7 @@ class HollowArrowPainter extends CustomPainter {
 
     final path = Path();
 
-    if (isNegative) {
+    if (pointsRight) {
       // For negative amounts: arrow from left side, around number, turns downward
       final startX = 0.0;
       final startY = size.height * 0.5;
@@ -210,38 +210,59 @@ class HollowArrowPainter extends CustomPainter {
   }
 }
 
-/// Widget for displaying amount with L-shaped arrow
 class AmountWithArrow extends StatelessWidget {
   final String amount;
-  final bool isNegative;
+  final String? denomination;
   final Color amountColor;
   final Color arrowColor;
   final double amountFontSize;
   final double containerSize;
+  final bool
+      pointsRight; // true = arrow points right, false = arrow points left
+
+  // New independent layout and canvas parameters
+  final double? layoutWidth;
+  final double? layoutHeight;
+  final double? canvasWidth;
+  final double? canvasHeight;
 
   const AmountWithArrow({
     super.key,
     required this.amount,
-    required this.isNegative,
+    this.denomination,
     required this.amountColor,
     required this.arrowColor,
     this.amountFontSize = 24.0,
     this.containerSize = 80.0,
+    required this.pointsRight,
+    // New independent layout parameters
+    this.layoutWidth,
+    this.layoutHeight,
+    // New independent canvas parameters
+    this.canvasWidth,
+    this.canvasHeight,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Use new independent parameters if provided, otherwise fallback to containerSize
+    final effectiveLayoutWidth = layoutWidth ?? containerSize;
+    final effectiveLayoutHeight = layoutHeight ?? containerSize * 0.8;
+    final effectiveCanvasWidth = canvasWidth ?? containerSize * 0.9;
+    final effectiveCanvasHeight = canvasHeight ?? containerSize * 0.6;
+
     return SizedBox(
-      width: containerSize,
-      height: containerSize * 1.2, // More height for arrowhead
+      width: effectiveLayoutWidth,
+      height: effectiveLayoutHeight,
       child: CustomPaint(
-        size: Size(containerSize, containerSize * 1.2),
+        size: Size(effectiveCanvasWidth, effectiveCanvasHeight),
         painter: LShapedArrowPainter(
           amount: amount,
-          isNegative: isNegative,
+          denomination: denomination,
           amountColor: amountColor,
           arrowColor: arrowColor,
           amountFontSize: amountFontSize,
+          pointsRight: pointsRight,
         ),
       ),
     );
@@ -251,17 +272,19 @@ class AmountWithArrow extends StatelessWidget {
 /// Custom painter for L-shaped arrow with amount box
 class LShapedArrowPainter extends CustomPainter {
   final String amount;
-  final bool isNegative;
+  final String? denomination;
   final Color amountColor;
   final Color arrowColor;
   final double amountFontSize;
+  final bool pointsRight;
 
   LShapedArrowPainter({
     required this.amount,
-    required this.isNegative,
+    this.denomination,
     required this.amountColor,
     required this.arrowColor,
     required this.amountFontSize,
+    required this.pointsRight,
   });
 
   @override
@@ -276,75 +299,87 @@ class LShapedArrowPainter extends CustomPainter {
 
     // Calculate dimensions for stepped arrow design
     final fixedTransparentWidth = 10.0;
-    final mainBoxHeight = size.height * 0.25;
+    final mainBoxHeight = size.height * 0.85; // Taller for denomination
     final smallerBoxHeight = size.height * 0.1;
-    final arrowHeadSize = 22.0;
+    final arrowHeadSize = 35.0; // Larger arrow head
 
     // Variable width for colored portion (responsive)
     final coloredWidth = size.width - fixedTransparentWidth;
 
-    // Vertical positioning
-    final mainBoxY = (size.height - mainBoxHeight) / 2;
+    // Vertical positioning - more top/bottom space
+    final mainBoxY = size.height * 0; // More top margin
 
-    if (isNegative) {
-      // For negative amounts: stepped arrow pointing down
+    // Define variables that will be set based on direction
+    late final double horizontalOffset;
+    late final double mainBoxWidth;
 
-      // 1. Main horizontal box (contains amount) - shortened to fit just the text
-      final mainBoxWidth =
-          coloredWidth * 0.6; // Shorter than before, just enough for text
-      final mainBoxRect =
-          Rect.fromLTWH(0, mainBoxY, mainBoxWidth, mainBoxHeight);
+    if (pointsRight) {
+      // For negative amounts: arrow pointing RIGHT (issuer on left)
+
+      // Add horizontal offset to shift entire arrow right
+      horizontalOffset = coloredWidth * 0.0;
+
+      // 1. Main horizontal box (contains amount) - positioned on left
+      mainBoxWidth =
+          coloredWidth * 0.8; // Shorter than before, just enough for text
+      final mainBoxRect = Rect.fromLTWH(
+          horizontalOffset, mainBoxY, mainBoxWidth, mainBoxHeight);
       canvas.drawRect(mainBoxRect, paint);
 
-      // Draw transparent area on the remainder of the box width
-      final transparentRect1 = Rect.fromLTWH(
-          mainBoxWidth, mainBoxY, size.width - mainBoxWidth, mainBoxHeight);
+      // Draw transparent area on the left and right of the box
+      final transparentRect1 =
+          Rect.fromLTWH(0, mainBoxY, horizontalOffset, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
+      final transparentRect2 = Rect.fromLTWH(
+          horizontalOffset + mainBoxWidth,
+          mainBoxY,
+          size.width - (horizontalOffset + mainBoxWidth),
+          mainBoxHeight);
+      canvas.drawRect(transparentRect2, backgroundPaint);
 
-      // 2. Arrowhead pointing down (triangle) - positioned at bottom of main box, centered
-      final arrowTipX = coloredWidth * 0.75; // Shifted right from center
+      // 2. Arrowhead pointing right (triangle) - positioned on right side of main rectangle
+      final arrowTipX = horizontalOffset +
+          mainBoxWidth +
+          (arrowHeadSize * 0.6); // Tip right of box
       final arrowTipY =
-          mainBoxY + mainBoxHeight + (mainBoxHeight * 0.5); // Below main box
-      final arrowWidth = arrowHeadSize; // Keep same width
+          mainBoxY + mainBoxHeight / 2; // Center vertically on main box
+      final arrowHeight = arrowHeadSize; // Keep same size
       final arrowPath = Path()
-        ..moveTo(arrowTipX, arrowTipY) // tip
-        ..lineTo(arrowTipX - arrowWidth,
-            mainBoxY + mainBoxHeight) // left, connecting to main box
-        ..lineTo(arrowTipX + arrowWidth,
-            mainBoxY + mainBoxHeight) // right, connecting to main box
+        ..moveTo(arrowTipX, arrowTipY) // tip pointing right
+        ..lineTo(horizontalOffset + mainBoxWidth,
+            arrowTipY - arrowHeight) // top, connecting to box right edge
+        ..lineTo(horizontalOffset + mainBoxWidth,
+            arrowTipY + arrowHeight) // bottom, connecting to box right edge
         ..close();
       canvas.drawPath(arrowPath, paint);
     } else {
-      // For positive amounts: stepped arrow pointing up
-      
-      // Add horizontal offset to shift entire arrow right
-      final horizontalOffset = coloredWidth * 0.13;
+      // For positive amounts: arrow pointing LEFT (issuer on right)
 
-      // 1. Main horizontal box (contains amount) - shortened to fit just the text
-      final mainBoxWidth =
+      horizontalOffset = 0.0; // Not used for left arrow
+      mainBoxWidth =
           coloredWidth * 0.8; // Shorter than before, just enough for text
-      final mainBoxRect =
-          Rect.fromLTWH(horizontalOffset, mainBoxY, mainBoxWidth, mainBoxHeight);
+
+      // 1. Main horizontal box (contains amount) - positioned on right
+      final mainBoxRect = Rect.fromLTWH(
+          size.width - mainBoxWidth, mainBoxY, mainBoxWidth, mainBoxHeight);
       canvas.drawRect(mainBoxRect, paint);
 
-      // Draw transparent area on the remainder of the box width
-      final transparentRect1 = Rect.fromLTWH(
-          0, mainBoxY, horizontalOffset, mainBoxHeight);
+      // Draw transparent area on the left of the box
+      final transparentRect1 =
+          Rect.fromLTWH(0, mainBoxY, size.width - mainBoxWidth, mainBoxHeight);
       canvas.drawRect(transparentRect1, backgroundPaint);
-      final transparentRect2 = Rect.fromLTWH(
-          horizontalOffset + mainBoxWidth, mainBoxY, size.width - (horizontalOffset + mainBoxWidth), mainBoxHeight);
-      canvas.drawRect(transparentRect2, backgroundPaint);
 
-      // 3. Arrowhead pointing left (triangle) - positioned on left side of main rectangle
-      final arrowTipX = horizontalOffset - (arrowHeadSize * 0.6); // Tip left of box
+      // 2. Arrowhead pointing left (triangle) - positioned on left side of main rectangle
+      final arrowTipX =
+          size.width - mainBoxWidth - (arrowHeadSize * 0.6); // Tip left of box
       final arrowTipY =
           mainBoxY + mainBoxHeight / 2; // Center vertically on main box
       final arrowHeight = arrowHeadSize; // Keep same size
       final arrowPath = Path()
         ..moveTo(arrowTipX, arrowTipY) // tip pointing left
-        ..lineTo(horizontalOffset,
+        ..lineTo(size.width - mainBoxWidth,
             arrowTipY - arrowHeight) // top, connecting to box left edge
-        ..lineTo(horizontalOffset,
+        ..lineTo(size.width - mainBoxWidth,
             arrowTipY + arrowHeight) // bottom, connecting to box left edge
         ..close();
       canvas.drawPath(arrowPath, paint);
@@ -364,10 +399,41 @@ class LShapedArrowPainter extends CustomPainter {
     );
     textPainter.layout();
 
-    // Position text in the colored portion of the main box
+    // Position text in the colored portion of the main box (moved up)
     final textX = (coloredWidth - textPainter.width) / 2;
-    final textY = mainBoxY + (mainBoxHeight - textPainter.height) / 2;
+    final textY = mainBoxY + (mainBoxHeight - textPainter.height) / 3.5; // Moved up more
     textPainter.paint(canvas, Offset(textX, textY));
+
+    // Draw denomination text below amount within the colored box
+    if (denomination != null && denomination!.isNotEmpty) {
+      final denominationPainter = TextPainter(
+        text: TextSpan(
+          text: denomination,
+          style: TextStyle(
+            fontSize: amountFontSize * 0.6, // A little bigger than before
+            fontWeight: FontWeight.w500,
+            color: AppColors.white.withOpacity(0.8),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.right, // Right aligned
+      );
+      denominationPainter.layout();
+
+      // Calculate colored box bounds
+      final boxLeft =
+          pointsRight ? horizontalOffset : size.width - mainBoxWidth;
+      final boxRight =
+          pointsRight ? horizontalOffset + mainBoxWidth : size.width;
+
+      // Position denomination under the right side of the amount, right-aligned
+      final denominationX = textX +
+          textPainter.width -
+          denominationPainter.width; // Right edge of amount text
+      final denominationY =
+          textY + textPainter.height - 2; // Closer to amount
+      denominationPainter.paint(canvas, Offset(denominationX, denominationY));
+    }
   }
 
   void _drawArrowHead(

@@ -604,8 +604,8 @@ class MyApp extends StatelessWidget {
           // Credex detail screen route
           if (settings.name == '/credex-detail') {
             final args = settings.arguments as Map<String, dynamic>?;
-            if (args == null || 
-                !args.containsKey('credexID') || 
+            if (args == null ||
+                !args.containsKey('credexID') ||
                 !args.containsKey('accountRepository')) {
               Logger.error('Missing required arguments for credex-detail route');
               return MaterialPageRoute(
@@ -616,6 +616,7 @@ class MyApp extends StatelessWidget {
               builder: (context) => CredexDetailScreen(
                 credexId: args['credexID'] as String,
                 accountRepository: args['accountRepository'] as AccountRepository,
+                user: context.read<User?>(),
               ),
               settings: settings,
             );

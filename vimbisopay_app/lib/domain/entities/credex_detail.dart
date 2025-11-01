@@ -35,6 +35,10 @@ class CredexDetail {
   final String? currentUserAccountName;
   final String? counterpartyAccountHandle;
   final String? currentUserAccountHandle;
+  final String? issuerAccountHandle;
+  final String? acceptorAccountHandle;
+  final String? issuerAccountName;
+  final String? acceptorAccountName;
   final String? securerName;
   final String denomination;
   final String? issuerAccountID;
@@ -82,6 +86,10 @@ class CredexDetail {
     this.currentUserAccountName,
     this.counterpartyAccountHandle,
     this.currentUserAccountHandle,
+    this.issuerAccountHandle,
+    this.acceptorAccountHandle,
+    this.issuerAccountName,
+    this.acceptorAccountName,
     this.securerName,
     required this.denomination,
     this.issuerAccountID,
@@ -152,12 +160,13 @@ class CredexDetail {
   bool get isFinalized => isCancelled || isDeclined || isRedeemed;
 
   // Check if current user can perform actions
-  bool get canAccept => isPending && transactionType == 'OFFERS' && !debit;
-  bool get canDecline => isPending && transactionType == 'OFFERS' && !debit;
+  // Note: These methods assume the UI will determine direction based on user context
+  // For now, we use simplified logic that may need UI-level refinement
+  bool get canAccept => isPending && transactionType == 'OFFERS';
+  bool get canDecline => isPending && transactionType == 'OFFERS';
   bool get canCancel =>
       isPending &&
-      (transactionType == 'OFFERS' || transactionType == 'REQUESTS') &&
-      debit;
+      (transactionType == 'OFFERS' || transactionType == 'REQUESTS');
 
   factory CredexDetail.fromApiResponse(Map<String, dynamic> apiData) {
     try {
@@ -195,91 +204,132 @@ class CredexDetail {
 
       // Note: Dashboard member data extraction removed - now using direct API fields from details
 
-      final isDebit = details['amount']?.toString().startsWith('-') ?? false;
-
       final issuerAccountID = details['issuerAccountID']?.toString();
       final acceptorAccountID = details['acceptorAccountID']?.toString();
 
-      // Determine account names directly from API (no dashboard ownership logic needed)
-      Logger.data('[ACCOUNT_NAMES] Setting account names directly from API details');
+      // Store raw account names from API - UI will determine current user vs counterparty
+      Logger.data(
+          '[ACCOUNT_NAMES] Setting account names directly from API details');
       Logger.data('[ACCOUNT_NAMES] details keys: ${details.keys.toList()}');
-      Logger.data('[ACCOUNT_NAMES] issuerAccountName raw: ${details['issuerAccountName']}');
-      Logger.data('[ACCOUNT_NAMES] acceptorAccountName raw: ${details['acceptorAccountName']}');
 
-      // For now, keep it simple - assign issuer as current user position (this can be refined later)
-      final currentUserAccountName = details['issuerAccountName'] as String?;
-      final counterpartyAccountName = details['acceptorAccountName'] as String?;
-      final currentUserAccountHandle = details['issuerHandle'] as String?;
-      final counterpartyAccountHandle = details['acceptorHandle'] as String?;
+      // Parse nested issuer/acceptor objects from new API structure
+      final issuerData = details['issuer'] as Map<String, dynamic>?;
+      final acceptorData = details['acceptor'] as Map<String, dynamic>?;
 
-      Logger.data('[ACCOUNT_NAMES] currentUserAccountName: $currentUserAccountName');
-      Logger.data('[ACCOUNT_NAMES] counterpartyAccountName: $counterpartyAccountName');
+
+
+      // Store issuer and acceptor account info - UI will resolve current user positioning
+      final issuerAccountName = issuerData != null ? issuerData['accountName'] as String? : null;
+      final acceptorAccountName = acceptorData != null ? acceptorData['accountName'] as String? : null;
+      final issuerAccountHandleRaw = issuerData != null ? issuerData['accountHandle'] as String? : null;
+      final acceptorAccountHandleRaw = acceptorData != null ? acceptorData['accountHandle'] as String? : null;
+
+      // For backward compatibility, set defaults (will be overridden by UI logic)
+      final currentUserAccountName = issuerAccountName; // Temporary default
+      final counterpartyAccountName = acceptorAccountName; // Temporary default
+      final currentUserAccountHandle =
+          issuerAccountHandleRaw; // Temporary default
+      final counterpartyAccountHandle =
+          acceptorAccountHandleRaw; // Temporary default
+
+      // Debit will be determined by UI based on user context
+      final isDebit = false; // Temporary default - UI will set this properly
+
+      Logger.data(
+          '[ACCOUNT_NAMES] currentUserAccountName: $currentUserAccountName');
+      Logger.data(
+          '[ACCOUNT_NAMES] counterpartyAccountName: $counterpartyAccountName');
       Logger.data('Is Debit: $isDebit');
       Logger.data('Action details keys: ${details.keys.toList()}');
 
       Logger.data('[MEMBER_DATA] Direct parsing from action.details');
 
-      // Extract issuer member data directly from details
-      final issuerMemberId = details['issuerMemberID']?.toString();
-      final issuerFirstName = details['issuerFirstName']?.toString();
-      final issuerLastName = details['issuerLastName']?.toString();
-      final issuerHandle = details['issuerHandle']?.toString();
+      // Extract issuer member data from nested issuer object
+      final issuerMemberId = issuerData?['memberID']?.toString();
+      final issuerFirstName = issuerData?['firstName']?.toString();
+      final issuerLastName = issuerData?['lastName']?.toString();
+      final issuerHandle = issuerData?['handle']?.toString();
 
       // Parse issuer tier (object with low/high or direct value)
       int? issuerTier;
-      final issuerTierData = details['issuerTier'];
+      final issuerTierData = issuerData?['tier'];
       if (issuerTierData is Map<String, dynamic>) {
         issuerTier = issuerTierData['low'] as int?;
       } else {
         issuerTier = issuerTierData as int?;
       }
 
-      final issuerProfilePicture = details['issuerProfilePicture']?.toString();
+      final issuerProfilePicture = issuerData?['profilePicture']?.toString();
 
       // Parse issuer credit rating
       CreditRating? issuerCreditRating;
-      final issuerCreditRatingData = details['issuerCreditRating'] as Map<String, dynamic>?;
+      final issuerCreditRatingData =
+          issuerData?['creditRating'] as Map<String, dynamic>?;
       if (issuerCreditRatingData != null) {
         issuerCreditRating = CreditRating(
-          redeemedTotalUSD: (issuerCreditRatingData['redeemedTotal'] as num?)?.toDouble() ?? 0.0,
-          outstandingTotalUSD: (issuerCreditRatingData['outstandingTotal'] as num?)?.toDouble() ?? 0.0,
-          defaultedTotalUSD: (issuerCreditRatingData['defaultedTotal'] as num?)?.toDouble() ?? 0.0,
-          writtenOffTotalUSD: (issuerCreditRatingData['writtenOffTotal'] as num?)?.toDouble() ?? 0.0,
+          redeemedTotalUSD:
+              (issuerCreditRatingData['redeemedTotal'] as num?)?.toDouble() ??
+                  0.0,
+          outstandingTotalUSD:
+              (issuerCreditRatingData['outstandingTotal'] as num?)
+                      ?.toDouble() ??
+                  0.0,
+          defaultedTotalUSD:
+              (issuerCreditRatingData['defaultedTotal'] as num?)?.toDouble() ??
+                  0.0,
+          writtenOffTotalUSD:
+              (issuerCreditRatingData['writtenOffTotal'] as num?)?.toDouble() ??
+                  0.0,
         );
       }
 
-      // Extract acceptor member data directly from details
-      final acceptorMemberId = details['acceptorMemberID']?.toString();
-      final acceptorFirstName = details['acceptorFirstName']?.toString();
-      final acceptorLastName = details['acceptorLastName']?.toString();
-      final acceptorHandle = details['acceptorHandle']?.toString();
+      // Extract acceptor member data from nested acceptor object
+      final acceptorMemberId = acceptorData?['memberID']?.toString();
+      final acceptorFirstName = acceptorData?['firstName']?.toString();
+      final acceptorLastName = acceptorData?['lastName']?.toString();
+      final acceptorHandle = acceptorData?['handle']?.toString();
 
       // Parse acceptor tier (object with low/high or direct value)
       int? acceptorTier;
-      final acceptorTierData = details['acceptorTier'];
+      final acceptorTierData = acceptorData?['tier'];
       if (acceptorTierData is Map<String, dynamic>) {
         acceptorTier = acceptorTierData['low'] as int?;
       } else {
         acceptorTier = acceptorTierData as int?;
       }
 
-      final acceptorProfilePicture = details['acceptorProfilePicture']?.toString();
+      final acceptorProfilePicture = acceptorData?['profilePicture']?.toString();
 
       // Parse acceptor credit rating
       CreditRating? acceptorCreditRating;
-      final acceptorCreditRatingData = details['acceptorCreditRating'] as Map<String, dynamic>?;
+      final acceptorCreditRatingData =
+          acceptorData?['creditRating'] as Map<String, dynamic>?;
       if (acceptorCreditRatingData != null) {
         acceptorCreditRating = CreditRating(
-          redeemedTotalUSD: (acceptorCreditRatingData['redeemedTotal'] as num?)?.toDouble() ?? 0.0,
-          outstandingTotalUSD: (acceptorCreditRatingData['outstandingTotal'] as num?)?.toDouble() ?? 0.0,
-          defaultedTotalUSD: (acceptorCreditRatingData['defaultedTotal'] as num?)?.toDouble() ?? 0.0,
-          writtenOffTotalUSD: (acceptorCreditRatingData['writtenOffTotal'] as num?)?.toDouble() ?? 0.0,
+          redeemedTotalUSD:
+              (acceptorCreditRatingData['redeemedTotal'] as num?)?.toDouble() ??
+                  0.0,
+          outstandingTotalUSD:
+              (acceptorCreditRatingData['outstandingTotal'] as num?)
+                      ?.toDouble() ??
+                  0.0,
+          defaultedTotalUSD:
+              (acceptorCreditRatingData['defaultedTotal'] as num?)
+                      ?.toDouble() ??
+                  0.0,
+          writtenOffTotalUSD:
+              (acceptorCreditRatingData['writtenOffTotal'] as num?)?.
+                      toDouble() ??
+                  0.0,
         );
       }
 
-      Logger.data('[MEMBER_DATA] Parsed issuerFirstName: $issuerFirstName, acceptorFirstName: $acceptorFirstName');
-      Logger.data('[MEMBER_DATA] Parsed issuer credit rating: ${issuerCreditRating != null ? 'EXISTS' : 'NULL'}');
-      Logger.data('[MEMBER_DATA] Parsed acceptor credit rating: ${acceptorCreditRating != null ? 'EXISTS' : 'NULL'}');
+      Logger.data(
+          '[MEMBER_DATA] Parsed issuerFirstName: $issuerFirstName, acceptorFirstName: $acceptorFirstName');
+      Logger.data(
+          '[MEMBER_DATA] Parsed issuer credit rating: ${issuerCreditRating != null ? 'EXISTS' : 'NULL'}');
+      Logger.data(
+          '[MEMBER_DATA] Parsed acceptor credit rating: ${acceptorCreditRating != null ? 'EXISTS' : 'NULL'}');
 
       return CredexDetail(
         credexID: action['id']?.toString() ?? '',
@@ -289,16 +339,20 @@ class CredexDetail {
         currentUserAccountName: currentUserAccountName,
         counterpartyAccountHandle: counterpartyAccountHandle,
         currentUserAccountHandle: currentUserAccountHandle,
+        issuerAccountHandle: issuerAccountHandleRaw,
+        acceptorAccountHandle: acceptorAccountHandleRaw,
+        issuerAccountName: issuerAccountName,
+        acceptorAccountName: acceptorAccountName,
         securerName: null, // Not provided in current API response
         denomination: details['denomination']?.toString() ?? '',
         issuerAccountID: details['issuerAccountID']?.toString() ?? '',
         acceptorAccountID: details['acceptorAccountID']?.toString() ?? '',
-        initialAmount: parseAmount(details['amount']?.toString()),
+        initialAmount: parseAmount(details['initialAmount']?.toString()),
         outstandingAmount: parseAmount(status['outstandingAmount']?.toString()),
         redeemedAmount: parseAmount(status['redeemedAmount']?.toString()),
         defaultedAmount: parseAmount(status['defaultedAmount']?.toString()),
         writtenOffAmount: parseAmount(status['writtenOffAmount']?.toString()),
-        formattedInitialAmount: details['amount']?.toString() ?? '',
+        formattedInitialAmount: details['initialAmount']?.toString() ?? '',
         formattedOutstandingAmount:
             status['outstandingAmount']?.toString() ?? '',
         formattedRedeemedAmount: status['redeemedAmount']?.toString() ?? '',

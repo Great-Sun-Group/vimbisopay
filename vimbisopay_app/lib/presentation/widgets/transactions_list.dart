@@ -697,15 +697,18 @@ class _TransactionsListState extends State<TransactionsList> {
             width: 1.0,
           ),
         ),
-        child: const Center(
-          child: Text(
-            'Credit rating not yet established',
-            style: TextStyle(
-              color: AppColors.techAzure,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
+        child: const Padding(
+          padding: EdgeInsets.only(left: 8.0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Credibility',
+              style: TextStyle(
+                color: AppColors.techAzure,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
         ),
       );
@@ -764,7 +767,7 @@ class _TransactionsListState extends State<TransactionsList> {
         const Padding(
           padding: EdgeInsets.only(left: 8.0),
           child: Text(
-            'Credit rating',
+            'Credibility',
             style: TextStyle(
               color: Colors.black,
               fontSize: 11,

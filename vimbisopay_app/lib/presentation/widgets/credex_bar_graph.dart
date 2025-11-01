@@ -53,20 +53,6 @@ class _CredexBarGraphState extends State<CredexBarGraph> {
 
     return Column(
       children: [
-        // Header with SECURED/UNSECURED status
-        Center(
-          child: Text(
-            widget.credexDetail.securedCredex ? 'SECURED' : 'UNSECURED',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: widget.credexDetail.securedCredex
-                  ? AppColors.primary
-                  : AppColors.techAzure,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
 
         // Bar graph container
         Container(
