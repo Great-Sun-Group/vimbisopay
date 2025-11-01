@@ -401,7 +401,7 @@ class LShapedArrowPainter extends CustomPainter {
 
     // Position text in the colored portion of the main box (moved up)
     final textX = (coloredWidth - textPainter.width) / 2;
-    final textY = mainBoxY + (mainBoxHeight - textPainter.height) / 3.5; // Moved up more
+    final textY = mainBoxY + (mainBoxHeight - textPainter.height) / 11; // Moved up more
     textPainter.paint(canvas, Offset(textX, textY));
 
     // Draw denomination text below amount within the colored box

@@ -575,7 +575,7 @@ class CredexDetailView extends StatelessWidget {
                 pointsRight: !_determineCardPositioning(credex, currentUser).leftIsAcceptor, // Arrow always points towards acceptor
                 amountColor: AppColors.success, // Always positive/green
                 arrowColor: arrowColor,
-                amountFontSize: 20.0,
+                amountFontSize: 26.0,
                 containerSize:
                     CredexDetailDimensions.transactionArrowContainerSize,
                 layoutHeight: 48.0,
