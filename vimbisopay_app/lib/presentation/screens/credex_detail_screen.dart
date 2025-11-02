@@ -766,12 +766,12 @@ class _CredexDetailViewState extends State<CredexDetailView> {
       ),
       child: InkWell(
         onTap: () {
+          final accountRepository = context.read<CredexDetailBloc>().accountRepository;
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => CredexDetailScreen(
                 credexId: cleared.credexID,
-                accountRepository:
-                    context.read<CredexDetailBloc>().accountRepository,
+                accountRepository: accountRepository,
                 user: user,
               ),
             ),
