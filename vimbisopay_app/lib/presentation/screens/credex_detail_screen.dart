@@ -467,7 +467,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
                 children: [
                   _buildCredexTransactionContainer(
                       context, state.credexDetail!, state, currentUser),
-                  if (state.credexDetail!.clearedAgainst.isNotEmpty) ...[
+                  if (state.credexDetail!.clearedWith.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _buildClearedTransactionsSection(
                         context, state.credexDetail!, currentUser),
@@ -731,7 +731,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Cleared Against',
+            'Cleared With',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -740,14 +740,14 @@ class _CredexDetailViewState extends State<CredexDetailView> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'This Credex was cleared against the following transactions:',
+            'This Credex was cleared with the following transactions:',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
-          ...credex.clearedAgainst.map((cleared) =>
+          ...credex.clearedWith.map((cleared) =>
               _buildClearedTransactionTile(context, cleared, user)),
         ],
       ),

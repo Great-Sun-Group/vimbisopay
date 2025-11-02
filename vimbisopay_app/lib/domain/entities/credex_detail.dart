@@ -58,7 +58,7 @@ class CredexDetail {
   final DateTime? cancelledAt;
   final DateTime? dueDate;
   final bool securedCredex;
-  final List<ClearedTransaction> clearedAgainst;
+  final List<ClearedTransaction> clearedWith;
 
   // Member information for issuer
   final String? issuerMemberId;
@@ -109,7 +109,7 @@ class CredexDetail {
     this.cancelledAt,
     this.dueDate,
     required this.securedCredex,
-    required this.clearedAgainst,
+    required this.clearedWith,
     this.issuerMemberId,
     this.issuerFirstName,
     this.issuerLastName,
@@ -232,7 +232,7 @@ class CredexDetail {
       final action = apiData['action'] as Map<String, dynamic>? ?? {};
       final details = action['details'] as Map<String, dynamic>? ?? {};
       final status = details['status'] as Map<String, dynamic>? ?? {};
-      final clearedAgainst = details['clearedAgainst'] as List<dynamic>? ?? [];
+      final clearedWith = details['clearedWith'] as List<dynamic>? ?? [];
 
       // Parse dates
       DateTime? parseDate(String? dateStr) {
@@ -424,7 +424,7 @@ class CredexDetail {
         cancelledAt: parseDate(status['cancelledAt']?.toString()),
         dueDate: parseDate(status['dueDate']?.toString()),
         securedCredex: details['securedCredex'] == true,
-        clearedAgainst: clearedAgainst
+        clearedWith: clearedWith
             .map((item) =>
                 ClearedTransaction.fromJson(item as Map<String, dynamic>))
             .toList(),
