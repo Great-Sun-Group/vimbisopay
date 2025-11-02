@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/core/constants/url_constants.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 import 'package:vimbisopay_app/domain/entities/dashboard.dart' as dashboard;
@@ -12,6 +13,7 @@ import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_event.
 import 'package:vimbisopay_app/presentation/blocs/send_credex/send_credex_state.dart';
 import 'package:vimbisopay_app/presentation/screens/scan_qr_screen.dart';
 import 'package:vimbisopay_app/presentation/screens/marketplace/invoicing/buyer_invoice_detail_screen.dart';
+import 'package:vimbisopay_app/presentation/screens/credex_detail_screen.dart';
 import 'package:vimbisopay_app/presentation/widgets/send_credex/index.dart';
 import 'package:vimbisopay_app/presentation/widgets/tier_limit_dialog.dart';
 import 'package:vimbisopay_app/core/utils/logger.dart';
@@ -239,26 +241,12 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
             });
           }
           
-          // Show success dialog
+          // Handle success - show brief success animation then navigate to credex detail
           Logger.data('SendCredexScreen: Checking success condition - status=${state.status}, hasResponse=${state.credexResponse != null}');
           if (state.status == SendCredexStatus.success && state.credexResponse != null) {
-            Logger.data('SendCredexScreen: Success condition met, preparing to show dialog');
+            Logger.data('SendCredexScreen: Success condition met, showing success animation');
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              Logger.data('SendCredexScreen: Inside post frame callback, about to show dialog');
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) {
-                  Logger.data('SendCredexScreen: Building TransactionSuccessDialog');
-                  return TransactionSuccessDialog(
-                    response: state.credexResponse!,
-                    amount: state.amount,
-                    denomination: state.selectedDenomination.toString().split('.').last,
-                    homeBloc: widget.homeBloc,
-                  );
-                },
-              );
-              Logger.data('SendCredexScreen: Dialog show method called');
+              _showSuccessAnimationAndNavigate(context, state.credexResponse!.data.action.id);
             });
           }
         },
@@ -575,29 +563,31 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
                           builder: (context, snapshot) {
                             // Check if we need to disable the button due to daily limit
                             bool canSubmit = _canSubmitCredex(state);
-                            
+
                             // Additional check for daily limit for memberTier < 3
-                            if (canSubmit && 
-                                snapshot.hasData && 
-                                snapshot.data != null && 
-                                snapshot.data!.dashboard != null && 
+                            if (canSubmit &&
+                                snapshot.hasData &&
+                                snapshot.data != null &&
+                                snapshot.data!.dashboard != null &&
                                 snapshot.data!.dashboard!.member.memberTier < 3) {
-                              
+
                               final dailyLimit = snapshot.data!.dashboard!.member.remainingAvailableUSD;
                               final amount = double.tryParse(state.amount) ?? 0.0;
-                              
+
                               if (amount > dailyLimit) {
                                 canSubmit = false; // Amount exceeds daily limit
                               }
                             }
-                            
+
                             return ActionButton(
                               label: 'Sign Offer',
                               onPressed: canSubmit ? _handleSubmit : null,
                               isLoading: state.isLoading,
-                              backgroundColor: _shouldShowWarningColor(state) 
-                                  ? AppColors.darkRed 
-                                  : (state.credexType == CredexType.SECURED 
+                              loadingAnimationAsset: 'assets/animations/loading_anim.json',
+                              loadingAnimationSize: 32.0,
+                              backgroundColor: _shouldShowWarningColor(state)
+                                  ? AppColors.darkRed
+                                  : (state.credexType == CredexType.SECURED
                                       ? AppColors.primary // Gold for Secured
                                       : AppColors.techAzure), // Teal for Unsecured
                             );
@@ -737,9 +727,59 @@ class _SendCredexScreenState extends State<SendCredexScreen> {
     );
   }
 
+  void _showSuccessAnimationAndNavigate(BuildContext context, String credexId) async {
+    Logger.data('SendCredexScreen: Showing success animation overlay');
+
+    // Show success animation overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Center(
+            child: SizedBox(
+              width: 120,
+              height: 120,
+              child: Lottie.asset(
+                'assets/animations/success.json',
+                fit: BoxFit.contain,
+                repeat: false,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    // Wait for animation to complete (approximately 1.5 seconds based on typical success animations)
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Close the animation dialog
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+
+    // Navigate to CredexDetailScreen
+    Logger.data('SendCredexScreen: Navigating to CredexDetailScreen with credexId: $credexId');
+    if (mounted) {
+      final user = await _userFuture;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => CredexDetailScreen(
+            credexId: credexId,
+            accountRepository: widget.accountRepository,
+            user: user,
+          ),
+        ),
+      );
+    }
+  }
+
   void _handleSubmit() {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // Dispatch submit event
     _bloc.add(const SendCredexSubmitEvent());
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:vimbisopay_app/core/theme/app_colors.dart';
 
 /// A standardized action button widget
@@ -15,6 +16,8 @@ class ActionButton extends StatelessWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
   final Widget? icon;
+  final String? loadingAnimationAsset;
+  final double loadingAnimationSize;
   
   const ActionButton({
     super.key,
@@ -30,6 +33,8 @@ class ActionButton extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(4.0)),
     this.padding = const EdgeInsets.symmetric(vertical: 16.0),
     this.icon,
+    this.loadingAnimationAsset,
+    this.loadingAnimationSize = 24.0,
   });
   
   /// Factory constructor for a teal-styled button
@@ -93,14 +98,23 @@ class ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final buttonChild = isLoading
-        ? const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
-            ),
-          )
+        ? (loadingAnimationAsset != null
+            ? SizedBox(
+                height: loadingAnimationSize,
+                width: loadingAnimationSize,
+                child: Lottie.asset(
+                  loadingAnimationAsset!,
+                  fit: BoxFit.contain,
+                ),
+              )
+            : const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                ),
+              ))
         : Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
