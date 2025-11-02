@@ -52,13 +52,20 @@ enum CredexColorState {
   secured,       // Gold
 }
 
-class CredexDetailView extends StatelessWidget {
+class CredexDetailView extends StatefulWidget {
   final User? user;
 
   const CredexDetailView({
     super.key,
     required this.user,
   });
+
+  @override
+  State<CredexDetailView> createState() => _CredexDetailViewState();
+}
+
+class _CredexDetailViewState extends State<CredexDetailView> {
+  User? _resolvedUser;
 
   // Helper method to determine the color state based on credex data
   CredexColorState _getCredexColorState(CredexDetail credex) {
@@ -176,8 +183,10 @@ class CredexDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<User?>(
-      future: user != null ? Future.value(user) : DatabaseHelper().getUser(),
+      future: widget.user != null ? Future.value(widget.user) : DatabaseHelper().getUser(),
       builder: (context, snapshot) {
+        // Store the resolved user for use in button logic
+        _resolvedUser = snapshot.data;
         final currentUser = snapshot.data;
 
         return BlocConsumer<CredexDetailBloc, CredexDetailState>(
@@ -820,27 +829,17 @@ class CredexDetailView extends StatelessWidget {
 
   Widget _buildActionButtons(BuildContext context, CredexDetailState state) {
     final credex = state.credexDetail!;
-    final currentUser = user;
     if (credex.isFinalized) {
       return const SizedBox.shrink();
     }
 
-    // Determine user role for offers
-    final isCurrentUserIssuer = currentUser != null &&
-        currentUser.memberId == credex.issuerMemberId;
-    final isCurrentUserAcceptor = currentUser != null &&
-        currentUser.memberId == credex.acceptorMemberId;
+    // Get user's account handles for role-based button logic using resolved user
+    final userAccountHandles = _getUserAccountHandles(_resolvedUser);
 
-    // For offers: issuer can cancel, acceptor can accept/decline
-    // For requests: issuer can cancel (simplified logic)
-    final canShowAccept = credex.canAccept &&
-        credex.transactionType == 'OFFERS' &&
-        isCurrentUserAcceptor;
-    final canShowDecline = credex.canDecline &&
-        credex.transactionType == 'OFFERS' &&
-        isCurrentUserAcceptor;
-    final canShowCancel = credex.canCancel &&
-        (credex.transactionType == 'OFFERS' || credex.transactionType == 'REQUESTS');
+    // Use new role-based logic that considers multiple user accounts
+    final canShowAccept = credex.canAcceptWithUserAccounts(userAccountHandles);
+    final canShowDecline = credex.canDeclineWithUserAccounts(userAccountHandles);
+    final canShowCancel = credex.canCancelWithUserAccounts(userAccountHandles);
 
     return Column(
       children: [
@@ -950,6 +949,42 @@ class CredexDetailView extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  // Helper method to get user's account handles for role-based button logic
+  List<String> _getUserAccountHandles(User? currentUser) {
+    if (currentUser == null) {
+      Logger.data('[BUTTON_LOGIC] No current user');
+      return [];
+    }
+
+    final dashboard = DashboardService.instance.dashboard;
+    if (dashboard == null) {
+      Logger.data('[BUTTON_LOGIC] No dashboard available in DashboardService');
+      return [];
+    }
+
+    Logger.data('[BUTTON_LOGIC] Dashboard found with ${dashboard.accounts.length} accounts');
+
+    // Collect all account handles from user's accounts
+    final accountHandles = <String>[];
+
+    // Add handles from regular accounts
+    for (final account in dashboard.accounts) {
+      if (account.accountHandle.isNotEmpty) {
+        accountHandles.add(account.accountHandle);
+        Logger.data('[BUTTON_LOGIC] Found account handle: ${account.accountHandle}');
+      } else {
+        Logger.data('[BUTTON_LOGIC] Account ${account.accountName} has empty handle');
+      }
+    }
+
+    Logger.data('[BUTTON_LOGIC] Total user account handles found: ${accountHandles.length}');
+
+    // Note: Internal accounts don't have accountHandle property
+    // Only regular accounts are used for handle comparison
+
+    return accountHandles;
   }
 
   // Helper method to get user from dashboard service

@@ -350,25 +350,7 @@ class _TransactionsListState extends State<TransactionsList> {
                       ),
                     ],
                   ),
-                  // Add Decline button for incoming transactions
-                  if (isIncoming && !_selectionMode)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: GestureDetector(
-                        onTap: (state.status == HomeStatus.acceptingCredex ||
-                                isProcessing)
-                            ? null
-                            : () => _declineTransaction(context, offer.credexID),
-                        child: const Text(
-                          'Decline',
-                          style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
+
                 ],
               ),
               const SizedBox(width: 16),
@@ -420,69 +402,36 @@ class _TransactionsListState extends State<TransactionsList> {
                       fontSize: 18,
                     ),
                   ),
-                  if (!_selectionMode) ...[
+                  if (!_selectionMode && isIncoming) ...[
                     const SizedBox(height: 8),
-                    if (isIncoming)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isProcessing ? AppColors.green.withOpacity(0.6) : AppColors.green,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: GestureDetector(
-                          onTap: (state.status == HomeStatus.acceptingCredex ||
-                                  isProcessing)
-                              ? null
-                              : () => _acceptSingleTransaction(
-                                  context, offer.credexID),
-                          child: isProcessing
-                              ? const SizedBox(
-                                  height: 15,
-                                  width: 15,
-                                  child: InlineLoadingAnimation(size: 15),
-                                )
-                              : const Text(
-                                  'Accept',
-                                  style: TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isProcessing
-                              ? AppColors.error.withOpacity(0.6)
-                              : AppColors.error,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: GestureDetector(
-                          onTap: (isCancelling || isProcessing)
-                              ? null
-                              : () => _cancelTransaction(context, offer.credexID),
-                          child: isProcessing
-                              ? const Text(
-                                  'Processing...',
-                                  style: TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isProcessing ? AppColors.green.withOpacity(0.6) : AppColors.green,
+                        borderRadius: BorderRadius.circular(4),
                       ),
+                      child: GestureDetector(
+                        onTap: (state.status == HomeStatus.acceptingCredex ||
+                                isProcessing)
+                            ? null
+                            : () => _acceptSingleTransaction(
+                                context, offer.credexID),
+                        child: isProcessing
+                            ? const SizedBox(
+                                height: 15,
+                                width: 15,
+                                child: InlineLoadingAnimation(size: 15),
+                            )
+                            : const Text(
+                                'Accept',
+                                style: TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
                   ],
                 ],
               ),

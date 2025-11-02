@@ -160,8 +160,67 @@ class CredexDetail {
   bool get isFinalized => isCancelled || isDeclined || isRedeemed;
 
   // Check if current user can perform actions
-  // Note: These methods assume the UI will determine direction based on user context
-  // For now, we use simplified logic that may need UI-level refinement
+  // These methods now use role-based logic that considers multiple user accounts
+  bool _userOwnsIssuerAccount(List<String> userAccountHandles) =>
+      issuerAccountHandle != null && userAccountHandles.contains(issuerAccountHandle);
+
+  bool _userOwnsAcceptorAccount(List<String> userAccountHandles) =>
+      acceptorAccountHandle != null && userAccountHandles.contains(acceptorAccountHandle);
+
+  bool _userOwnsBothAccounts(List<String> userAccountHandles) =>
+      _userOwnsIssuerAccount(userAccountHandles) && _userOwnsAcceptorAccount(userAccountHandles);
+
+  // Role-based action permissions
+  bool canAcceptWithUserAccounts(List<String> userAccountHandles) {
+    if (!isPending) return false;
+
+    if (_userOwnsBothAccounts(userAccountHandles)) return true;
+
+    if (transactionType == 'OFFERS') {
+      // For offers, acceptor can accept
+      return _userOwnsAcceptorAccount(userAccountHandles);
+    } else if (transactionType == 'REQUESTS') {
+      // For requests, issuer can accept
+      return _userOwnsIssuerAccount(userAccountHandles);
+    }
+
+    return false;
+  }
+
+  bool canDeclineWithUserAccounts(List<String> userAccountHandles) {
+    if (!isPending) return false;
+
+    if (_userOwnsBothAccounts(userAccountHandles)) return true;
+
+    if (transactionType == 'OFFERS') {
+      // For offers, acceptor can decline
+      return _userOwnsAcceptorAccount(userAccountHandles);
+    } else if (transactionType == 'REQUESTS') {
+      // For requests, issuer can decline
+      return _userOwnsIssuerAccount(userAccountHandles);
+    }
+
+    return false;
+  }
+
+  bool canCancelWithUserAccounts(List<String> userAccountHandles) {
+    if (!isPending) return false;
+
+    if (_userOwnsBothAccounts(userAccountHandles)) return true;
+
+    if (transactionType == 'OFFERS') {
+      // For offers, issuer can cancel
+      return _userOwnsIssuerAccount(userAccountHandles);
+    } else if (transactionType == 'REQUESTS') {
+      // For requests, acceptor can cancel
+      return _userOwnsAcceptorAccount(userAccountHandles);
+    }
+
+    return false;
+  }
+
+  // Legacy getters for backward compatibility
+  // Note: These should be replaced with the new methods that take user account handles
   bool get canAccept => isPending && transactionType == 'OFFERS';
   bool get canDecline => isPending && transactionType == 'OFFERS';
   bool get canCancel =>
