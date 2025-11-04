@@ -85,39 +85,11 @@ class _CredexDetailViewState extends State<CredexDetailView> {
 
   // Helper method to get colors based on credex state
   ({Color appBarColor, Color iconColor}) _getHeaderColors(CredexDetail? credex) {
-    if (credex == null) {
-      // Default to secured colors if no data yet
-      return (
-        appBarColor: AppColors.primary,
-        iconColor: AppColors.primary,
-      );
-    }
-
-    final state = _getCredexColorState(credex);
-
-    switch (state) {
-      case CredexColorState.writtenOff:
-        return (
-          appBarColor: AppColors.error,    // Red
-          iconColor: AppColors.error,      // Red
-        );
-      case CredexColorState.defaulted:
-        return (
-          appBarColor: AppColors.warning,  // Orange
-          iconColor: AppColors.warning,    // Orange
-        );
-      case CredexColorState.redeemed:
-      case CredexColorState.secured:
-        return (
-          appBarColor: AppColors.primary,  // Gold
-          iconColor: AppColors.primary,    // Gold
-        );
-      case CredexColorState.unsecured:
-        return (
-          appBarColor: AppColors.secondary, // Teal
-          iconColor: AppColors.secondary,   // Teal
-        );
-    }
+    // Always use dark blue header like home screen
+    return (
+      appBarColor: AppColors.surface,  // Dark blue
+      iconColor: AppColors.surface,    // Dark blue
+    );
   }
 
   // Helper method to get amount arrow color based on credex state
@@ -247,7 +219,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
 
         if (state.isLoading && !state.hasData) {
           return Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: AppColors.black,
             appBar: AppBar(
               backgroundColor: headerStyle.appBarColor,
               foregroundColor: AppColors.white,
@@ -275,7 +247,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
 
         if (state.hasError && !state.hasData) {
           return Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: AppColors.black,
             appBar: AppBar(
               backgroundColor: headerStyle.appBarColor,
               foregroundColor: AppColors.white,
@@ -349,7 +321,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
 
         if (!state.hasData) {
           return Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: AppColors.black,
             appBar: AppBar(
               backgroundColor: headerStyle.appBarColor,
               foregroundColor: AppColors.white,
@@ -386,7 +358,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
 
         // Main content with data
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: AppColors.black,
           appBar: PreferredSize(
             preferredSize: Size.fromHeight(CredexDetailDimensions
                 .headerTotalHeight), // Exact fit: automatically calculated from base dimensions
@@ -725,7 +697,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,7 +707,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 8),
@@ -743,7 +715,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
             'This Credex was cleared with the following transactions:',
             style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 16),
@@ -762,7 +734,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: InkWell(
         onTap: () {
@@ -781,7 +753,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
           children: [
             const Icon(
               Icons.link,
-              color: AppColors.success,
+              color: AppColors.primary,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -802,7 +774,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
                     'Cleared: ${cleared.formattedClearedAmount}',
                     style: const TextStyle(
                       fontSize: 14,
-                      color: AppColors.success,
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -818,7 +790,7 @@ class _CredexDetailViewState extends State<CredexDetailView> {
             ),
             const Icon(
               Icons.arrow_forward_ios,
-              color: AppColors.textSecondary,
+              color: AppColors.primary,
               size: 16,
             ),
           ],
